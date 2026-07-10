@@ -1,0 +1,24 @@
+{
+  "name": "minhky-ev-inventory",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "next": "14.2.15",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "@supabase/supabase-js": "^2.45.0",
+    "@supabase/ssr": "^0.5.1",
+    "html5-qrcode": "^2.3.8",
+    "tesseract.js": "^5.1.1"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.10",
+    "postcss": "^8.4.41",
+    "autoprefixer": "^10.4.20"
+  }
+}
