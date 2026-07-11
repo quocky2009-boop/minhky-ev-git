@@ -149,3 +149,10 @@ export function FramePicker({ units, selected, onToggle, emptyText = "Kho này c
     </div>
   );
 }
+
+// ===== V3: Go tim Kho/Cua hang (thay dropdown) =====
+export function LocSearch({ locations, value, onChange, exclude, placeholder = "Gõ để tìm kho / cửa hàng…" }) {
+  const items = locations.filter((l) => l.code !== exclude && l.status === "Hoạt động");
+  return <SearchPicker items={items} value={value} onChange={onChange} placeholder={placeholder}
+    getKey={(l) => l.code} getLabel={(l) => `[${l.region}] ${l.name}`} />;
+}

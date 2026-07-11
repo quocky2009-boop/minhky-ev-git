@@ -63,7 +63,7 @@ export default function DieuChinh() {
           <div className="grid gap-x-4 md:grid-cols-2">
             <div>
               <Field label="Xe (gõ để tìm)" required><VehicleSearch vehicles={vehicles} value={f.vehicle_id} onChange={(v) => set("vehicle_id", v)} /></Field>
-              <Field label="Kho / cửa hàng" required><LocPicker locations={locations} value={f.loc} onChange={(v) => set("loc", v)} /></Field>
+              <Field label="Kho / cửa hàng" required><LocSearch locations={locations} value={f.loc} onChange={(v) => set("loc", v)} /></Field>
               <Field label="Lý do điều chỉnh" required><select className="inp" value={f.reason} onChange={(e) => set("reason", e.target.value)}>{ADJUST_REASONS.map((r) => <option key={r}>{r}</option>)}</select></Field>
               <Field label="Ghi chú / biên bản"><input className="inp" value={f.note} onChange={(e) => set("note", e.target.value)} /></Field>
             </div>

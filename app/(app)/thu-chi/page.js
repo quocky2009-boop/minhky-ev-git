@@ -12,6 +12,7 @@ export default function ThuChi() {
   const [accounts, setAccounts] = useState([]);
   const [txns, setTxns] = useState([]);
   const [closings, setClosings] = useState([]);
+  const [bal, setBal] = useState({});
   const [from, setFrom] = useState(today().slice(0, 8) + "01");
   const [to, setTo] = useState(today());
   const [fAcc, setFAcc] = useState("");
@@ -39,14 +40,12 @@ export default function ThuChi() {
     setAccounts(ac || []); setTxns(tx || []); setClosings(cl || []);
   };
   useEffect(() => { if (!loading) load(); }, [loading, from, to]);
+  useEffect(() => { if (!loading) loadBalances(); }, [loading]);
 
   if (loading || !profile) return <div className="card">Đang tải dữ liệu…</div>;
   if (!["CEO", "ADMIN", "MANAGER"].includes(profile.role)) return <div className="card">Phần Thu - Chi chỉ dành cho BGĐ / Admin / Quản lý.</div>;
   const canManageAcc = ["CEO", "ADMIN"].includes(profile.role);
 
-  // So du hien tai tung quy (tinh tu opening + toan bo txn da tai? -> can toan bo, query rieng)
-  const balances = {}; // se dung fn_so_du qua view don gian: tinh tu txns trong pham vi khong du -> goi rpc
-  // Don gian: tinh so du = opening + tong txn (moi thoi gian) -> can txns all; toi uu: fetch tong theo account
   const accName = (id) => accounts.find((x) => x.id === Number(id))?.name || id;
   const locName = (c) => locations.find((l) => l.code === c)?.name || "";
   const thuCats = (settings.thu_categories || "Bán xe\nThu khác").split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean);
@@ -78,8 +77,7 @@ export default function ThuChi() {
     notify("Đã gửi báo cáo quỹ vào Discord — kiểm tra channel.");
   };
 
-  // So du: goi rpc fn_so_du cho tung quy
-  const [bal, setBal] = useState({});
+  // So du hien tai tung quy (goi rpc fn_so_du)
   const loadBalances = async () => {
     const { data: ac } = await supabase.from("cash_accounts").select("id");
     const res = {};
@@ -89,7 +87,6 @@ export default function ThuChi() {
     }
     setBal(res);
   };
-  useEffect(() => { if (!loading) loadBalances(); }, [loading]);
   const totalBal = accounts.reduce((s, x) => s + (bal[x.id] || 0), 0);
 
   const exportCSV = () => {

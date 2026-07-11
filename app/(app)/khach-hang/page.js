@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Field, Badge, Toast, KPI } from "@/components/ui";
-import { fmtVND, fmtDate, errMsg } from "@/lib/format";
+import { fmtVND, fmtDate, fmtTime, errMsg } from "@/lib/format";
 import { CUSTOMER_TYPES, CUSTOMER_SOURCES } from "@/lib/const";
 
 const STATUSES = ["Lead mới", "Đang tư vấn", "Hẹn xem xe", "Đã mua", "Không mua", "Chăm sóc lại"];
@@ -200,14 +200,20 @@ export default function KhachHang() {
                       <div className="text-xs font-bold mb-2">Lịch sử chăm sóc ({logs.length})</div>
                       <div className="max-h-40 overflow-y-auto mb-2">
                         {logs.length === 0 && <span className="text-sm text-[#8A93A0]">Chưa có lần chăm sóc nào.</span>}
-                        {logs.map((l) => (
-                          <div key={l.id} className="py-1.5 border-t border-[#EEF1F4] text-[12.5px]">
-                            <div className="flex items-center gap-2"><b>{fmtDate(l.care_date)}</b><span className="text-[#8A93A0]">· {l.created_by_name}</span>
-                              <button className="ml-auto text-[#C6CDD6] hover:text-danger text-xs" onClick={() => removeCare(c.id, l.id)}>✕</button></div>
-                            <div>{l.content}</div>
-                            {l.result && <div className="text-[#5A6572]">Kết quả: {l.result}</div>}
-                          </div>
-                        ))}
+                        {logs.map((l) => {
+                          const backdated = new Date(l.created_at).toISOString().slice(0, 10) !== l.care_date;
+                          return (
+                            <div key={l.id} className="py-1.5 border-t border-[#EEF1F4] text-[12.5px]">
+                              <div className="flex items-center gap-2"><b>{fmtDate(l.care_date)}</b><span className="text-[#8A93A0]">· {l.created_by_name}</span>
+                                <button className="ml-auto text-[#C6CDD6] hover:text-danger text-xs" onClick={() => removeCare(c.id, l.id)}>✕</button></div>
+                              <div>{l.content}</div>
+                              {l.result && <div className="text-[#5A6572]">Kết quả: {l.result}</div>}
+                              <div className={`text-[10.5px] italic ${backdated ? "text-[#A25F00]" : "text-[#C6CDD6]"}`}>
+                                Nhập lúc {fmtTime(l.created_at)}{backdated ? " ⚠ khác ngày chăm sóc đã chọn" : ""}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                       <div className="bg-white border border-[#E6EAEF] rounded-lg p-2.5">
                         <div className="flex gap-1.5 mb-1.5">
