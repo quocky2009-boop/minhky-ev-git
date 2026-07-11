@@ -28,13 +28,37 @@ export default function Scanner({ onAdd, onClose }) {
     let mounted = true, inst = null;
     (async () => {
       try {
-        const { Html5Qrcode } = await import("html5-qrcode");
+        const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import("html5-qrcode");
         if (!mounted) return;
-        inst = new Html5Qrcode("mk-scan-region");
+        // Khai bao ro cac dinh dang: QR + ma vach 1D (Code128/39, EAN, UPC, ITF...)
+        inst = new Html5Qrcode("mk-scan-region", {
+          formatsToSupport: [
+            Html5QrcodeSupportedFormats.QR_CODE,
+            Html5QrcodeSupportedFormats.DATA_MATRIX,
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.CODE_39,
+            Html5QrcodeSupportedFormats.CODE_93,
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.EAN_8,
+            Html5QrcodeSupportedFormats.UPC_A,
+            Html5QrcodeSupportedFormats.UPC_E,
+            Html5QrcodeSupportedFormats.ITF,
+            Html5QrcodeSupportedFormats.CODABAR,
+          ],
+          verbose: false,
+        });
         scannerRef.current = inst;
         await inst.start(
           { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 260, height: 140 } },
+          {
+            fps: 15,
+            // Khung quet NGANG rong — ma vach 1D can chieu ngang lon
+            qrbox: (w, h) => ({ width: Math.min(Math.floor(w * 0.9), 420), height: 150 }),
+            // Uu tien bo giai ma goc cua trinh duyet (BarcodeDetector) — doc 1D tot hon han
+            experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+            // Xin do phan giai cao de net vach nho
+            videoConstraints: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } },
+          },
           (text) => {
             const v = String(text).trim().toUpperCase();
             if (!v) return;
@@ -101,7 +125,7 @@ export default function Scanner({ onAdd, onClose }) {
         {tab === "scan" && (
           <>
             <div id="mk-scan-region" className="rounded-xl overflow-hidden bg-black min-h-[240px]" />
-            <p className="text-[11px] text-[#5A6572] mt-2">Đưa mã vạch trên tem số khung / thùng xe vào khung. Quét trúng sẽ kêu "bíp" và tự thêm vào danh sách — quét liên tục nhiều xe không cần bấm gì.</p>
+            <p className="text-[11px] text-[#5A6572] mt-2">Đưa mã vào giữa khung, giữ máy cách tem 10–20cm cho nét. Mã vạch 1D: để mã nằm NGANG, chiếm gần hết chiều rộng khung. Quét trúng kêu "bíp" và tự thêm — quét liên tục nhiều xe không cần bấm gì. Trên điện thoại Android/Chrome tốc độ đọc mã vạch nhanh nhất.</p>
           </>
         )}
 
