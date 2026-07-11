@@ -18,6 +18,30 @@ export default function CaiDat() {
   const [newBrand, setNewBrand] = useState("");
   const [reg, setReg] = useState(null);
   const [hook, setHook] = useState(null);
+  const [hookTC, setHookTC] = useState(null);
+  const [cats, setCats] = useState(null); // {thu, chi}
+
+  const saveHookTC = async () => {
+    const v = hookTC.trim();
+    if (v && !v.startsWith("https://discord.com/api/webhooks/") && !v.startsWith("https://discordapp.com/api/webhooks/"))
+      return notify("URL không đúng dạng webhook Discord.", "err");
+    const { error } = await supabase.rpc("fn_set_setting", { p_key: "discord_webhook_thuchi", p_value: v });
+    if (error) return notify(errMsg(error), "err");
+    notify(v ? "Đã lưu webhook Thu-Chi. Báo cáo tự gửi 21h00 mỗi ngày." : "Đã tắt báo cáo Thu-Chi Discord.");
+    setHookTC(null); refresh();
+  };
+  const testHookTC = async () => {
+    const { error } = await supabase.rpc("fn_test_discord_thuchi");
+    if (error) return notify(errMsg(error), "err");
+    notify("Đã gửi báo cáo quỹ thử — kiểm tra channel Thu-Chi.");
+  };
+  const saveCats = async () => {
+    const cln = (x) => x.split(/[\n,;]+/).map((y) => y.trim()).filter(Boolean).join("\n");
+    let e1 = (await supabase.rpc("fn_set_setting", { p_key: "thu_categories", p_value: cln(cats.thu) })).error;
+    let e2 = (await supabase.rpc("fn_set_setting", { p_key: "chi_categories", p_value: cln(cats.chi) })).error;
+    if (e1 || e2) return notify(errMsg(e1 || e2), "err");
+    notify("Đã lưu danh mục hạng mục thu / chi."); setCats(null); refresh();
+  };
 
   const saveHook = async () => {
     const v = hook.trim();
@@ -152,6 +176,42 @@ export default function CaiDat() {
             </div>
           </div>
         )}
+      </div>
+
+      <div className="card">
+        <div className="font-extrabold mb-1">Thu - Chi: báo cáo Discord 21h00 {settings.discord_webhook_thuchi ? <Badge tone="green">Đang bật</Badge> : <Badge tone="gray">Chưa bật</Badge>}</div>
+        <p className="text-xs text-[#5A6572] mb-3">Tạo channel Discord riêng (VD #bao-cao-thu-chi) → lấy webhook như hướng dẫn ở mục trên → dán vào đây. Mỗi ngày 21h00 hệ thống tự gửi: thu/chi trong ngày, số dư từng quỹ, trạng thái chốt quỹ, cảnh báo quỹ chưa chốt.</p>
+        {hookTC === null ? (
+          <div className="flex gap-2 items-center flex-wrap mb-3">
+            <span className="text-sm font-mono text-[#5A6572]">{settings.discord_webhook_thuchi ? settings.discord_webhook_thuchi.slice(0, 45) + "…" : "Chưa cấu hình webhook Thu-Chi."}</span>
+            <button className="btn-ghost !py-1.5 !text-xs" onClick={() => setHookTC(settings.discord_webhook_thuchi || "")}>✎ {settings.discord_webhook_thuchi ? "Sửa" : "Thêm webhook"}</button>
+            {settings.discord_webhook_thuchi && <button className="btn-primary !py-1.5 !text-xs" onClick={testHookTC}>📨 Gửi báo cáo thử</button>}
+          </div>
+        ) : (
+          <div className="max-w-xl mb-3">
+            <input className="inp font-mono !text-xs" placeholder="https://discord.com/api/webhooks/…" value={hookTC} onChange={(e) => setHookTC(e.target.value)} />
+            <div className="flex gap-2 mt-2">
+              <button className="btn-ok !py-2 !text-xs" onClick={saveHookTC}>Lưu</button>
+              <button className="btn-ghost !py-2 !text-xs" onClick={() => setHookTC(null)}>Hủy</button>
+            </div>
+          </div>
+        )}
+        <div className="pt-3 border-t border-dashed border-[#E6EAEF]">
+          <div className="text-sm font-bold mb-1.5">Hạng mục thu / chi</div>
+          {cats === null ? (
+            <div className="flex gap-2 items-center flex-wrap">
+              <div className="text-xs"><b>Thu:</b> {(settings.thu_categories || "").split(/[\n,;]+/).filter(Boolean).join(", ")}</div>
+              <div className="text-xs"><b>Chi:</b> {(settings.chi_categories || "").split(/[\n,;]+/).filter(Boolean).join(", ")}</div>
+              <button className="btn-ghost !py-1.5 !text-xs" onClick={() => setCats({ thu: settings.thu_categories || "", chi: settings.chi_categories || "" })}>✎ Sửa</button>
+            </div>
+          ) : (
+            <div className="grid gap-3 md:grid-cols-2 max-w-xl">
+              <div><label className="lbl">Hạng mục THU (mỗi dòng 1)</label><textarea className="inp !h-28" value={cats.thu} onChange={(e) => setCats((p) => ({ ...p, thu: e.target.value }))} /></div>
+              <div><label className="lbl">Hạng mục CHI (mỗi dòng 1)</label><textarea className="inp !h-28" value={cats.chi} onChange={(e) => setCats((p) => ({ ...p, chi: e.target.value }))} /></div>
+              <div className="flex gap-2"><button className="btn-ok !py-2 !text-xs" onClick={saveCats}>Lưu</button><button className="btn-ghost !py-2 !text-xs" onClick={() => setCats(null)}>Hủy</button></div>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="card">
