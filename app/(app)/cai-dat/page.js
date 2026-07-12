@@ -20,6 +20,16 @@ export default function CaiDat() {
   const [hook, setHook] = useState(null);
   const [hookTC, setHookTC] = useState(null);
   const [cats, setCats] = useState(null); // {thu, chi}
+  const [bk, setBk] = useState(null); // {pk, bh, ftg, dk}
+
+  const saveBk = async () => {
+    const cln = (x) => x.split(/\n+/).map((y) => y.trim()).filter(Boolean).join("\n");
+    for (const [key, val] of [["phu_kien", cln(bk.pk)], ["bao_hiem", cln(bk.bh)], ["cong_ty_tra_gop", cln(bk.ftg)], ["gia_dang_ky", String(Number(bk.dk) || 350000)]]) {
+      const { error } = await supabase.rpc("fn_set_setting", { p_key: key, p_value: val });
+      if (error) return notify(errMsg(error), "err");
+    }
+    notify("Đã lưu danh mục bán kèm & trả góp."); setBk(null); refresh();
+  };
 
   const saveHookTC = async () => {
     const v = hookTC.trim();
@@ -212,6 +222,25 @@ export default function CaiDat() {
             </div>
           )}
         </div>
+      </div>
+
+      <div className="card">
+        <div className="font-extrabold mb-1">Bán kèm & Trả góp (dùng trong đơn bán)</div>
+        <p className="text-xs text-[#5A6572] mb-3">Danh mục phụ kiện và bảo hiểm theo định dạng mỗi dòng: <b>Tên|Giá</b> (VD: Mũ bảo hiểm|150000). Công ty trả góp mỗi dòng 1 tên.</p>
+        {bk === null ? (
+          <div className="flex gap-2 items-center flex-wrap">
+            <div className="text-xs"><b>Phụ kiện:</b> {(settings.phu_kien || "").split(/\n+/).filter(Boolean).length} mục · <b>Bảo hiểm:</b> {(settings.bao_hiem || "").split(/\n+/).filter(Boolean).length} mục · <b>Trả góp:</b> {(settings.cong_ty_tra_gop || "").split(/[\n,;]+/).filter(Boolean).join(", ")} · <b>Giá DV đăng ký:</b> {Number(settings.gia_dang_ky || 350000).toLocaleString("vi-VN")} đ</div>
+            <button className="btn-ghost !py-1.5 !text-xs" onClick={() => setBk({ pk: settings.phu_kien || "", bh: settings.bao_hiem || "", ftg: settings.cong_ty_tra_gop || "", dk: settings.gia_dang_ky || "350000" })}>✎ Sửa</button>
+          </div>
+        ) : (
+          <div className="grid gap-3 md:grid-cols-2 max-w-2xl">
+            <div><label className="lbl">Phụ kiện (Tên|Giá)</label><textarea className="inp !h-32 !text-xs font-mono" value={bk.pk} onChange={(e) => setBk((p) => ({ ...p, pk: e.target.value }))} /></div>
+            <div><label className="lbl">Bảo hiểm (Tên|Giá)</label><textarea className="inp !h-32 !text-xs font-mono" value={bk.bh} onChange={(e) => setBk((p) => ({ ...p, bh: e.target.value }))} /></div>
+            <div><label className="lbl">Công ty trả góp (mỗi dòng 1)</label><textarea className="inp !h-24 !text-xs" value={bk.ftg} onChange={(e) => setBk((p) => ({ ...p, ftg: e.target.value }))} /></div>
+            <div><label className="lbl">Giá DV đăng ký mặc định (đ)</label><input type="number" className="inp" value={bk.dk} onChange={(e) => setBk((p) => ({ ...p, dk: e.target.value }))} /></div>
+            <div className="flex gap-2"><button className="btn-ok !py-2 !text-xs" onClick={saveBk}>Lưu</button><button className="btn-ghost !py-2 !text-xs" onClick={() => setBk(null)}>Hủy</button></div>
+          </div>
+        )}
       </div>
 
       <div className="card">

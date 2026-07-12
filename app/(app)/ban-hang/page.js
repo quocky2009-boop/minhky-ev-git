@@ -31,6 +31,10 @@ function BanHangInner() {
   const [show, setShow] = useState(!!params.get("xe"));
   const [busy, setBusy] = useState(false);
   const [detail, setDetail] = useState(null);
+  const [funds, setFunds] = useState([]);
+  const [items, setItems] = useState([]);   // dong ban kem
+  const [pays, setPays] = useState([]);     // dong thanh toan
+  useEffect(() => { (async () => { const { data } = await supabase.rpc("fn_ds_quy"); setFunds(data || []); })(); }, []);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
@@ -64,13 +68,19 @@ function BanHangInner() {
     cfields.forEach((c) => {
       if (c.field_type === "formula") extra[c.field_key] = calcFormula(c.formula, f.sale_price || vehicle?.list_price, taxRate);
     });
+    if (pays.length === 0) { setBusy(false); return notify("Cần khai báo ít nhất 1 dòng thanh toán.", "err"); }
+    if (conLai !== 0) { setBusy(false); return notify(`Tổng thanh toán đang ${conLai > 0 ? "thiếu" : "thừa"} ${fmtVND(Math.abs(conLai))} so với tổng đơn — phải khớp 100%.`, "err"); }
     const { data, error } = await supabase.rpc("fn_ban_hang", {
-      p: { ...f, frames, extra, sale_price: f.sale_price ? Number(f.sale_price) : null },
+      p: { ...f, frames, extra, sale_price: f.sale_price ? Number(f.sale_price) : null,
+        items: items.map((it) => ({ ...it, qty: Number(it.qty) || 1, unit_price: Number(it.unit_price) || 0 })),
+        payments: pays.map((x) => ({ ...x, amount: Number(x.amount) || 0 })) },
     });
     setBusy(false);
     if (error) return notify(errMsg(error), "err");
-    notify(`Đã lưu đơn ${data} (${frames.length} xe). Tồn kho đã trừ tự động.`);
-    setF(empty); setFrames([]); setShow(false); refresh(); loadOrders();
+    const nPT = pays.filter((x) => x.method !== "Trả góp").length;
+    const nTG = pays.length - nPT;
+    notify(`Đã lưu đơn ${data} (${frames.length} xe)${nPT ? `, sinh ${nPT} phiếu thu vào quỹ` : ""}${nTG ? `, ${nTG} khoản chờ giải ngân` : ""}. Tồn kho đã trừ tự động.`);
+    setF(empty); setFrames([]); setItems([]); setPays([]); setShow(false); refresh(); loadOrders();
   };
 
   const updateOrder = async (id, field, value) => {
@@ -84,6 +94,34 @@ function BanHangInner() {
   if (loading || !profile) return <div className="card">Đang tải dữ liệu…</div>;
   const canEdit = ["CEO", "MANAGER", "ADMIN"].includes(profile.role);
   const cfieldsAll = customFields.filter((c) => c.entity === "sales_order");
+
+  // ===== Ban kem & thanh toan =====
+  const catalog = (key) => (settings[key] || "").split(/\n+/).map((l) => {
+    const [name, price] = l.split("|"); return name?.trim() ? { name: name.trim(), price: Number(price) || 0 } : null;
+  }).filter(Boolean);
+  const pkList = catalog("phu_kien"), bhList = catalog("bao_hiem");
+  const ftgList = (settings.cong_ty_tra_gop || "Home Credit\nShinhanbank\nHD Saison\nFE Credit").split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean);
+  const giaDangKy = Number(settings.gia_dang_ky) || 350000;
+
+  const tongXe = (Number(f.sale_price) || 0) * Math.max(frames.length, 1);
+  const tongKem = items.reduce((sm, it) => sm + (Number(it.qty) || 1) * (Number(it.unit_price) || 0), 0);
+  const tongDon = tongXe + tongKem;
+  const daKhai = pays.reduce((sm, x) => sm + (Number(x.amount) || 0), 0);
+  const conLai = tongDon - daKhai;
+
+  const addItem = (item_type, name, unit_price) => setItems((p) => [...p, { item_type, name, qty: 1, unit_price }]);
+  const setItem = (i, k, v) => setItems((p) => p.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
+  const addPay = (method) => setPays((p) => [...p, { method, account_id: "", finance_company: ftgList[0] || "", amount: conLai > 0 ? conLai : "", expected_date: "" }]);
+
+  const openDetail = async (o) => {
+    setDetail({ ...o, _items: null, _pays: null });
+    const [{ data: di }, { data: dp }] = await Promise.all([
+      supabase.from("sale_items").select("*").eq("sale_code", o.code),
+      supabase.from("sale_payments").select("*").eq("sale_code", o.code),
+    ]);
+    setDetail({ ...o, _items: di || [], _pays: dp || [] });
+  };
+  const setPay = (i, k, v) => setPays((p) => p.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
   const fieldValText = (c, val) => {
     if (val === undefined || val === null || val === "") return "—";
     if (c.field_type === "formula") return fmtVND(val);
@@ -115,7 +153,7 @@ function BanHangInner() {
             <Field label={`Giá bán thực tế / xe ${vehicle ? `(niêm yết ${fmtVND(vehicle.list_price)})` : ""}`}>
               <input type="number" className="inp" value={f.sale_price} onChange={(e) => set("sale_price", e.target.value)} placeholder={vehicle ? String(vehicle.list_price) : ""} />
             </Field>
-            <Field label="Thanh toán"><select className="inp" value={f.payment_method} onChange={(e) => set("payment_method", e.target.value)}>{PAYMENT_METHODS.map((c) => <option key={c}>{c}</option>)}</select></Field>
+
             <Field label="Trạng thái hồ sơ"><select className="inp" value={f.document_status} onChange={(e) => set("document_status", e.target.value)}>{DOC_STATUSES.map((c) => <option key={c}>{c}</option>)}</select></Field>
 
             {cfields.map((c) => {
@@ -141,9 +179,73 @@ function BanHangInner() {
 
             <Field label="Ghi chú"><input className="inp" value={f.note} onChange={(e) => set("note", e.target.value)} /></Field>
           </div>
+
+          {/* ===== BAN KEM ===== */}
+          <div className="bg-[#F8FAFC] rounded-xl p-3.5 mb-3">
+            <div className="flex items-center gap-2 flex-wrap mb-2">
+              <div className="font-extrabold text-[13.5px] mr-auto">Bán kèm (phụ kiện · đăng ký · bảo hiểm)</div>
+              <select className="inp !w-auto !py-1.5 !text-xs" value="" onChange={(e) => { const pk = pkList.find((x) => x.name === e.target.value); if (pk) addItem("PHU_KIEN", pk.name, pk.price); }}>
+                <option value="">+ Phụ kiện…</option>{pkList.map((x) => <option key={x.name} value={x.name}>{x.name} — {fmtVND(x.price)}</option>)}
+              </select>
+              <button className="btn-ghost !py-1.5 !text-xs" onClick={() => addItem("DANG_KY", "Dịch vụ đăng ký xe trọn gói", giaDangKy)}>+ DV đăng ký</button>
+              <select className="inp !w-auto !py-1.5 !text-xs" value="" onChange={(e) => { const bh = bhList.find((x) => x.name === e.target.value); if (bh) addItem("BAO_HIEM", bh.name, bh.price); }}>
+                <option value="">+ Bảo hiểm…</option>{bhList.map((x) => <option key={x.name} value={x.name}>{x.name} — {fmtVND(x.price)}</option>)}
+              </select>
+            </div>
+            {items.length === 0 && <div className="text-xs text-[#8A93A0]">Chưa có dòng bán kèm. Danh mục phụ kiện/bảo hiểm và giá mặc định chỉnh trong Cài đặt.</div>}
+            {items.map((it, i) => (
+              <div key={i} className="flex gap-1.5 items-center flex-wrap py-1 border-t border-[#EEF1F4]">
+                <Badge tone={it.item_type === "PHU_KIEN" ? "blue" : it.item_type === "DANG_KY" ? "purple" : "green"}>
+                  {it.item_type === "PHU_KIEN" ? "PK" : it.item_type === "DANG_KY" ? "ĐK" : "BH"}</Badge>
+                <input className="inp !py-1.5 !text-xs flex-1 min-w-[150px]" value={it.name} onChange={(e) => setItem(i, "name", e.target.value)} />
+                <input type="number" min="1" className="inp !py-1.5 !text-xs !w-16" title="Số lượng" value={it.qty} onChange={(e) => setItem(i, "qty", e.target.value)} />
+                <input type="number" className="inp !py-1.5 !text-xs !w-28" title="Đơn giá" value={it.unit_price} onChange={(e) => setItem(i, "unit_price", e.target.value)} />
+                <b className="text-[13px] tabular-nums w-24 text-right">{fmtVND((Number(it.qty) || 1) * (Number(it.unit_price) || 0))}</b>
+                <button className="text-[#C6CDD6] hover:text-danger" onClick={() => setItems((prev) => prev.filter((_, j) => j !== i))}>✕</button>
+              </div>
+            ))}
+          </div>
+
+          {/* ===== THANH TOAN ===== */}
+          <div className="bg-[#F8FAFC] rounded-xl p-3.5 mb-3">
+            <div className="flex items-center gap-2 flex-wrap mb-2">
+              <div className="font-extrabold text-[13.5px] mr-auto">Thanh toán — tổng đơn: <span className="text-brand">{fmtVND(tongDon)}</span>
+                <span className="text-[11px] font-normal text-[#8A93A0]"> (xe {fmtVND(tongXe)}{tongKem ? ` + bán kèm ${fmtVND(tongKem)}` : ""})</span></div>
+              <button className="btn-ghost !py-1.5 !text-xs" onClick={() => addPay("Tiền mặt")}>+ Tiền mặt</button>
+              <button className="btn-ghost !py-1.5 !text-xs" onClick={() => addPay("Chuyển khoản")}>+ Chuyển khoản</button>
+              <button className="btn-ghost !py-1.5 !text-xs" onClick={() => addPay("Trả góp")}>+ Trả góp</button>
+            </div>
+            {pays.length === 0 && <div className="text-xs text-[#A25F00] font-semibold">⚠ Bắt buộc khai báo thanh toán đủ 100% tổng đơn (tiền mặt / chuyển khoản thu ngay, trả góp chờ giải ngân).</div>}
+            {pays.map((x, i) => (
+              <div key={i} className="flex gap-1.5 items-center flex-wrap py-1 border-t border-[#EEF1F4]">
+                <Badge tone={x.method === "Tiền mặt" ? "green" : x.method === "Chuyển khoản" ? "blue" : "amber"}>{x.method}</Badge>
+                {x.method !== "Trả góp" ? (
+                  <select className="inp !py-1.5 !text-xs flex-1 min-w-[160px]" value={x.account_id} onChange={(e) => setPay(i, "account_id", e.target.value)}>
+                    <option value="">— Chọn quỹ nhận {x.method === "Tiền mặt" ? "tiền mặt" : "(TK ngân hàng)"} —</option>
+                    {funds.filter((q) => q.type === (x.method === "Tiền mặt" ? "Tiền mặt" : "Ngân hàng")).map((q) => <option key={q.id} value={q.id}>{q.name}</option>)}
+                  </select>
+                ) : (
+                  <>
+                    <select className="inp !py-1.5 !text-xs min-w-[130px]" value={x.finance_company} onChange={(e) => setPay(i, "finance_company", e.target.value)}>
+                      {ftgList.map((c) => <option key={c}>{c}</option>)}
+                    </select>
+                    <input type="date" className="inp !py-1.5 !text-xs !w-36" title="Ngày dự kiến giải ngân" value={x.expected_date} onChange={(e) => setPay(i, "expected_date", e.target.value)} />
+                  </>
+                )}
+                <input type="number" className="inp !py-1.5 !text-xs !w-32" placeholder="Số tiền" value={x.amount} onChange={(e) => setPay(i, "amount", e.target.value)} />
+                <button className="text-[#C6CDD6] hover:text-danger" onClick={() => setPays((prev) => prev.filter((_, j) => j !== i))}>✕</button>
+              </div>
+            ))}
+            {pays.length > 0 && (
+              <div className={`mt-2 text-[13px] font-bold ${conLai === 0 ? "text-[#0E7A4A]" : "text-danger"}`}>
+                Đã khai: {fmtVND(daKhai)} / {fmtVND(tongDon)} {conLai === 0 ? "✓ Khớp" : conLai > 0 ? `— còn thiếu ${fmtVND(conLai)}` : `— thừa ${fmtVND(-conLai)}`}
+              </div>
+            )}
+          </div>
+
           <div className="flex gap-2.5">
-            <button className="btn-ok" disabled={busy || frames.length === 0} onClick={submit}>{busy ? "Đang lưu…" : `Lưu đơn (${frames.length} xe) & trừ tồn`}</button>
-            <button className="btn-ghost" onClick={() => { setShow(false); setF(empty); setFrames([]); }}>Hủy</button>
+            <button className="btn-ok" disabled={busy || frames.length === 0 || pays.length === 0 || conLai !== 0} onClick={submit}>{busy ? "Đang lưu…" : `Lưu đơn (${frames.length} xe) & trừ tồn + thu tiền`}</button>
+            <button className="btn-ghost" onClick={() => { setShow(false); setF(empty); setFrames([]); setItems([]); setPays([]); }}>Hủy</button>
           </div>
         </div>
       )}
@@ -170,7 +272,7 @@ function BanHangInner() {
                 <td className="td">{canEdit ? (
                   <select className="inp !w-auto !py-1 !text-xs" value={s.warranty_status} onChange={(e) => updateOrder(s.id, "p_warranty", e.target.value)}><option>Chưa kích hoạt</option><option>Đã kích hoạt</option></select>
                 ) : (s.warranty_status === "Đã kích hoạt" ? <Badge tone="green">Đã kích hoạt</Badge> : <Badge tone="gray">Chưa kích hoạt</Badge>)}</td>
-                <td className="td"><button className="btn-ghost !px-2.5 !py-1 !text-xs" onClick={() => setDetail(s)}>Chi tiết</button></td>
+                <td className="td"><button className="btn-ghost !px-2.5 !py-1 !text-xs" onClick={() => openDetail(s)}>Chi tiết</button></td>
               </tr>
             );
           })}</tbody>
@@ -207,6 +309,28 @@ function BanHangInner() {
                 {cfieldsAll.map((c) => (
                   <div key={c.id}><span className="text-[#8A93A0]">{c.label}:</span> <b>{fieldValText(c, detail.extra?.[c.field_key])}</b></div>
                 ))}
+                {detail._items?.length > 0 && (
+                  <div className="col-span-2 pt-1 border-t border-dashed border-[#E6EAEF]">
+                    <div className="text-[#8A93A0] mb-1">Bán kèm:</div>
+                    {detail._items.map((it) => (
+                      <div key={it.id} className="flex justify-between"><span>{it.name} ×{it.qty}</span><b>{fmtVND(it.amount)}</b></div>
+                    ))}
+                    <div className="flex justify-between mt-1 pt-1 border-t border-[#EEF1F4]"><b>Tổng đơn (xe + bán kèm)</b>
+                      <b className="text-brand">{fmtVND(detail.sale_price * detail.quantity + detail._items.reduce((sm, x) => sm + x.amount, 0))}</b></div>
+                  </div>
+                )}
+                {detail._pays?.length > 0 && (
+                  <div className="col-span-2 pt-1 border-t border-dashed border-[#E6EAEF]">
+                    <div className="text-[#8A93A0] mb-1">Thanh toán:</div>
+                    {detail._pays.map((x) => (
+                      <div key={x.id} className="flex justify-between items-center gap-2">
+                        <span>{x.method}{x.finance_company ? ` · ${x.finance_company}` : ""}{x.cash_txn_code ? ` · ${x.cash_txn_code}` : ""}{x.expected_date ? ` · dự kiến ${fmtDate(x.expected_date)}` : ""}</span>
+                        <span className="flex items-center gap-1.5"><b>{fmtVND(x.amount)}</b>
+                          <Badge tone={x.status === "Đã thu" || x.status === "Đã giải ngân" ? "green" : "amber"}>{x.status}</Badge></span>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {detail.note && <div className="col-span-2"><span className="text-[#8A93A0]">Ghi chú:</span> {detail.note}</div>}
                 <div className="col-span-2 text-[11px] text-[#8A93A0] pt-1 border-t border-dashed border-[#E6EAEF] mt-1">Tạo lúc {fmtTime(detail.created_at)}</div>
               </div>

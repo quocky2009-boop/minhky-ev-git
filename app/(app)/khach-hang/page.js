@@ -19,7 +19,7 @@ export default function KhachHang() {
   const [fStatus, setFStatus] = useState("");
   const [fTemp, setFTemp] = useState("");
   const [show, setShow] = useState(false);
-  const empty = { id: "", name: "", phone: "", cccd: "", address: "", customer_type: "Khách lẻ", source: "Khách vãng lai", status: "Lead mới", temperature: "", note: "" };
+  const empty = { id: "", name: "", phone: "", cccd: "", address: "", customer_type: "Khách lẻ", source: "Khách vãng lai", status: "Lead mới", temperature: "", note: "", next_care_date: "", next_care_note: "" };
   const [f, setF] = useState(empty);
   const [origStatus, setOrigStatus] = useState(null); // trang thai truoc khi sua, de khoa "Da mua"
   const [dup, setDup] = useState(null);
@@ -56,7 +56,7 @@ export default function KhachHang() {
   };
 
   const startEdit = (c) => {
-    setF({ id: c.id, name: c.name, phone: c.phone, cccd: c.cccd, address: c.address, customer_type: c.customer_type, source: c.source, status: c.status, temperature: c.temperature || "", note: c.note });
+    setF({ id: c.id, name: c.name, phone: c.phone, cccd: c.cccd, address: c.address, customer_type: c.customer_type, source: c.source, status: c.status, temperature: c.temperature || "", note: c.note, next_care_date: c.next_care_date || "", next_care_note: c.next_care_note || "" });
     setOrigStatus(c.status); setShow(true); window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -77,10 +77,13 @@ export default function KhachHang() {
   const saveCare = async (cid) => {
     const cf = careForm[cid] || {};
     if (!cf.content?.trim()) return notify("Nhập nội dung chăm sóc.", "err");
-    const { error } = await supabase.rpc("fn_luu_cham_soc", { p: { customer_id: cid, care_date: cf.care_date || "", content: cf.content, result: cf.result || "" } });
+    const payload = { customer_id: cid, care_date: cf.care_date || "", content: cf.content, result: cf.result || "" };
+    if (cf.next) { payload.next_care_date = cf.next; payload.next_care_note = cf.content; }
+    const { error } = await supabase.rpc("fn_luu_cham_soc", { p: payload });
     if (error) return notify(errMsg(error), "err");
     notify("Đã lưu lịch sử chăm sóc.");
-    setCareForm((p) => ({ ...p, [cid]: { content: "", result: "", care_date: "" } }));
+    setCareForm((p) => ({ ...p, [cid]: { content: "", result: "", care_date: "", next: "" } }));
+    load();
     const { data } = await supabase.from("customer_care_logs").select("*").eq("customer_id", cid).order("care_date", { ascending: false });
     setCareLogs((p) => ({ ...p, [cid]: data || [] }));
   };
@@ -140,6 +143,8 @@ export default function KhachHang() {
             <Field label="Tình trạng lead"><select className="inp" value={f.temperature} onChange={(e) => set("temperature", e.target.value)}>
               <option value="">— Chưa đánh giá —</option>{TEMPS.map((t) => <option key={t}>{t}</option>)}
             </select></Field>
+            <Field label="Hẹn chăm sóc tiếp (ngày)"><input type="date" className="inp" value={f.next_care_date} onChange={(e) => set("next_care_date", e.target.value)} /></Field>
+            <Field label="Việc cần làm khi đến hẹn"><input className="inp" value={f.next_care_note} onChange={(e) => set("next_care_note", e.target.value)} placeholder="VD: Gọi mời xem VF6, báo giá lăn bánh…" /></Field>
             <Field label="Ghi chú (nhu cầu, xe quan tâm…)"><input className="inp" value={f.note} onChange={(e) => set("note", e.target.value)} /></Field>
           </div>
           <div className="flex gap-2.5">
@@ -161,7 +166,7 @@ export default function KhachHang() {
           </select>
         </div>
         <div className="overflow-x-auto"><table className="w-full border-collapse">
-          <thead><tr><th className="th">Mã KH</th><th className="th">Khách hàng</th><th className="th">Ngày tạo</th><th className="th">Loại · Nguồn</th><th className="th">Trạng thái</th><th className="th">Lead</th><th className="th">Phụ trách</th><th className="th"></th></tr></thead>
+          <thead><tr><th className="th">Mã KH</th><th className="th">Khách hàng</th><th className="th">Ngày tạo</th><th className="th">Loại · Nguồn</th><th className="th">Trạng thái</th><th className="th">Lead</th><th className="th">Hẹn CS</th><th className="th">Phụ trách</th><th className="th"></th></tr></thead>
           <tbody>{pageSlice(filtered, page, pageSize).map((c) => {
             const hist = history[c.id] || [];
             const logs = careLogs[c.id] || [];
@@ -175,6 +180,9 @@ export default function KhachHang() {
                 <td className="td text-xs">{c.customer_type}<div className="text-[#8A93A0]">{c.source}</div></td>
                 <td className="td"><Badge tone={stTone(c.status)}>{c.status}</Badge></td>
                 <td className="td">{c.temperature ? <Badge tone={tempTone(c.temperature)}>{c.temperature}</Badge> : <span className="text-[#C6CDD6]">—</span>}</td>
+                <td className="td text-xs whitespace-nowrap">{c.next_care_date
+                  ? <b className={c.next_care_date <= new Date().toLocaleDateString("sv-SE") ? "text-danger" : ""}>{fmtDate(c.next_care_date)}</b>
+                  : <span className="text-[#C6CDD6]">—</span>}</td>
                 <td className="td text-xs">{c.assigned_name || c.created_by_name}</td>
                 <td className="td"><div className="flex gap-1.5">
                   <button className="btn-ghost !px-2.5 !py-1 !text-xs" onClick={() => toggleHistory(c)}>{openId === c.id ? "Thu gọn" : "Chi tiết"}</button>
@@ -182,7 +190,7 @@ export default function KhachHang() {
                 </div></td>
               </tr>,
               openId === c.id && (
-                <tr key={c.id + "h"}><td colSpan={8} className="td bg-[#F8FAFC]">
+                <tr key={c.id + "h"}><td colSpan={9} className="td bg-[#F8FAFC]">
                   <div className="grid gap-4 md:grid-cols-2">
                     <div>
                       <div className="text-xs font-bold mb-2">Lịch sử mua {hist.length > 0 && <>· {hist.reduce((s, o) => s + o.quantity, 0)} xe · <span className="text-brand">{fmtVND(total)}</span></>}</div>
@@ -224,8 +232,10 @@ export default function KhachHang() {
                         </div>
                         <div className="flex gap-1.5">
                           <input className="inp !py-1.5 !text-xs flex-1" placeholder="Kết quả (tùy chọn)…" value={cf.result} onChange={(e) => setCareForm((p) => ({ ...p, [c.id]: { ...cf, result: e.target.value } }))} />
+                          <input type="date" title="Hẹn chăm sóc lần sau" className="inp !py-1.5 !text-xs !w-36" value={cf.next || ""} onChange={(e) => setCareForm((p) => ({ ...p, [c.id]: { ...cf, next: e.target.value } }))} />
                           <button className="btn-primary !py-1.5 !text-xs" onClick={() => saveCare(c.id)}>Lưu</button>
                         </div>
+                        <div className="text-[10.5px] text-[#8A93A0] mt-1">Ô ngày bên phải = hẹn chăm sóc lần sau (hiện ở "Việc cần chăm sóc").</div>
                       </div>
                     </div>
                   </div>

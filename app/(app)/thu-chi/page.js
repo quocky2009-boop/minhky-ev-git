@@ -1,12 +1,15 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Field, Badge, Toast, KPI, Pager, pageSlice } from "@/components/ui";
 import { fmtVND, fmtDate, errMsg, downloadCSV } from "@/lib/format";
 
 const today = () => new Date().toLocaleDateString("sv-SE"); // yyyy-mm-dd theo gio may
 
-export default function ThuChi() {
+function ThuChiInner() {
+  const params = useSearchParams();
+  const urlTab = params.get("tab");
   const { supabase, locations, profile, loading, settings } = useCatalog();
   const { toast, notify } = useToast();
   const [accounts, setAccounts] = useState([]);
@@ -30,8 +33,9 @@ export default function ThuChi() {
   const [closeAcc, setCloseAcc] = useState("");
   const [closeActual, setCloseActual] = useState("");
   const [closeNote, setCloseNote] = useState("");
-  const [tab, setTab] = useState("quy");
+  const [tab, setTab] = useState(urlTab || "quy");
   const [bcGroup, setBcGroup] = useState("quy");
+  useEffect(() => { if (urlTab) setTab(urlTab); }, [urlTab]);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
 
@@ -309,4 +313,8 @@ export default function ThuChi() {
       })()}
     </div>
   );
+}
+
+export default function ThuChi() {
+  return <Suspense fallback={<div className="card">Đang tải…</div>}><ThuChiInner /></Suspense>;
 }
