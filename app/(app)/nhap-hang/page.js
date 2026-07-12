@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Field, Toast, Badge, VehicleSearch, LocPicker } from "@/components/ui";
+import { Field, Toast, Badge, VehicleSearch, LocSearch, Pager, pageSlice } from "@/components/ui";
 import { fmtTime, fmtDate, errMsg, parseCSV, downloadCSV } from "@/lib/format";
 import Scanner from "@/components/Scanner";
 
@@ -15,6 +15,8 @@ export default function NhapHang() {
   const [showScanner, setShowScanner] = useState(false);
   const [detail, setDetail] = useState(null);       // {doc, txn, units}
   const [importLoc, setImportLoc] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const fileRef = useRef(null);
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
 
@@ -68,7 +70,7 @@ export default function NhapHang() {
   };
 
   const load = async () => {
-    const { data } = await supabase.from("inventory_txns").select("*").eq("txn_type", "Nhập hàng").order("created_at", { ascending: false }).limit(50);
+    const { data } = await supabase.from("inventory_txns").select("*").eq("txn_type", "Nhập hàng").order("created_at", { ascending: false }).limit(1000);
     setTxns(data || []);
   };
   useEffect(() => { load(); }, []);
@@ -99,7 +101,7 @@ export default function NhapHang() {
         <div className="grid gap-x-4 md:grid-cols-2">
           <div>
             <Field label="Xe (gõ để tìm trong danh mục)" required><VehicleSearch vehicles={vehicles} value={f.vehicle_id} onChange={(v) => set("vehicle_id", v)} /></Field>
-            <Field label="Kho / cửa hàng nhập" required><LocPicker locations={locations} value={f.loc} onChange={(v) => set("loc", v)} /></Field>
+            <Field label="Kho / cửa hàng nhập" required><LocSearch locations={locations} value={f.loc} onChange={(v) => set("loc", v)} /></Field>
             <Field label="Nhà cung cấp" hint='Thêm/bớt nhà cung cấp trong menu Cài đặt.'>
               <select className="inp" value={f.supplier} onChange={(e) => set("supplier", e.target.value)}>
                 <option value="">— Chọn nhà cung cấp —</option>
@@ -123,10 +125,7 @@ export default function NhapHang() {
         </button>
         <div className="mt-4 pt-3 border-t border-dashed border-[#E6EAEF] flex gap-2 items-center flex-wrap">
           <span className="text-xs font-bold">Nhập hàng loạt từ file:</span>
-          <select className="inp !w-auto !py-1.5 !text-xs" value={importLoc} onChange={(e) => setImportLoc(e.target.value)}>
-            <option value="">— Kho nhập —</option>
-            {locations.filter((l) => l.status === "Hoạt động").map((l) => <option key={l.code} value={l.code}>{l.name}</option>)}
-          </select>
+          <div className="!w-56"><LocSearch locations={locations} value={importLoc} onChange={setImportLoc} placeholder="Gõ để tìm kho nhập…" /></div>
           <button className="btn-ghost !py-1.5 !text-xs" onClick={() => fileRef.current?.click()}>⬆ Import CSV</button>
           <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={(e) => { if (e.target.files[0]) importCSV(e.target.files[0]); e.target.value = ""; }} />
           <span className="text-[11px] text-[#8A93A0]">Cột bắt buộc: vehicle_id (mã nội bộ), frame_number. Thêm được: engine_number, note. Excel: Save As → CSV UTF-8.</span>
@@ -170,7 +169,7 @@ export default function NhapHang() {
         <div className="font-extrabold mb-2.5">Lịch sử nhập gần đây</div>
         <div className="overflow-x-auto"><table className="w-full border-collapse">
           <thead><tr><th className="th">Thời gian</th><th className="th">Phiếu</th><th className="th">Xe</th><th className="th">Kho nhập</th><th className="th">SL</th><th className="th">Tồn sau</th><th className="th">Người nhập</th><th className="th"></th></tr></thead>
-          <tbody>{txns.map((t) => {
+          <tbody>{pageSlice(txns, page, pageSize).map((t) => {
             const v = vehicles.find((x) => x.id === t.vehicle_id);
             return <tr key={t.id}>
               <td className="td">{fmtTime(t.created_at)}</td><td className="td font-bold">{t.doc_code}</td>
@@ -182,6 +181,7 @@ export default function NhapHang() {
             </tr>;
           })}</tbody>
         </table></div>
+        <Pager total={txns.length} page={page} setPage={setPage} pageSize={pageSize} setPageSize={setPageSize} />
       </div>
     </div>
   );

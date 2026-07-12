@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Field, Badge, Toast, KPI } from "@/components/ui";
+import { Field, Badge, Toast, KPI, Pager, pageSlice } from "@/components/ui";
 import { fmtVND, fmtNum, fmtTime, fmtDate, downloadCSV } from "@/lib/format";
 
 const iso = (d) => d.toISOString().slice(0, 10);
@@ -42,6 +42,8 @@ export default function BaoCao() {
   const [fBrand, setFBrand] = useState("");
   const [rows, setRows] = useState([]);
   const [busy, setBusy] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
 
   const pickPreset = (k) => {
     setPreset(k);
@@ -113,7 +115,7 @@ export default function BaoCao() {
     notify("Đã xuất file CSV (mở được bằng Excel).");
   };
 
-  const preview = rows.slice(0, 50);
+  const preview = pageSlice(rows, page, pageSize);
 
   return (
     <div className="flex flex-col gap-4">
@@ -152,7 +154,7 @@ export default function BaoCao() {
       </div>
 
       <div className="card">
-        <div className="font-extrabold mb-2.5">Xem trước {busy ? "· đang tải…" : `· hiển thị ${preview.length}/${fmtNum(rows.length)} dòng`}{rows.length > 50 && <span className="text-xs font-normal text-[#8A93A0]"> (file xuất sẽ có đủ toàn bộ)</span>}</div>
+        <div className="font-extrabold mb-2.5">Xem trước {busy ? "· đang tải…" : `· ${fmtNum(rows.length)} dòng`}<span className="text-xs font-normal text-[#8A93A0]"> (file CSV xuất luôn có đủ toàn bộ)</span></div>
         <div className="overflow-x-auto">
           {type === "ban" && (
             <table className="w-full border-collapse">
@@ -188,6 +190,7 @@ export default function BaoCao() {
           )}
           {rows.length === 0 && !busy && <div className="text-sm text-[#8A93A0] py-4">Không có dữ liệu trong phạm vi đã chọn — thử nới khung ngày hoặc bỏ bớt bộ lọc.</div>}
         </div>
+        <Pager total={rows.length} page={page} setPage={setPage} pageSize={pageSize} setPageSize={setPageSize} />
       </div>
     </div>
   );

@@ -2,7 +2,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Badge, Field, Toast } from "@/components/ui";
+import { Badge, Field, Toast, Pager, pageSlice } from "@/components/ui";
 import { errMsg } from "@/lib/format";
 
 export default function Kho() {
@@ -10,6 +10,8 @@ export default function Kho() {
   const { toast, notify } = useToast();
   const [edit, setEdit] = useState(null); // location dang sua; "NEW" = them moi
   const [f, setF] = useState({});
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
   const startNew = () => { setEdit("NEW"); setF({ name: "", region: regions[0] || "Thành phố", type: "Cửa hàng", address: "", status: "Hoạt động" }); };
 
@@ -79,7 +81,7 @@ export default function Kho() {
         <p className="text-xs text-[#5A6572] mb-2.5">Bấm tên kho để xem chi tiết từng chiếc xe (số khung, ngày nhập, số ngày tồn), import/export danh sách xe.</p>
         <div className="overflow-x-auto"><table className="w-full border-collapse">
           <thead><tr><th className="th">Tên</th><th className="th">Khu vực</th><th className="th">Loại điểm</th><th className="th">Địa chỉ</th><th className="th">Tổng tồn</th><th className="th">Trạng thái</th><th className="th"></th></tr></thead>
-          <tbody>{locations.map((l) => {
+          <tbody>{pageSlice(locations, page, pageSize).map((l) => {
             const q = vehicles.reduce((s, v) => s + getQty(v.id, l.code), 0);
             return (
               <tr key={l.code} className="hover:bg-[#F8FAFC]">
@@ -96,6 +98,7 @@ export default function Kho() {
             );
           })}</tbody>
         </table></div>
+        <Pager total={locations.length} page={page} setPage={setPage} pageSize={pageSize} setPageSize={setPageSize} />
       </div>
     </div>
   );

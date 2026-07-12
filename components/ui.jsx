@@ -149,3 +149,41 @@ export function FramePicker({ units, selected, onToggle, emptyText = "Kho này c
     </div>
   );
 }
+
+// ===== V3: Go tim Kho/Cua hang (thay dropdown) =====
+export function LocSearch({ locations, value, onChange, exclude, placeholder = "Gõ để tìm kho / cửa hàng…" }) {
+  const items = locations.filter((l) => l.code !== exclude && l.status === "Hoạt động");
+  return <SearchPicker items={items} value={value} onChange={onChange} placeholder={placeholder}
+    getKey={(l) => l.code} getLabel={(l) => `[${l.region}] ${l.name}`} />;
+}
+
+// ===== V3: Phan trang dung chung =====
+export function pageClamp(page, total, ps) {
+  return Math.min(Math.max(1, page), Math.max(1, Math.ceil(total / ps)));
+}
+export function pageSlice(arr, page, ps) {
+  const cur = pageClamp(page, arr.length, ps);
+  return arr.slice((cur - 1) * ps, cur * ps);
+}
+export function Pager({ total, page, setPage, pageSize, setPageSize }) {
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+  const cur = pageClamp(page, total, pageSize);
+  if (total === 0) return null;
+  return (
+    <div className="flex items-center gap-2 flex-wrap mt-3 text-[13px]">
+      <span className="text-[#5A6572]">Hiển thị</span>
+      <select className="inp !w-auto !py-1 !text-xs" value={pageSize}
+        onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}>
+        {[10, 20, 50, 100].map((n) => <option key={n} value={n}>{n}</option>)}
+      </select>
+      <span className="text-[#5A6572]">dòng/trang · tổng <b>{total}</b> dòng</span>
+      <div className="ml-auto flex items-center gap-1">
+        <button className="btn-ghost !px-2.5 !py-1 !text-xs" disabled={cur <= 1} onClick={() => setPage(1)}>«</button>
+        <button className="btn-ghost !px-2.5 !py-1 !text-xs" disabled={cur <= 1} onClick={() => setPage(cur - 1)}>‹ Trước</button>
+        <span className="px-2 font-bold tabular-nums">{cur}/{pages}</span>
+        <button className="btn-ghost !px-2.5 !py-1 !text-xs" disabled={cur >= pages} onClick={() => setPage(cur + 1)}>Sau ›</button>
+        <button className="btn-ghost !px-2.5 !py-1 !text-xs" disabled={cur >= pages} onClick={() => setPage(pages)}>»</button>
+      </div>
+    </div>
+  );
+}

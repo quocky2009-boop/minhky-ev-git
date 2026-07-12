@@ -1,7 +1,7 @@
 "use client";
 import { useState, useRef } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Field, Toast, stockBadge, Badge } from "@/components/ui";
+import { Field, Toast, stockBadge, Badge, Pager, pageSlice } from "@/components/ui";
 import { fmtVND, errMsg, parseCSV } from "@/lib/format";
 
 export default function DMXe() {
@@ -11,6 +11,8 @@ export default function DMXe() {
   const [show, setShow] = useState(false);
   const [q, setQ] = useState(""); const [fBrand, setFBrand] = useState("");
   const [newBrand, setNewBrand] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const empty = { brand: "VinFast", name: "", color: "", mfr_code: "", list_price: "", min_stock: 2 };
   const [f, setF] = useState(empty);
   const [editId, setEditId] = useState(null);
@@ -125,7 +127,7 @@ export default function DMXe() {
         </div>
         <div className="overflow-x-auto"><table className="w-full border-collapse">
           <thead><tr><th className="th">Mã nội bộ</th><th className="th">Mã hãng</th><th className="th">Hãng</th><th className="th">Tên xe</th><th className="th">Màu</th><th className="th">Giá niêm yết</th><th className="th">Tồn min</th><th className="th">Tổng tồn</th><th className="th">Cảnh báo</th><th className="th"></th></tr></thead>
-          <tbody>{list.map((v) => {
+          <tbody>{pageSlice(list, page, pageSize).map((v) => {
             const qty = totalQty(v.id);
             return (
               <tr key={v.id}>
@@ -139,6 +141,7 @@ export default function DMXe() {
             );
           })}</tbody>
         </table></div>
+        <Pager total={list.length} page={page} setPage={setPage} pageSize={pageSize} setPageSize={setPageSize} />
       </div>
     </div>
   );

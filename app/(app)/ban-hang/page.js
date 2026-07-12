@@ -2,8 +2,8 @@
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Field, Badge, Toast, VehicleSearch, LocPicker, FramePicker } from "@/components/ui";
-import { fmtVND, fmtDate, errMsg } from "@/lib/format";
+import { Field, Badge, Toast, VehicleSearch, LocPicker, FramePicker, Pager, pageSlice } from "@/components/ui";
+import { fmtVND, fmtDate, fmtTime, errMsg } from "@/lib/format";
 import { CUSTOMER_TYPES, CUSTOMER_SOURCES, PAYMENT_METHODS, DOC_STATUSES } from "@/lib/const";
 
 // Tinh gia tri truong cong thuc (vd: gia truoc thue = gia ban / (1 + thue))
@@ -30,11 +30,14 @@ function BanHangInner() {
   const [f, setF] = useState(empty);
   const [show, setShow] = useState(!!params.get("xe"));
   const [busy, setBusy] = useState(false);
+  const [detail, setDetail] = useState(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
   const setExtra = (k, v) => setF((p) => ({ ...p, extra: { ...p.extra, [k]: v } }));
 
   const loadOrders = async () => {
-    const { data } = await supabase.from("sales_orders").select("*").order("created_at", { ascending: false }).limit(100);
+    const { data } = await supabase.from("sales_orders").select("*").order("created_at", { ascending: false }).limit(1000);
     setOrders(data || []);
   };
   useEffect(() => { loadOrders(); }, []);
@@ -80,6 +83,13 @@ function BanHangInner() {
 
   if (loading || !profile) return <div className="card">Đang tải dữ liệu…</div>;
   const canEdit = ["CEO", "MANAGER", "ADMIN"].includes(profile.role);
+  const cfieldsAll = customFields.filter((c) => c.entity === "sales_order");
+  const fieldValText = (c, val) => {
+    if (val === undefined || val === null || val === "") return "—";
+    if (c.field_type === "formula") return fmtVND(val);
+    if (c.field_type === "checkbox") return val ? "Có" : "Không";
+    return String(val);
+  };
 
   return (
     <div className="flex flex-col gap-4">
@@ -141,8 +151,8 @@ function BanHangInner() {
       <div className="card">
         <div className="font-extrabold mb-2.5">{canEdit ? "Đơn bán gần đây" : "Đơn bán của tôi"} ({orders.length})</div>
         <div className="overflow-x-auto"><table className="w-full border-collapse">
-          <thead><tr><th className="th">Mã đơn</th><th className="th">Ngày</th><th className="th">Xe · Số khung</th><th className="th">Kho xuất</th><th className="th">Khách</th><th className="th">Giá bán</th><th className="th">NV bán</th><th className="th">Hồ sơ</th><th className="th">Bảo hành</th></tr></thead>
-          <tbody>{orders.map((s) => {
+          <thead><tr><th className="th">Mã đơn</th><th className="th">Ngày</th><th className="th">Xe · Số khung</th><th className="th">Kho xuất</th><th className="th">Khách</th><th className="th">Giá bán</th><th className="th">NV bán</th><th className="th">Hồ sơ</th><th className="th">Bảo hành</th><th className="th"></th></tr></thead>
+          <tbody>{pageSlice(orders, page, pageSize).map((s) => {
             const v = vehicles.find((x) => x.id === s.vehicle_id);
             const l = locations.find((x) => x.code === s.location_code);
             return (
@@ -160,11 +170,50 @@ function BanHangInner() {
                 <td className="td">{canEdit ? (
                   <select className="inp !w-auto !py-1 !text-xs" value={s.warranty_status} onChange={(e) => updateOrder(s.id, "p_warranty", e.target.value)}><option>Chưa kích hoạt</option><option>Đã kích hoạt</option></select>
                 ) : (s.warranty_status === "Đã kích hoạt" ? <Badge tone="green">Đã kích hoạt</Badge> : <Badge tone="gray">Chưa kích hoạt</Badge>)}</td>
+                <td className="td"><button className="btn-ghost !px-2.5 !py-1 !text-xs" onClick={() => setDetail(s)}>Chi tiết</button></td>
               </tr>
             );
           })}</tbody>
         </table></div>
+        <Pager total={orders.length} page={page} setPage={setPage} pageSize={pageSize} setPageSize={setPageSize} />
       </div>
+      {detail && (() => {
+        const v = vehicles.find((x) => x.id === detail.vehicle_id);
+        const l = locations.find((x) => x.code === detail.location_code);
+        return (
+          <div className="fixed inset-0 z-[90] bg-black/50 flex items-center justify-center p-3" onClick={() => setDetail(null)}>
+            <div className="bg-white rounded-2xl w-[560px] max-w-full max-h-[88vh] overflow-y-auto p-4" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center mb-3">
+                <div className="font-extrabold text-base mr-auto">Chi tiết đơn {detail.code}</div>
+                <button className="btn-ghost !px-3 !py-1.5 !text-xs" onClick={() => setDetail(null)}>✕</button>
+              </div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[13px]">
+                <div><span className="text-[#8A93A0]">Ngày bán:</span> <b>{fmtDate(detail.sale_date)}</b></div>
+                <div><span className="text-[#8A93A0]">Kho xuất:</span> <b>{l?.name || detail.location_code}</b></div>
+                <div className="col-span-2"><span className="text-[#8A93A0]">Xe:</span> <b>{v ? `${v.brand} · ${v.name} · ${v.color}` : detail.vehicle_id}</b> × {detail.quantity}</div>
+                {detail.frame_number && <div className="col-span-2"><span className="text-[#8A93A0]">Số khung:</span> <span className="font-mono font-bold">{detail.frame_number}</span></div>}
+                <div><span className="text-[#8A93A0]">Khách hàng:</span> <b>{detail.customer_name}</b></div>
+                <div><span className="text-[#8A93A0]">SĐT:</span> <b>{detail.customer_phone}</b></div>
+                <div><span className="text-[#8A93A0]">CCCD:</span> {detail.customer_cccd || "—"}</div>
+                <div><span className="text-[#8A93A0]">Địa chỉ:</span> {detail.customer_address || "—"}</div>
+                <div><span className="text-[#8A93A0]">Loại khách:</span> {detail.customer_type}</div>
+                <div><span className="text-[#8A93A0]">Nguồn khách:</span> {detail.customer_source}</div>
+                <div><span className="text-[#8A93A0]">Giá niêm yết:</span> {fmtVND(detail.list_price)}</div>
+                <div><span className="text-[#8A93A0]">Giá bán:</span> <b className="text-brand">{fmtVND(detail.sale_price)}</b></div>
+                <div><span className="text-[#8A93A0]">Thanh toán:</span> {detail.payment_method}</div>
+                <div><span className="text-[#8A93A0]">NV bán:</span> {detail.seller_name}</div>
+                <div><span className="text-[#8A93A0]">Hồ sơ:</span> <Badge tone="blue">{detail.document_status}</Badge></div>
+                <div><span className="text-[#8A93A0]">Bảo hành:</span> <Badge tone={detail.warranty_status === "Đã kích hoạt" ? "green" : "gray"}>{detail.warranty_status}</Badge></div>
+                {cfieldsAll.map((c) => (
+                  <div key={c.id}><span className="text-[#8A93A0]">{c.label}:</span> <b>{fieldValText(c, detail.extra?.[c.field_key])}</b></div>
+                ))}
+                {detail.note && <div className="col-span-2"><span className="text-[#8A93A0]">Ghi chú:</span> {detail.note}</div>}
+                <div className="col-span-2 text-[11px] text-[#8A93A0] pt-1 border-t border-dashed border-[#E6EAEF] mt-1">Tạo lúc {fmtTime(detail.created_at)}</div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

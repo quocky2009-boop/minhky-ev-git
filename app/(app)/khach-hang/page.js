@@ -1,8 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Field, Badge, Toast, KPI } from "@/components/ui";
-import { fmtVND, fmtDate, errMsg } from "@/lib/format";
+import { Field, Badge, Toast, KPI, Pager, pageSlice } from "@/components/ui";
+import { fmtVND, fmtDate, fmtTime, errMsg } from "@/lib/format";
 import { CUSTOMER_TYPES, CUSTOMER_SOURCES } from "@/lib/const";
 
 const STATUSES = ["Lead mới", "Đang tư vấn", "Hẹn xem xe", "Đã mua", "Không mua", "Chăm sóc lại"];
@@ -27,6 +27,8 @@ export default function KhachHang() {
   const [history, setHistory] = useState({});
   const [careLogs, setCareLogs] = useState({});
   const [careForm, setCareForm] = useState({});   // customer_id -> {content, result, care_date}
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
 
   const load = async () => {
@@ -160,7 +162,7 @@ export default function KhachHang() {
         </div>
         <div className="overflow-x-auto"><table className="w-full border-collapse">
           <thead><tr><th className="th">Mã KH</th><th className="th">Khách hàng</th><th className="th">Ngày tạo</th><th className="th">Loại · Nguồn</th><th className="th">Trạng thái</th><th className="th">Lead</th><th className="th">Phụ trách</th><th className="th"></th></tr></thead>
-          <tbody>{filtered.map((c) => {
+          <tbody>{pageSlice(filtered, page, pageSize).map((c) => {
             const hist = history[c.id] || [];
             const logs = careLogs[c.id] || [];
             const cf = careForm[c.id] || { content: "", result: "", care_date: "" };
@@ -200,14 +202,20 @@ export default function KhachHang() {
                       <div className="text-xs font-bold mb-2">Lịch sử chăm sóc ({logs.length})</div>
                       <div className="max-h-40 overflow-y-auto mb-2">
                         {logs.length === 0 && <span className="text-sm text-[#8A93A0]">Chưa có lần chăm sóc nào.</span>}
-                        {logs.map((l) => (
-                          <div key={l.id} className="py-1.5 border-t border-[#EEF1F4] text-[12.5px]">
-                            <div className="flex items-center gap-2"><b>{fmtDate(l.care_date)}</b><span className="text-[#8A93A0]">· {l.created_by_name}</span>
-                              <button className="ml-auto text-[#C6CDD6] hover:text-danger text-xs" onClick={() => removeCare(c.id, l.id)}>✕</button></div>
-                            <div>{l.content}</div>
-                            {l.result && <div className="text-[#5A6572]">Kết quả: {l.result}</div>}
-                          </div>
-                        ))}
+                        {logs.map((l) => {
+                          const backdated = new Date(l.created_at).toISOString().slice(0, 10) !== l.care_date;
+                          return (
+                            <div key={l.id} className="py-1.5 border-t border-[#EEF1F4] text-[12.5px]">
+                              <div className="flex items-center gap-2"><b>{fmtDate(l.care_date)}</b><span className="text-[#8A93A0]">· {l.created_by_name}</span>
+                                <button className="ml-auto text-[#C6CDD6] hover:text-danger text-xs" onClick={() => removeCare(c.id, l.id)}>✕</button></div>
+                              <div>{l.content}</div>
+                              {l.result && <div className="text-[#5A6572]">Kết quả: {l.result}</div>}
+                              <div className={`text-[10.5px] italic ${backdated ? "text-[#A25F00]" : "text-[#C6CDD6]"}`}>
+                                Nhập lúc {fmtTime(l.created_at)}{backdated ? " ⚠ khác ngày chăm sóc đã chọn" : ""}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                       <div className="bg-white border border-[#E6EAEF] rounded-lg p-2.5">
                         <div className="flex gap-1.5 mb-1.5">
@@ -226,6 +234,7 @@ export default function KhachHang() {
             ];
           })}</tbody>
         </table></div>
+        <Pager total={filtered.length} page={page} setPage={setPage} pageSize={pageSize} setPageSize={setPageSize} />
       </div>
     </div>
   );

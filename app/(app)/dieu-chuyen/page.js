@@ -2,7 +2,7 @@
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Field, Badge, Toast, VehicleSearch, LocPicker, FramePicker } from "@/components/ui";
+import { Field, Badge, Toast, VehicleSearch, LocSearch, FramePicker } from "@/components/ui";
 import { fmtTime, errMsg } from "@/lib/format";
 
 function DieuChuyenInner() {
@@ -66,8 +66,8 @@ function DieuChuyenInner() {
         <div className="grid gap-x-4 md:grid-cols-2">
           <div>
             <Field label="Xe (gõ để tìm)" required><VehicleSearch vehicles={vehicles} value={f.vehicle_id} onChange={(v) => set("vehicle_id", v)} /></Field>
-            <Field label="Kho đi" required><LocPicker locations={locations} value={f.from} onChange={(v) => set("from", v)} /></Field>
-            <Field label="Kho đến" required><LocPicker locations={locations} value={f.to} onChange={(v) => set("to", v)} exclude={f.from} /></Field>
+            <Field label="Kho đi" required><LocSearch locations={locations} value={f.from} onChange={(v) => set("from", v)} /></Field>
+            <Field label="Kho đến" required><LocSearch locations={locations} value={f.to} onChange={(v) => set("to", v)} exclude={f.from} /></Field>
             <Field label="Ghi chú"><input className="inp" value={f.note} onChange={(e) => set("note", e.target.value)} placeholder="Lý do, người vận chuyển…" /></Field>
           </div>
           <Field label={`Chọn xe chuyển (${units.length} xe sẵn sàng tại kho đi)`} required>

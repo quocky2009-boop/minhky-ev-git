@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useCatalog } from "@/lib/useData";
-import { stockBadge, StockBattery } from "@/components/ui";
+import { stockBadge, StockBattery, Pager, pageSlice } from "@/components/ui";
 import { fmtNum, fmtVND } from "@/lib/format";
 
 export default function TraCuu() {
@@ -10,6 +10,8 @@ export default function TraCuu() {
   const { vehicles, locations, loading, getQty, totalQty, regionQty } = useCatalog();
   const [q, setQ] = useState(""); const [brand, setBrand] = useState(""); const [model, setModel] = useState("");
   const [color, setColor] = useState(""); const [region, setRegion] = useState(""); const [open, setOpen] = useState(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   if (loading) return <div className="card">Đang tải dữ liệu…</div>;
   const brands = [...new Set(vehicles.map((v) => v.brand))];
@@ -46,7 +48,7 @@ export default function TraCuu() {
       </div>
       <div className="text-[13px] text-[#5A6572] mb-2.5">{list.length} mã xe · Tổng tồn hiển thị: <b>{fmtNum(list.reduce((s, v) => s + totalQty(v.id), 0))}</b> xe</div>
       <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(290px,1fr))" }}>
-        {list.map((v) => {
+        {pageSlice(list, page, pageSize).map((v) => {
           const tot = totalQty(v.id), tp = regionQty(v.id, "Thành phố"), hy = regionQty(v.id, "Hàm Yên");
           const isOpen = open === v.id;
           return (
@@ -82,6 +84,7 @@ export default function TraCuu() {
         })}
       </div>
       {list.length === 0 && <div className="card text-center text-[#8A93A0]">Không tìm thấy xe phù hợp. Thử đổi từ khóa hoặc bỏ bớt bộ lọc.</div>}
+      <Pager total={list.length} page={page} setPage={setPage} pageSize={pageSize} setPageSize={setPageSize} />
     </div>
   );
 }

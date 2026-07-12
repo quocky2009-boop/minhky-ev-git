@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Field, Badge, Toast, KPI } from "@/components/ui";
+import { Field, Badge, Toast, KPI, Pager, pageSlice } from "@/components/ui";
 import { fmtVND, fmtDate, errMsg, downloadCSV } from "@/lib/format";
 
 const today = () => new Date().toLocaleDateString("sv-SE"); // yyyy-mm-dd theo gio may
@@ -30,6 +30,10 @@ export default function ThuChi() {
   const [closeAcc, setCloseAcc] = useState("");
   const [closeActual, setCloseActual] = useState("");
   const [closeNote, setCloseNote] = useState("");
+  const [tab, setTab] = useState("quy");
+  const [bcGroup, setBcGroup] = useState("quy");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   const load = async () => {
     const [{ data: ac }, { data: tx }, { data: cl }] = await Promise.all([
@@ -105,7 +109,14 @@ export default function ThuChi() {
         {canManageAcc && <button className="btn-ghost self-center ml-auto !text-xs" onClick={sendReport}>📨 Gửi báo cáo quỹ Discord ngay</button>}
       </div>
 
+      <div className="flex gap-1.5 flex-wrap">
+        {[["quy", "💵 Quỹ tiền"], ["ghi", "✍ Ghi thu chi"], ["chot", "🔒 Chốt quỹ"], ["so", "📒 Sổ thu chi"], ["bc", "📊 Báo cáo"]].map(([k, lb]) => (
+          <button key={k} className={`btn !px-4 !py-2.5 !text-[13px] ${tab === k ? "bg-brand text-white" : "bg-white border border-[#E6EAEF] text-[#3B4552]"}`} onClick={() => setTab(k)}>{lb}</button>
+        ))}
+      </div>
+
       {/* QUY TIEN */}
+      {tab === "quy" && (
       <div className="card">
         <div className="flex items-center mb-2.5">
           <div className="font-extrabold mr-auto">Quỹ tiền ({accounts.length})</div>
@@ -146,8 +157,10 @@ export default function ThuChi() {
           {accounts.length === 0 && <div className="text-sm text-[#8A93A0]">Chưa có quỹ nào — bấm "+ Thêm quỹ" để tạo (VD: Quỹ tiền mặt từng cửa hàng, TK ngân hàng công ty).</div>}
         </div>
       </div>
+      )}
 
       {/* GHI THU CHI */}
+      {tab === "ghi" && (
       <div className="card">
         <div className="font-extrabold mb-3">Ghi phiếu thu / chi</div>
         <div className="grid gap-x-4 md:grid-cols-4 sm:grid-cols-2">
@@ -170,8 +183,10 @@ export default function ThuChi() {
         </div>
         <button className="btn-ok" onClick={saveTxn}>Lưu phiếu {t.direction.toLowerCase()}</button>
       </div>
+      )}
 
       {/* CHOT QUY */}
+      {tab === "chot" && (
       <div className="card">
         <div className="font-extrabold">Chốt quỹ cuối ngày ({fmtDate(today())})</div>
         <p className="text-xs text-[#5A6572] mb-3">Đếm tiền thực tế trong két / kiểm tra số dư tài khoản, nhập vào đây. Hệ thống so với số dư sổ sách và lưu chênh lệch. 21h00 mỗi tối, báo cáo tổng hợp tự gửi vào Discord kèm cảnh báo quỹ chưa chốt.</p>
@@ -188,8 +203,10 @@ export default function ThuChi() {
           <button className="btn-primary" onClick={doClose}>Chốt quỹ</button>
         </div>
       </div>
+      )}
 
       {/* SO THU CHI */}
+      {tab === "so" && (
       <div className="card">
         <div className="flex gap-2 flex-wrap items-center mb-3">
           <div className="font-extrabold mr-auto">Sổ thu chi ({list.length})</div>
@@ -205,7 +222,7 @@ export default function ThuChi() {
         </div>
         <div className="overflow-x-auto"><table className="w-full border-collapse">
           <thead><tr><th className="th">Phiếu</th><th className="th">Ngày</th><th className="th">Quỹ</th><th className="th">Hạng mục</th><th className="th">Thu</th><th className="th">Chi</th><th className="th">Đối tượng · Diễn giải</th><th className="th">Người ghi</th></tr></thead>
-          <tbody>{list.map((x) => (
+          <tbody>{pageSlice(list, page, pageSize).map((x) => (
             <tr key={x.id}>
               <td className="td font-bold">{x.code}</td>
               <td className="td">{fmtDate(x.txn_date)}</td>
@@ -218,8 +235,78 @@ export default function ThuChi() {
             </tr>
           ))}</tbody>
         </table></div>
+        <Pager total={list.length} page={page} setPage={setPage} pageSize={pageSize} setPageSize={setPageSize} />
         <p className="text-[11px] text-[#8A93A0] mt-2">Sổ thu chi không sửa/xóa được — ghi nhầm thì lập phiếu ngược chiều để bù, ghi rõ diễn giải.</p>
       </div>
+      )}
+
+      {/* BAO CAO */}
+      {tab === "bc" && (() => {
+        const accOf = (id) => accounts.find((x) => x.id === id);
+        const keyOf = (x) => {
+          const acc = accOf(x.account_id);
+          const l = acc?.location_code ? locations.find((y) => y.code === acc.location_code) : null;
+          if (bcGroup === "quy") return acc?.name || "Quỹ đã xóa";
+          if (bcGroup === "cuahang") return l ? l.name : "Không gắn điểm bán";
+          if (bcGroup === "khuvuc") return l ? l.region : "Không gắn khu vực";
+          return x.category || "Khác";
+        };
+        const grp = {};
+        txns.forEach((x) => {
+          const k = keyOf(x);
+          grp[k] = grp[k] || { thu: 0, chi: 0, n: 0 };
+          grp[k][x.direction === "Thu" ? "thu" : "chi"] += x.amount;
+          grp[k].n++;
+        });
+        const rows = Object.entries(grp).sort((a, b) => (b[1].thu + b[1].chi) - (a[1].thu + a[1].chi));
+        const tThu = rows.reduce((sm, [, r]) => sm + r.thu, 0);
+        const tChi = rows.reduce((sm, [, r]) => sm + r.chi, 0);
+        const GROUPS = [["quy", "Theo quỹ"], ["cuahang", "Theo cửa hàng"], ["khuvuc", "Theo khu vực"], ["hangmuc", "Theo hạng mục"]];
+        const exportBC = () => {
+          downloadCSV(`bao_cao_thu_chi_${bcGroup}_${from}_den_${to}.csv`,
+            [["Nhom", "Thu", "Chi", "Chenh_Thu_Chi", "So_Phieu"],
+             ...rows.map(([k, r]) => [k, r.thu, r.chi, r.thu - r.chi, r.n]),
+             ["TONG", tThu, tChi, tThu - tChi, txns.length]]);
+        };
+        return (
+          <div className="card">
+            <div className="flex gap-2 flex-wrap items-center mb-3">
+              <div className="font-extrabold mr-auto">Báo cáo tổng hợp thu - chi</div>
+              <input type="date" className="inp !w-auto" value={from} onChange={(e) => setFrom(e.target.value)} />
+              <input type="date" className="inp !w-auto" value={to} onChange={(e) => setTo(e.target.value)} />
+              <button className="btn-ghost !text-xs" onClick={exportBC}>⬇ Xuất CSV</button>
+            </div>
+            <div className="flex gap-1.5 flex-wrap mb-3">
+              {GROUPS.map(([k, lb]) => (
+                <button key={k} className={`btn !px-3 !py-2 !text-xs ${bcGroup === k ? "bg-navy-900 text-white" : "bg-[#EEF1F4] text-[#3B4552]"}`} onClick={() => setBcGroup(k)}>{lb}</button>
+              ))}
+            </div>
+            <p className="text-[11px] text-[#8A93A0] mb-2">Nhóm theo cửa hàng / khu vực dựa trên điểm bán đã gắn với từng quỹ (chỉnh trong tab Quỹ tiền → ✎). Phạm vi: {fmtDate(from)} – {fmtDate(to)}.</p>
+            <div className="overflow-x-auto"><table className="w-full border-collapse">
+              <thead><tr><th className="th">{GROUPS.find(([k]) => k === bcGroup)[1].replace("Theo ", "").toUpperCase()}</th><th className="th">Tổng thu</th><th className="th">Tổng chi</th><th className="th">Chênh (Thu − Chi)</th><th className="th">Số phiếu</th></tr></thead>
+              <tbody>
+                {rows.map(([k, r]) => (
+                  <tr key={k}>
+                    <td className="td font-bold">{k}</td>
+                    <td className="td font-bold text-[#0E7A4A]">{fmtVND(r.thu)}</td>
+                    <td className="td font-bold text-danger">{fmtVND(r.chi)}</td>
+                    <td className="td font-extrabold"><span className={r.thu - r.chi >= 0 ? "text-[#0E7A4A]" : "text-danger"}>{fmtVND(r.thu - r.chi)}</span></td>
+                    <td className="td">{r.n}</td>
+                  </tr>
+                ))}
+                {rows.length === 0 && <tr><td className="td" colSpan={5}>Không có phiếu thu chi trong khoảng ngày đã chọn.</td></tr>}
+                <tr className="bg-[#F3F5F8] font-extrabold">
+                  <td className="td">TỔNG</td>
+                  <td className="td text-[#0E7A4A]">{fmtVND(tThu)}</td>
+                  <td className="td text-danger">{fmtVND(tChi)}</td>
+                  <td className="td"><span className={tThu - tChi >= 0 ? "text-[#0E7A4A]" : "text-danger"}>{fmtVND(tThu - tChi)}</span></td>
+                  <td className="td">{txns.length}</td>
+                </tr>
+              </tbody>
+            </table></div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
