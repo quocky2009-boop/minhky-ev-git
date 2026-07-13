@@ -30,9 +30,16 @@ export default function QuetGom() {
   const [poolPage, setPoolPage] = useState(1);
   const [poolPageSize, setPoolPageSize] = useState(20);
 
+  const [batches, setBatches] = useState([]);
+  const [selBatch, setSelBatch] = useState("");   // "" = tat ca cac lo
+  const loadBatches = async () => {
+    const { data } = await supabase.from("pool_batches").select("*").order("created_at", { ascending: false }).limit(100);
+    setBatches(data || []);
+  };
+
   const loadPoolAll = async () => {
     const [{ data: pool }, { data: units }, { data: drafts_ }] = await Promise.all([
-      supabase.from("frame_pool").select("frame_number, vehicle_id").order("vehicle_id").limit(5000),
+      supabase.from("frame_pool").select("frame_number, vehicle_id, batch_id").order("vehicle_id").limit(5000),
       supabase.from("vehicle_units").select("frame_number, status, location_code").limit(10000),
       supabase.from("import_drafts").select("code, rows").eq("status", "Nháp").limit(500),
     ]);
@@ -50,24 +57,22 @@ export default function QuetGom() {
   const togglePoolList = async () => {
     const next = !poolOpen;
     setPoolOpen(next);
-    if (next) { setPoolAll(null); await loadPoolAll(); }
+    if (next && poolAll === null) await loadPoolAll();
   };
 
   const loadPoolCount = async () => {
     const { count } = await supabase.from("frame_pool").select("*", { count: "exact", head: true });
     setPoolCount(count ?? 0);
   };
-  useEffect(() => { if (!loading) loadPoolCount(); }, [loading]);
+  useEffect(() => { if (!loading) { loadPoolCount(); loadPoolAll(); loadBatches(); } }, [loading]);
 
   useEffect(() => {
-    const q = poolQ.trim();
-    if (q.length < 3) { setPoolHits([]); return; }
-    const t = setTimeout(async () => {
-      const { data } = await supabase.rpc("fn_tim_pool", { p_q: q });
-      setPoolHits(data || []);
-    }, 300);
-    return () => clearTimeout(t);
-  }, [poolQ]);
+    const q = poolQ.trim().toUpperCase();
+    if (q.length < 3 || poolAll === null) { setPoolHits([]); return; }
+    setPoolHits(poolAll
+      .filter((x) => (!selBatch || String(x.batch_id) === String(selBatch)) && x.frame_number.includes(q))
+      .slice(0, 20));
+  }, [poolQ, poolAll, selBatch]);
 
   const loadDrafts = async () => {
     const { data } = await supabase.from("import_drafts").select("*").order("updated_at", { ascending: false }).limit(200);
@@ -116,16 +121,18 @@ export default function QuetGom() {
     if (iVid < 0 || iFrame < 0) return notify(`Không nhận ra cột. Tiêu đề cần có "Mã xe" (mã nội bộ) và "Số khung" — file đang có: ${cells(lines[0]).join(" | ")}`, "err");
     const rws = lines.slice(1).map(cells).map((c) => ({ vehicle_id: c[iVid], frame_number: c[iFrame] })).filter((r) => r.frame_number);
     if (rws.length === 0) return notify("Không đọc được dòng dữ liệu nào.", "err");
-    if (!confirm(`Import ${rws.length} số khung từ file hãng vào danh sách chờ?`)) return;
+    if (!confirm(`Import ${rws.length} số khung từ file "${file.name}" thành 1 lô mới?`)) return;
     setBusy(true);
+    const { data: lo, error: eLo } = await supabase.rpc("fn_tao_lo_import", { p_file_name: file.name });
+    if (eLo) { setBusy(false); return notify(errMsg(eLo), "err"); }
     let ins = 0, upd = 0, skipped = [];
     for (let i = 0; i < rws.length; i += 500) {
-      const { data, error } = await supabase.rpc("fn_import_pool", { p_rows: rws.slice(i, i + 500) });
+      const { data, error } = await supabase.rpc("fn_import_pool", { p_rows: rws.slice(i, i + 500), p_batch: lo.id });
       if (error) { setBusy(false); return notify(errMsg(error), "err"); }
       ins += data.inserted; upd += data.updated; skipped = skipped.concat(data.skipped || []);
     }
-    setBusy(false); loadPoolCount(); if (poolOpen) loadPoolAll();
-    notify(`Import xong: ${ins} mới, ${upd} cập nhật.` +
+    setBusy(false); loadPoolCount(); loadPoolAll(); loadBatches(); setSelBatch(String(lo.id));
+    notify(`Đã tạo lô ${lo.code} (${file.name}): ${ins} mới, ${upd} cập nhật.` +
       (skipped.length ? ` Bỏ qua ${skipped.length}: ${skipped.slice(0, 3).map((x) => `${x.frame} (${x.ly_do})`).join("; ")}${skipped.length > 3 ? "…" : ""}` : ""),
       skipped.length ? "err" : "ok");
   };
@@ -159,7 +166,7 @@ export default function QuetGom() {
       if (d) setDraftId(d.id);
     }
     notify(`Đã lưu phiếu nhập nháp ${data} (${rows.length} xe · ${locLabel}). Sửa tiếp hoặc chuyển Admin/BGĐ nhập vào kho.`);
-    loadDrafts();
+    loadDrafts(); loadPoolAll();
   };
 
   const exportRows = (rws, tag) => {
@@ -178,7 +185,7 @@ export default function QuetGom() {
       (sk.length ? ` Bỏ qua ${sk.length} số khung: ${sk.slice(0, 3).map((x) => `${x.frame} (${x.ly_do})`).join("; ")}${sk.length > 3 ? "…" : ""}` : ""),
       sk.length ? "err" : "ok");
     if (draftId === d.id) newDraft();
-    loadDrafts(); refresh();
+    loadDrafts(); refresh(); loadPoolAll();
   };
 
   const importCurrent = async () => {
@@ -265,6 +272,24 @@ export default function QuetGom() {
           )}
         </div>
         <p className="text-[11px] text-[#8A93A0] mb-2">Nhìn tem xe → gõ 3–6 ký tự cuối số khung → chạm chọn, xe tự vào danh sách đang gom với đúng mẫu xe theo file hãng (không lo chọn nhầm model). Kho vẫn do mình chọn ở ô trên.</p>
+        <div className="flex gap-1.5 items-center mb-2">
+          <span className="text-xs font-bold text-[#5A6572] shrink-0">Lô import:</span>
+          <select className="inp !py-2 !text-[13px]" value={selBatch} onChange={(e) => { setSelBatch(e.target.value); setPoolPage(1); }}>
+            <option value="">Tất cả các lô ({poolCount ?? 0} số khung)</option>
+            {batches.map((b) => <option key={b.id} value={b.id}>{b.code} · {b.file_name || "(không tên)"} · {b.row_count} xe · {fmtTime(b.created_at)} · {b.imported_by_name}</option>)}
+          </select>
+          {canImport && selBatch && (
+            <button className="btn-ghost !px-2.5 !text-xs hover:text-danger shrink-0" title="Xóa lô này khỏi danh sách chờ"
+              onClick={async () => {
+                const b = batches.find((x) => String(x.id) === String(selBatch));
+                if (!confirm(`Xóa lô ${b?.code} (${b?.file_name}, ${b?.row_count} xe) khỏi danh sách chờ?\nXe đã nhập vào kho / đã ở phiếu nháp KHÔNG bị ảnh hưởng.`)) return;
+                const { error } = await supabase.rpc("fn_xoa_lo", { p_id: Number(selBatch) });
+                if (error) return notify(errMsg(error), "err");
+                setSelBatch(""); loadBatches(); loadPoolCount(); loadPoolAll();
+                notify(`Đã xóa lô ${b?.code}.`);
+              }}>🗑 Xóa lô</button>
+          )}
+        </div>
         <div className="flex gap-1.5">
           <input className="inp font-mono !text-[14px]" placeholder="Gõ đuôi số khung, VD: 429407…" value={poolQ} onChange={(e) => { setPoolQ(e.target.value.toUpperCase()); setPoolPage(1); }} />
           <button className={`btn !px-3 !text-xs whitespace-nowrap ${poolOpen ? "bg-navy-900 text-white" : "bg-[#EEF1F4] text-[#3B4552]"}`} onClick={togglePoolList}>📋 {poolOpen ? "Ẩn danh sách" : "Xem danh sách chờ"}</button>
@@ -273,20 +298,22 @@ export default function QuetGom() {
           <div className="mt-2.5">
             {poolAll === null ? <div className="text-sm text-[#8A93A0]">Đang tải danh sách…</div> : (() => {
               const q = poolQ.trim().toUpperCase();
-              const filtered = poolAll.filter((x) => {
-                if (poolFilter && x.state !== poolFilter) return false;
+              const dispState = (x) => (x.state === "Chờ gán" && rows.some((r) => r.frame === x.frame_number)) ? "Đã chọn" : x.state;
+              const inBatch = poolAll.filter((x) => !selBatch || String(x.batch_id) === String(selBatch));
+              const filtered = inBatch.filter((x) => {
+                if (poolFilter && dispState(x) !== poolFilter) return false;
                 if (!q) return true;
                 const v = vOf(x.vehicle_id);
                 const label = `${x.frame_number} ${x.vehicle_id} ${v ? v.name + " " + v.color : ""}`.toUpperCase();
                 return label.includes(q);
               });
-              const counts = poolAll.reduce((m, x) => ({ ...m, [x.state]: (m[x.state] || 0) + 1 }), {});
+              const counts = inBatch.reduce((m, x) => ({ ...m, [dispState(x)]: (m[dispState(x)] || 0) + 1 }), {});
               return (
                 <>
                   <div className="flex gap-1.5 flex-wrap mb-2">
-                    {["", "Chờ gán", "Đang ở phiếu", "Đã trong kho", "Đã bán"].map((st) => (
+                    {["", "Chờ gán", "Đã chọn", "Đang ở phiếu", "Đã trong kho", "Đã bán"].map((st) => (
                       <button key={st} className={`btn !px-3 !py-1.5 !text-xs ${poolFilter === st ? "bg-navy-900 text-white" : "bg-[#EEF1F4] text-[#3B4552]"}`} onClick={() => { setPoolFilter(st); setPoolPage(1); }}>
-                        {st === "" ? `Tất cả (${poolAll.length})` : `${st} (${counts[st] || 0})`}
+                        {st === "" ? `Tất cả (${inBatch.length})` : `${st} (${counts[st] || 0})`}
                       </button>
                     ))}
                   </div>
@@ -294,17 +321,21 @@ export default function QuetGom() {
                     <thead><tr><th className="th w-10">STT</th><th className="th">Xe (theo file hãng)</th><th className="th">Số khung</th><th className="th">Trạng thái</th><th className="th w-20"></th></tr></thead>
                     <tbody>{pageSlice(filtered, poolPage, poolPageSize).map((x, i) => {
                       const v = vOf(x.vehicle_id);
-                      const free = x.state === "Chờ gán";
+                      const st = dispState(x);
+                      const free = st === "Chờ gán";
+                      const picked = st === "Đã chọn";
                       return (
-                        <tr key={x.frame_number} className="hover:bg-[#F8FAFC]">
+                        <tr key={x.frame_number} className={picked ? "bg-[#F0FDF6]" : "hover:bg-[#F8FAFC]"}>
                           <td className="td text-center text-xs text-[#8A93A0]">{(poolPage - 1) * poolPageSize + i + 1}</td>
                           <td className="td text-[13px] font-semibold">{v ? `${v.name} ${v.color}` : x.vehicle_id}<div className="text-[10.5px] text-[#8A93A0] font-normal">{x.vehicle_id}</div></td>
                           <td className="td font-mono text-[12.5px]">{x.frame_number}</td>
-                          <td className="td">{free ? <Badge tone="green">Chờ gán</Badge>
-                            : x.state === "Đang ở phiếu" ? <Badge tone="amber">Ở phiếu {x.ref}</Badge>
-                            : x.state === "Đã bán" ? <Badge tone="gray">Đã bán</Badge>
+                          <td className="td">{picked ? <Badge tone="purple">✓ Đã chọn</Badge>
+                            : free ? <Badge tone="green">Chờ gán</Badge>
+                            : st === "Đang ở phiếu" ? <Badge tone="amber">Ở phiếu {x.ref}</Badge>
+                            : st === "Đã bán" ? <Badge tone="gray">Đã bán</Badge>
                             : <Badge tone="blue">Kho {locNameOf(x.ref)}</Badge>}</td>
-                          <td className="td">{free && <button className="btn-primary !px-2.5 !py-1 !text-xs" onClick={() => { pickPool({ ...x }); loadPoolAll(); }}>+ Chọn</button>}</td>
+                          <td className="td">{free && <button className="btn-primary !px-2.5 !py-1 !text-xs" onClick={() => pickPool({ ...x })}>+ Chọn</button>}
+                            {picked && <button className="btn-ghost !px-2.5 !py-1 !text-xs" title="Bỏ khỏi danh sách đang gom" onClick={() => setRows((p) => p.filter((r) => r.frame !== x.frame_number))}>Bỏ</button>}</td>
                         </tr>
                       );
                     })}
@@ -322,13 +353,15 @@ export default function QuetGom() {
             {poolHits.length === 0 && <div className="px-3 py-2.5 text-sm text-[#8A93A0]">Không thấy trong danh sách hãng — kiểm tra lại số hoặc dùng quét camera/gõ tay ở trên.</div>}
             {poolHits.map((h) => {
               const v = vOf(h.vehicle_id);
-              const free = h.state === "Chờ gán";
+              const picked = h.state === "Chờ gán" && rows.some((r) => r.frame === h.frame_number);
+              const free = h.state === "Chờ gán" && !picked;
               return (
-                <button key={h.frame_number} className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left border-b border-[#F2F4F7] last:border-0 ${free ? "hover:bg-[#F0FDF6] cursor-pointer" : "opacity-60"}`} onClick={() => pickPool(h)}>
+                <button key={h.frame_number} className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left border-b border-[#F2F4F7] last:border-0 ${picked ? "bg-[#F0FDF6]" : free ? "hover:bg-[#F0FDF6] cursor-pointer" : "opacity-60"}`} onClick={() => !picked && pickPool(h)}>
                   <span className="font-mono font-bold text-[13px]">{h.frame_number}</span>
                   <span className="text-xs text-[#5A6572]">{v ? `${v.name} ${v.color}` : h.vehicle_id}</span>
                   <span className="ml-auto">
-                    {free ? <Badge tone="green">Chờ gán</Badge>
+                    {picked ? <Badge tone="purple">✓ Đã chọn</Badge>
+                      : free ? <Badge tone="green">Chờ gán</Badge>
                       : h.state === "Đang ở phiếu" ? <Badge tone="amber">Ở phiếu {h.ref}</Badge>
                       : h.state === "Đã bán" ? <Badge tone="gray">Đã bán</Badge>
                       : <Badge tone="blue">Kho {locNameOf(h.ref)}</Badge>}
