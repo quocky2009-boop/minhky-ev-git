@@ -227,19 +227,23 @@ export default function QuetGom() {
       <Toast toast={toast} />
       {showScanner && <Scanner onClose={() => setShowScanner(false)} onAdd={addFrames} />}
 
-      <div className="card">
-        <div className="font-extrabold text-base">Quét gom số khung</div>
-        <p className="text-xs text-[#5A6572] mb-3">Đứng dãy xe nào chọn đúng mẫu xe đó rồi quét liên tục; sang dãy khác đổi mẫu xe quét tiếp. Quét xong bấm <b>Lưu phiếu nháp</b> — phiếu sửa được trước khi Admin/BGĐ nhập vào kho. Trang này không tự thay đổi tồn.</p>
+      <div className="card !border-brand !border-2">
+        <div className="font-extrabold text-base">📍 Kho / cửa hàng đang kiểm</div>
+        <p className="text-xs text-[#5A6572] mb-3">Chọn kho trước tiên — áp dụng chung cho mọi cách đưa số khung vào danh sách gom bên dưới (quét camera, gõ tay, chọn từ danh sách hãng). Phiếu nhập nháp sẽ mang kho này.</p>
         {draftId && (
           <div className="flex items-center gap-2 bg-[#FDF6E3] border border-[#F5C542] rounded-xl px-3 py-2 mb-3 text-[13px]">
             <span className="font-bold">✏ Đang sửa phiếu {draftCode}</span>
             <button className="btn-ghost !px-2.5 !py-1 !text-xs ml-auto" onClick={newDraft}>+ Phiếu mới</button>
           </div>
         )}
-        <div className="grid gap-x-4 md:grid-cols-2">
-          <Field label="Kho / cửa hàng đang kiểm" required><LocSearch locations={locations} value={loc} onChange={setLoc} /></Field>
-          <Field label="Mẫu xe đang quét (dãy hiện tại)" required><VehicleSearch vehicles={vehicles} value={vid} onChange={setVid} /></Field>
-        </div>
+        <div className="max-w-md"><LocSearch locations={locations} value={loc} onChange={setLoc} /></div>
+        {!loc && <p className="text-[11px] text-[#A25F00] font-semibold mt-1.5">⚠ Chưa chọn kho — vẫn gom được nhưng phải chọn kho trước khi Lưu phiếu nháp / Nhập.</p>}
+      </div>
+
+      <div className="card">
+        <div className="font-extrabold text-base">📷 Quét camera / gõ tay</div>
+        <p className="text-xs text-[#5A6572] mb-3">Đứng dãy xe nào chọn đúng mẫu xe đó rồi quét liên tục; sang dãy khác đổi mẫu xe quét tiếp. Quét xong bấm <b>Lưu phiếu nháp</b> ở khối "Đã gom" — trang này không tự thay đổi tồn.</p>
+        <Field label="Mẫu xe đang quét (dãy hiện tại)" required><VehicleSearch vehicles={vehicles} value={vid} onChange={setVid} /></Field>
         <button className="btn-primary !py-3 w-full" disabled={!vid} onClick={() => setShowScanner(true)}>📷 Quét camera / chụp OCR</button>
         <div className="flex gap-1.5 mt-2">
           <input className="inp font-mono !text-[13px]" placeholder="Hoặc gõ/dán số khung, cách nhau xuống dòng…" value={manual} onChange={(e) => setManual(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addManual()} />
