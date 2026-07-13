@@ -17,6 +17,12 @@ export default function QuetGom() {
   const [draftId, setDraftId] = useState(null);  // dang sua phieu nao
   const [draftCode, setDraftCode] = useState("");
   const [drafts, setDrafts] = useState([]);
+  // Panel sua phieu ngay trong danh sach
+  const [editId, setEditId] = useState(null);
+  const [editLoc, setEditLoc] = useState("");
+  const [editRows, setEditRows] = useState([]);
+  const [edVid, setEdVid] = useState("");
+  const [edFrame, setEdFrame] = useState("");
   const [dTab, setDTab] = useState("Nháp");
   // ===== Danh sach hang (frame_pool) =====
   const [poolQ, setPoolQ] = useState("");
@@ -216,7 +222,7 @@ export default function QuetGom() {
     setRows((d.rows || []).map((r) => ({ frame: r.frame_number, vehicle_id: r.vehicle_id })));
     setLoc(d.location_code); setDraftId(d.id); setDraftCode(d.code);
     window.scrollTo({ top: 0, behavior: "smooth" });
-    notify(`Đang mở phiếu ${d.code} để sửa — sửa xong nhớ bấm "Lưu phiếu nháp".`);
+    notify(`Đã nạp ${(d.rows || []).length} xe của phiếu ${d.code} vào khối "Đã gom" — quét/chọn thêm xe rồi bấm "Lưu phiếu nháp".`);
   };
 
   const delDraft = async (d) => {
@@ -225,6 +231,39 @@ export default function QuetGom() {
     if (error) return notify(errMsg(error), "err");
     if (draftId === d.id) newDraft();
     notify(`Đã xóa phiếu ${d.code}.`); loadDrafts();
+  };
+
+  const toggleEdit = (d) => {
+    if (editId === d.id) { setEditId(null); return; }
+    setEditId(d.id);
+    setEditLoc(d.location_code);
+    setEditRows((d.rows || []).map((r) => ({ frame: r.frame_number, vehicle_id: r.vehicle_id })));
+    setEdVid(""); setEdFrame("");
+  };
+
+  const edAddRow = () => {
+    const fr = edFrame.trim().toUpperCase();
+    if (!edVid) return notify("Chọn mẫu xe cho số khung muốn thêm.", "err");
+    if (!fr) return notify("Gõ số khung muốn thêm.", "err");
+    if (editRows.some((r) => r.frame === fr)) return notify("Số khung này đã có trong phiếu.", "err");
+    setEditRows((p) => [...p, { frame: fr, vehicle_id: edVid }]);
+    setEdFrame("");
+  };
+
+  const saveEdit = async (d) => {
+    if (!editLoc) return notify("Chọn kho cho phiếu.", "err");
+    const frames = editRows.map((r) => r.frame.trim()).filter(Boolean);
+    if (frames.length === 0) return notify("Phiếu phải còn ít nhất 1 số khung — muốn bỏ cả phiếu thì dùng nút 🗑.", "err");
+    if (frames.length !== editRows.length) return notify("Có dòng số khung đang trống — điền hoặc xóa dòng đó.", "err");
+    if (new Set(frames).size !== frames.length) return notify("Có số khung trùng nhau trong phiếu.", "err");
+    setBusy(true);
+    const { error } = await supabase.rpc("fn_luu_phieu_nhap", {
+      p: { id: d.id, location_code: editLoc, rows: editRows.map((r) => ({ frame_number: r.frame.trim().toUpperCase(), vehicle_id: r.vehicle_id })) },
+    });
+    setBusy(false);
+    if (error) return notify(errMsg(error), "err");
+    notify(`Đã lưu phiếu ${d.code} (${editRows.length} xe · ${locNameOf(editLoc)}).`);
+    setEditId(null); loadDrafts(); loadPoolAll();
   };
 
   const shown = drafts.filter((d) => d.status === dTab);
@@ -413,8 +452,8 @@ export default function QuetGom() {
         {shown.length === 0 ? <div className="text-sm text-[#8A93A0]">Chưa có phiếu nào ở mục này.</div> : (
           <div className="overflow-x-auto"><table className="w-full border-collapse">
             <thead><tr><th className="th">Phiếu</th><th className="th">Kho</th><th className="th">Số xe</th><th className="th">Người tạo</th><th className="th">Cập nhật</th><th className="th">Trạng thái</th><th className="th"></th></tr></thead>
-            <tbody>{shown.map((d) => (
-              <tr key={d.id} className="hover:bg-[#F8FAFC]">
+            <tbody>{shown.map((d) => [
+              <tr key={d.id} className={editId === d.id ? "bg-[#FDF6E3]" : "hover:bg-[#F8FAFC]"}>
                 <td className="td font-bold">{d.code}{d.imported_doc && <div className="text-[10.5px] text-[#8A93A0] font-normal">→ {d.imported_doc}</div>}</td>
                 <td className="td text-xs">{locNameOf(d.location_code)}</td>
                 <td className="td font-bold text-center">{(d.rows || []).length}</td>
@@ -422,13 +461,45 @@ export default function QuetGom() {
                 <td className="td text-xs">{fmtTime(d.updated_at)}</td>
                 <td className="td">{d.status === "Nháp" ? <Badge tone="amber">Nháp</Badge> : <Badge tone="green">Đã nhập{d.imported_by_name ? ` · ${d.imported_by_name}` : ""}</Badge>}</td>
                 <td className="td"><div className="flex gap-1.5 flex-wrap">
-                  {d.status === "Nháp" && <button className="btn-ghost !px-2.5 !py-1 !text-xs" onClick={() => openDraft(d)}>✏ Mở sửa</button>}
+                  {d.status === "Nháp" && <button className={`!px-2.5 !py-1 !text-xs ${editId === d.id ? "btn-primary" : "btn-ghost"}`} onClick={() => toggleEdit(d)}>{editId === d.id ? "Đóng sửa" : "✏ Sửa"}</button>}
                   <button className="btn-ghost !px-2.5 !py-1 !text-xs" onClick={() => exportRows(d.rows || [], d.code)}>CSV</button>
                   {canImport && d.status === "Nháp" && <button className="btn-primary !px-2.5 !py-1 !text-xs" disabled={busy} onClick={() => importDraft(d)}>⚡ Nhập</button>}
                   {d.status === "Nháp" && <button className="btn-ghost !px-2 !py-1 !text-xs hover:text-danger" onClick={() => delDraft(d)}>🗑</button>}
                 </div></td>
-              </tr>
-            ))}</tbody>
+              </tr>,
+              editId === d.id && (
+                <tr key={d.id + "e"}><td colSpan={7} className="td bg-[#FFFDF5] !p-3">
+                  <div className="flex gap-2 items-center flex-wrap mb-2.5">
+                    <span className="text-xs font-bold">Sửa phiếu {d.code} · {editRows.length} xe</span>
+                    <div className="!w-64"><LocSearch locations={locations} value={editLoc} onChange={setEditLoc} /></div>
+                    <button className="btn-ok !px-3 !py-2 !text-xs" disabled={busy} onClick={() => saveEdit(d)}>💾 Lưu phiếu</button>
+                    <button className="btn-ghost !px-3 !py-2 !text-xs" onClick={() => { openDraft(d); setEditId(null); }}>📷 Quét thêm xe vào phiếu này</button>
+                  </div>
+                  <div className="overflow-x-auto"><table className="w-full border-collapse">
+                    <thead><tr><th className="th w-10">STT</th><th className="th">Hãng</th><th className="th">Tên xe</th><th className="th">Màu</th><th className="th">Số khung (sửa được)</th><th className="th w-8"></th></tr></thead>
+                    <tbody>{editRows.map((r, i) => {
+                      const v = vOf(r.vehicle_id);
+                      return (
+                        <tr key={i}>
+                          <td className="td text-center text-xs text-[#8A93A0]">{i + 1}</td>
+                          <td className="td text-xs">{v?.brand || "?"}</td>
+                          <td className="td font-semibold text-[13px]">{v?.name || r.vehicle_id}</td>
+                          <td className="td text-xs">{v?.color || ""}</td>
+                          <td className="td"><input className="inp !py-1.5 !text-[12.5px] font-mono !w-56 max-w-full" value={r.frame} onChange={(e) => setEditRows((p) => p.map((x, j) => j === i ? { ...x, frame: e.target.value.toUpperCase() } : x))} /></td>
+                          <td className="td"><button className="text-[#C6CDD6] hover:text-danger" title="Xóa dòng" onClick={() => setEditRows((p) => p.filter((_, j) => j !== i))}>✕</button></td>
+                        </tr>
+                      );
+                    })}</tbody>
+                  </table></div>
+                  <div className="flex gap-1.5 items-center mt-2 flex-wrap">
+                    <span className="text-[11px] font-bold text-[#5A6572] shrink-0">Thêm xe:</span>
+                    <div className="!w-64"><VehicleSearch vehicles={vehicles} value={edVid} onChange={setEdVid} /></div>
+                    <input className="inp !w-56 !py-2 font-mono !text-[12.5px]" placeholder="Số khung…" value={edFrame} onChange={(e) => setEdFrame(e.target.value.toUpperCase())} onKeyDown={(e) => e.key === "Enter" && edAddRow()} />
+                    <button className="btn-ghost !px-3 !py-2 !text-xs" onClick={edAddRow}>+ Thêm</button>
+                  </div>
+                </td></tr>
+              ),
+            ])}</tbody>
           </table></div>
         )}
         <p className="text-[11px] text-[#8A93A0] mt-2">Sales lưu phiếu nháp → Quản lý/Admin/BGĐ mở sửa nếu cần → Admin/BGĐ bấm ⚡ Nhập là xe vào kho, phiếu chuyển sang "Đã nhập" kèm mã chứng từ.</p>
