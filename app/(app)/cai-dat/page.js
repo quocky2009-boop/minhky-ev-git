@@ -14,44 +14,20 @@ export default function CaiDat() {
   const empty = { label: "", field_type: "text", optionsText: "", op: "divide", operand: "TAX", required: false };
   const [f, setF] = useState(empty);
   const [editField, setEditField] = useState(null);
-  const [sup, setSup] = useState(null); // null = chua sua, string = dang sua
   const [newBrand, setNewBrand] = useState("");
   const [reg, setReg] = useState(null);
   const [hook, setHook] = useState(null);
-  const [hookTC, setHookTC] = useState(null);
-  const [cats, setCats] = useState(null); // {thu, chi}
   const [bk, setBk] = useState(null); // {pk, bh, ftg, dk}
 
   const saveBk = async () => {
     const cln = (x) => x.split(/\n+/).map((y) => y.trim()).filter(Boolean).join("\n");
-    for (const [key, val] of [["phu_kien", cln(bk.pk)], ["bao_hiem", cln(bk.bh)], ["cong_ty_tra_gop", cln(bk.ftg)], ["gia_dang_ky", String(Number(bk.dk) || 350000)]]) {
+    for (const [key, val] of [["phu_kien", cln(bk.pk)], ["bao_hiem", cln(bk.bh)], ["gia_dang_ky", String(Number(bk.dk) || 350000)]]) {
       const { error } = await supabase.rpc("fn_set_setting", { p_key: key, p_value: val });
       if (error) return notify(errMsg(error), "err");
     }
     notify("Đã lưu danh mục bán kèm & trả góp."); setBk(null); refresh();
   };
 
-  const saveHookTC = async () => {
-    const v = hookTC.trim();
-    if (v && !v.startsWith("https://discord.com/api/webhooks/") && !v.startsWith("https://discordapp.com/api/webhooks/"))
-      return notify("URL không đúng dạng webhook Discord.", "err");
-    const { error } = await supabase.rpc("fn_set_setting", { p_key: "discord_webhook_thuchi", p_value: v });
-    if (error) return notify(errMsg(error), "err");
-    notify(v ? "Đã lưu webhook Thu-Chi. Báo cáo tự gửi 21h00 mỗi ngày." : "Đã tắt báo cáo Thu-Chi Discord.");
-    setHookTC(null); refresh();
-  };
-  const testHookTC = async () => {
-    const { error } = await supabase.rpc("fn_test_discord_thuchi");
-    if (error) return notify(errMsg(error), "err");
-    notify("Đã gửi báo cáo quỹ thử — kiểm tra channel Thu-Chi.");
-  };
-  const saveCats = async () => {
-    const cln = (x) => x.split(/[\n,;]+/).map((y) => y.trim()).filter(Boolean).join("\n");
-    let e1 = (await supabase.rpc("fn_set_setting", { p_key: "thu_categories", p_value: cln(cats.thu) })).error;
-    let e2 = (await supabase.rpc("fn_set_setting", { p_key: "chi_categories", p_value: cln(cats.chi) })).error;
-    if (e1 || e2) return notify(errMsg(e1 || e2), "err");
-    notify("Đã lưu danh mục hạng mục thu / chi."); setCats(null); refresh();
-  };
 
   const saveHook = async () => {
     const v = hook.trim();
@@ -98,12 +74,6 @@ export default function CaiDat() {
     setShow(true);
   };
 
-  const saveSuppliers = async () => {
-    const clean = sup.split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean).join("\n");
-    const { error } = await supabase.rpc("fn_set_setting", { p_key: "suppliers", p_value: clean });
-    if (error) return notify(errMsg(error), "err");
-    notify("Đã lưu danh sách nhà cung cấp."); setSup(null); refresh();
-  };
 
   if (loading || !profile) return <div className="card">Đang tải dữ liệu…</div>;
   if (!["CEO", "ADMIN"].includes(profile.role)) return <div className="card">Chỉ BGĐ/Admin được vào phần cài đặt.</div>;
@@ -189,54 +159,17 @@ export default function CaiDat() {
       </div>
 
       <div className="card">
-        <div className="font-extrabold mb-1">Thu - Chi: báo cáo Discord 21h00 {settings.discord_webhook_thuchi ? <Badge tone="green">Đang bật</Badge> : <Badge tone="gray">Chưa bật</Badge>}</div>
-        <p className="text-xs text-[#5A6572] mb-3">Tạo channel Discord riêng (VD #bao-cao-thu-chi) → lấy webhook như hướng dẫn ở mục trên → dán vào đây. Mỗi ngày 21h00 hệ thống tự gửi: thu/chi trong ngày, số dư từng quỹ, trạng thái chốt quỹ, cảnh báo quỹ chưa chốt.</p>
-        {hookTC === null ? (
-          <div className="flex gap-2 items-center flex-wrap mb-3">
-            <span className="text-sm font-mono text-[#5A6572]">{settings.discord_webhook_thuchi ? settings.discord_webhook_thuchi.slice(0, 45) + "…" : "Chưa cấu hình webhook Thu-Chi."}</span>
-            <button className="btn-ghost !py-1.5 !text-xs" onClick={() => setHookTC(settings.discord_webhook_thuchi || "")}>✎ {settings.discord_webhook_thuchi ? "Sửa" : "Thêm webhook"}</button>
-            {settings.discord_webhook_thuchi && <button className="btn-primary !py-1.5 !text-xs" onClick={testHookTC}>📨 Gửi báo cáo thử</button>}
-          </div>
-        ) : (
-          <div className="max-w-xl mb-3">
-            <input className="inp font-mono !text-xs" placeholder="https://discord.com/api/webhooks/…" value={hookTC} onChange={(e) => setHookTC(e.target.value)} />
-            <div className="flex gap-2 mt-2">
-              <button className="btn-ok !py-2 !text-xs" onClick={saveHookTC}>Lưu</button>
-              <button className="btn-ghost !py-2 !text-xs" onClick={() => setHookTC(null)}>Hủy</button>
-            </div>
-          </div>
-        )}
-        <div className="pt-3 border-t border-dashed border-[#E6EAEF]">
-          <div className="text-sm font-bold mb-1.5">Hạng mục thu / chi</div>
-          {cats === null ? (
-            <div className="flex gap-2 items-center flex-wrap">
-              <div className="text-xs"><b>Thu:</b> {(settings.thu_categories || "").split(/[\n,;]+/).filter(Boolean).join(", ")}</div>
-              <div className="text-xs"><b>Chi:</b> {(settings.chi_categories || "").split(/[\n,;]+/).filter(Boolean).join(", ")}</div>
-              <button className="btn-ghost !py-1.5 !text-xs" onClick={() => setCats({ thu: settings.thu_categories || "", chi: settings.chi_categories || "" })}>✎ Sửa</button>
-            </div>
-          ) : (
-            <div className="grid gap-3 md:grid-cols-2 max-w-xl">
-              <div><label className="lbl">Hạng mục THU (mỗi dòng 1)</label><textarea className="inp !h-28" value={cats.thu} onChange={(e) => setCats((p) => ({ ...p, thu: e.target.value }))} /></div>
-              <div><label className="lbl">Hạng mục CHI (mỗi dòng 1)</label><textarea className="inp !h-28" value={cats.chi} onChange={(e) => setCats((p) => ({ ...p, chi: e.target.value }))} /></div>
-              <div className="flex gap-2"><button className="btn-ok !py-2 !text-xs" onClick={saveCats}>Lưu</button><button className="btn-ghost !py-2 !text-xs" onClick={() => setCats(null)}>Hủy</button></div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="card">
-        <div className="font-extrabold mb-1">Bán kèm & Trả góp (dùng trong đơn bán)</div>
-        <p className="text-xs text-[#5A6572] mb-3">Danh mục phụ kiện và bảo hiểm theo định dạng mỗi dòng: <b>Tên|Giá</b> (VD: Mũ bảo hiểm|150000). Công ty trả góp mỗi dòng 1 tên.</p>
+        <div className="font-extrabold mb-1">Bán kèm (dùng trong đơn bán)</div>
+        <p className="text-xs text-[#5A6572] mb-3">Danh mục phụ kiện và bảo hiểm theo định dạng mỗi dòng: <b>Tên|Giá</b> (VD: Mũ bảo hiểm|150000).</p>
         {bk === null ? (
           <div className="flex gap-2 items-center flex-wrap">
-            <div className="text-xs"><b>Phụ kiện:</b> {(settings.phu_kien || "").split(/\n+/).filter(Boolean).length} mục · <b>Bảo hiểm:</b> {(settings.bao_hiem || "").split(/\n+/).filter(Boolean).length} mục · <b>Trả góp:</b> {(settings.cong_ty_tra_gop || "").split(/[\n,;]+/).filter(Boolean).join(", ")} · <b>Giá DV đăng ký:</b> {Number(settings.gia_dang_ky || 350000).toLocaleString("vi-VN")} đ</div>
-            <button className="btn-ghost !py-1.5 !text-xs" onClick={() => setBk({ pk: settings.phu_kien || "", bh: settings.bao_hiem || "", ftg: settings.cong_ty_tra_gop || "", dk: settings.gia_dang_ky || "350000" })}>✎ Sửa</button>
+            <div className="text-xs"><b>Phụ kiện:</b> {(settings.phu_kien || "").split(/\n+/).filter(Boolean).length} mục · <b>Bảo hiểm:</b> {(settings.bao_hiem || "").split(/\n+/).filter(Boolean).length} mục · <b>Giá DV đăng ký:</b> {Number(settings.gia_dang_ky || 350000).toLocaleString("vi-VN")} đ</div>
+            <button className="btn-ghost !py-1.5 !text-xs" onClick={() => setBk({ pk: settings.phu_kien || "", bh: settings.bao_hiem || "", dk: settings.gia_dang_ky || "350000" })}>✎ Sửa</button>
           </div>
         ) : (
           <div className="grid gap-3 md:grid-cols-2 max-w-2xl">
             <div><label className="lbl">Phụ kiện (Tên|Giá)</label><textarea className="inp !h-32 !text-xs font-mono" value={bk.pk} onChange={(e) => setBk((p) => ({ ...p, pk: e.target.value }))} /></div>
             <div><label className="lbl">Bảo hiểm (Tên|Giá)</label><textarea className="inp !h-32 !text-xs font-mono" value={bk.bh} onChange={(e) => setBk((p) => ({ ...p, bh: e.target.value }))} /></div>
-            <div><label className="lbl">Công ty trả góp (mỗi dòng 1)</label><textarea className="inp !h-24 !text-xs" value={bk.ftg} onChange={(e) => setBk((p) => ({ ...p, ftg: e.target.value }))} /></div>
             <div><label className="lbl">Giá DV đăng ký mặc định (đ)</label><input type="number" className="inp" value={bk.dk} onChange={(e) => setBk((p) => ({ ...p, dk: e.target.value }))} /></div>
             <div className="flex gap-2"><button className="btn-ok !py-2 !text-xs" onClick={saveBk}>Lưu</button><button className="btn-ghost !py-2 !text-xs" onClick={() => setBk(null)}>Hủy</button></div>
           </div>
@@ -257,25 +190,6 @@ export default function CaiDat() {
             <div className="flex gap-2 mt-2">
               <button className="btn-ok !py-2 !text-xs" onClick={saveRegions}>Lưu</button>
               <button className="btn-ghost !py-2 !text-xs" onClick={() => setReg(null)}>Hủy</button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="card">
-        <div className="font-extrabold mb-1">Nhà cung cấp (dropdown ở màn Nhập hàng)</div>
-        <p className="text-xs text-[#5A6572] mb-3">Mỗi dòng 1 nhà cung cấp.</p>
-        {sup === null ? (
-          <div className="flex items-center gap-3">
-            <div className="text-sm">{(settings.suppliers || "VinFast\nTAILG").split(/[\n,;]+/).filter(Boolean).map((x) => <Badge key={x} tone="blue">{x}</Badge>).reduce((a, b) => [a, " ", b], [])}</div>
-            <button className="btn-ghost !py-1.5 !text-xs" onClick={() => setSup(settings.suppliers || "VinFast\nTAILG")}>✎ Sửa danh sách</button>
-          </div>
-        ) : (
-          <div className="max-w-sm">
-            <textarea className="inp !h-24" value={sup} onChange={(e) => setSup(e.target.value)} />
-            <div className="flex gap-2 mt-2">
-              <button className="btn-ok !py-2 !text-xs" onClick={saveSuppliers}>Lưu</button>
-              <button className="btn-ghost !py-2 !text-xs" onClick={() => setSup(null)}>Hủy</button>
             </div>
           </div>
         )}

@@ -45,7 +45,7 @@ export default function AppShell({ profile, children }) {
       <aside className={`w-[232px] bg-navy-900 text-[#C8D3E0] flex flex-col shrink-0 fixed md:static z-50 h-screen md:h-auto transition-transform ${open ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}>
         <div className="px-4 py-5 border-b border-navy-700">
           <div className="text-lg font-extrabold text-white tracking-wide">MINH KỲ <span className="text-[#4ADE80]">EV</span></div>
-          <div className="text-[11px] text-[#7E8FA3] mt-0.5">Quản lý xuất nhập tồn xe điện</div>
+          <div className="text-[11px] text-[#7E8FA3] mt-0.5">Quản lý hệ thống xe điện</div>
         </div>
         <nav className="flex-1 p-2 overflow-y-auto">
           {NAV_GROUPS.map((g, gi) => {

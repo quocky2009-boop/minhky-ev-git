@@ -36,9 +36,9 @@ export default function TonTongHop() {
   const regTotal = (rg) => list.reduce((s, v) => s + regionQty(v.id, rg), 0);
 
   const exportCSV = () => {
-    const rows = [["Ma_Xe","Ten_Xe","Mau", ...regions.map((r) => "Tong "+r), ...locs.map((l) => l.name), "Tong"],
-      ...list.map((v) => [v.id, v.name, v.color, ...regions.map((r) => regionQty(v.id, r)), ...locs.map((l) => getQty(v.id, l.code)), totalQty(v.id)]),
-      ["TONG", "", "", ...regions.map((r) => regTotal(r)), ...locs.map((l) => colTotal(l.code)), grand]];
+    const rows = [["Ma_Xe","Ten_Xe","Mau","Tong", ...regions.map((r) => "Tong "+r), ...locs.map((l) => l.name)],
+      ...list.map((v) => [v.id, v.name, v.color, totalQty(v.id), ...regions.map((r) => regionQty(v.id, r)), ...locs.map((l) => getQty(v.id, l.code))]),
+      ["TONG", "", "", grand, ...regions.map((r) => regTotal(r)), ...locs.map((l) => colTotal(l.code))]];
     const csv = "\uFEFF" + rows.map((r) => r.map((c) => `"${String(c ?? "")}"`).join(",")).join("\n");
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a"); a.href = url; a.download = "ton_tong_hop.csv"; a.click(); URL.revokeObjectURL(url);
@@ -60,15 +60,16 @@ export default function TonTongHop() {
           <thead className="sticky top-0 z-10">
             <tr className="bg-[#F3F5F8]">
               <th className="th sticky left-0 bg-[#F3F5F8] z-20 min-w-[190px]">Xe</th>
+              <th className="th text-center bg-[#E7EFFD]">TỔNG</th>
               {regions.map((r) => <th key={r} className="th text-center bg-[#E5F6EE]">Σ {r}</th>)}
               {locs.map((l) => <th key={l.code} className="th text-center !px-2" title={l.name}>{l.name.replace(/(Quang Trung|Trường Chinh|Song Hào)/, (m) => m.split(" ").map(w=>w[0]).join(""))}</th>)}
-              <th className="th text-center bg-[#E7EFFD]">Tổng</th>
             </tr>
           </thead>
           <tbody>
             {list.map((v) => (
               <tr key={v.id} className="hover:bg-[#F8FAFC]">
                 <td className="td sticky left-0 bg-white font-semibold text-[12.5px]">{v.name} <span className="text-[#8A93A0]">· {v.color}</span></td>
+                <td className="td text-center font-extrabold bg-[#E7EFFD]">{totalQty(v.id)}</td>
                 {regions.map((r) => { const n = regionQty(v.id, r);
                   return <td key={r} className={`td text-center tabular-nums bg-[#F4FBF7] ${n === 0 ? "text-[#C6CDD6]" : "font-bold"}`}>{n === 0 ? "·" : n}</td>; })}
                 {locs.map((l) => {
@@ -77,14 +78,13 @@ export default function TonTongHop() {
                     title={n > 0 ? `Xem ${n} xe ${v.name} tại ${l.name}` : ""}
                     onClick={() => n > 0 && openCell(v, l)}>{n === 0 ? "·" : n}</td>;
                 })}
-                <td className="td text-center font-extrabold bg-[#F5F9FF]">{totalQty(v.id)}</td>
               </tr>
             ))}
             <tr className="bg-[#F3F5F8] font-extrabold">
               <td className="td sticky left-0 bg-[#F3F5F8]">TỔNG</td>
+              <td className="td text-center bg-[#E7EFFD]">{grand}</td>
               {regions.map((r) => <td key={r} className="td text-center tabular-nums bg-[#E5F6EE]">{regTotal(r)}</td>)}
               {locs.map((l) => <td key={l.code} className="td text-center tabular-nums">{colTotal(l.code)}</td>)}
-              <td className="td text-center bg-[#E7EFFD]">{grand}</td>
             </tr>
           </tbody>
         </table>
