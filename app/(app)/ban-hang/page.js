@@ -64,6 +64,15 @@ function BanHangInner() {
   };
   useEffect(() => { loadOrders(); }, []);
 
+  // ===== Dieu chinh don ban (2 cap) — hooks phai nam TRUOC return som =====
+  const [adjF, setAdjF] = useState({ new_price: "", reason: "" });
+  const [pendAdj, setPendAdj] = useState([]);
+  const loadPendAdj = async () => {
+    const { data } = await supabase.from("sale_adjust_requests").select("*").eq("status", "Chờ duyệt").order("created_at");
+    setPendAdj(data || []);
+  };
+  useEffect(() => { loadPendAdj(); }, []);
+
   // Nap danh sach xe (so khung) san sang khi da chon xe + kho
   useEffect(() => {
     setFrames([]);
@@ -134,15 +143,6 @@ function BanHangInner() {
     ]);
     setDetail({ ...o, _items: di || [], _pays: dp || [], _adjs: da || [] });
   };
-
-  // ===== Dieu chinh don ban (2 cap) =====
-  const [adjF, setAdjF] = useState({ new_price: "", reason: "" });
-  const [pendAdj, setPendAdj] = useState([]);
-  const loadPendAdj = async () => {
-    const { data } = await supabase.from("sale_adjust_requests").select("*").eq("status", "Chờ duyệt").order("created_at");
-    setPendAdj(data || []);
-  };
-  useEffect(() => { loadPendAdj(); }, []);
 
   const sendAdj = async () => {
     const { data, error } = await supabase.rpc("fn_yeu_cau_sua_don", {

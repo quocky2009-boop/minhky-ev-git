@@ -18,6 +18,27 @@ export default function QuetGom() {
   const [draftCode, setDraftCode] = useState("");
   const [drafts, setDrafts] = useState([]);
   const [dTab, setDTab] = useState("Nháp");
+  // ===== Danh sach hang (frame_pool) =====
+  const [poolQ, setPoolQ] = useState("");
+  const [poolHits, setPoolHits] = useState([]);
+  const [poolCount, setPoolCount] = useState(null);
+  const fileRef = { current: null };
+
+  const loadPoolCount = async () => {
+    const { count } = await supabase.from("frame_pool").select("*", { count: "exact", head: true });
+    setPoolCount(count ?? 0);
+  };
+  useEffect(() => { if (!loading) loadPoolCount(); }, [loading]);
+
+  useEffect(() => {
+    const q = poolQ.trim();
+    if (q.length < 3) { setPoolHits([]); return; }
+    const t = setTimeout(async () => {
+      const { data } = await supabase.rpc("fn_tim_pool", { p_q: q });
+      setPoolHits(data || []);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [poolQ]);
 
   const loadDrafts = async () => {
     const { data } = await supabase.from("import_drafts").select("*").order("updated_at", { ascending: false }).limit(200);
@@ -44,6 +65,50 @@ export default function QuetGom() {
   };
   const addManual = () => { addFrames(manual.split(/[\n,;\s]+/)); setManual(""); };
   const editFrame = (i, val) => setRows((p) => p.map((r, j) => (j === i ? { ...r, frame: val.toUpperCase() } : r)));
+
+  const pickPool = (h) => {
+    if (h.state !== "Chờ gán") return notify(`Số khung này ${h.state === "Đang ở phiếu" ? `đang nằm ở phiếu ${h.ref}` : h.state === "Đã trong kho" ? `đã ở kho ${h.ref}` : "đã bán"} — không chọn lại được.`, "err");
+    if (rows.some((r) => r.frame === h.frame_number)) return notify("Số khung này đã có trong danh sách đang gom.", "err");
+    setRows((p) => [...p, { frame: h.frame_number, vehicle_id: h.vehicle_id }]);
+    setPoolQ(""); setPoolHits([]);
+    notify(`Đã thêm ${h.frame_number} — nhớ Lưu phiếu nháp để giữ chỗ, tránh điểm khác chọn trùng.`);
+  };
+
+  const stripVN = (x) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const importPoolCSV = async (file) => {
+    const text = (await file.text()).replace(/^\uFEFF/, "");
+    const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    if (lines.length < 2) return notify("File rỗng hoặc thiếu dòng dữ liệu.", "err");
+    const sep = lines[0].includes(";") && !lines[0].includes(",") ? ";" : ",";
+    const cells = (l) => l.split(sep).map((c) => c.replace(/^"|"$/g, "").trim());
+    const head = cells(lines[0]).map(stripVN);
+    const iVid = head.findIndex((h) => ["maxe", "manoibo", "vehicleid", "maxenoibo", "ma"].some((k) => h.includes(k)));
+    const iFrame = head.findIndex((h) => ["sokhung", "framenumber", "frame", "sokhungxe", "vin"].some((k) => h.includes(k)));
+    if (iVid < 0 || iFrame < 0) return notify(`Không nhận ra cột. Tiêu đề cần có "Mã xe" (mã nội bộ) và "Số khung" — file đang có: ${cells(lines[0]).join(" | ")}`, "err");
+    const rws = lines.slice(1).map(cells).map((c) => ({ vehicle_id: c[iVid], frame_number: c[iFrame] })).filter((r) => r.frame_number);
+    if (rws.length === 0) return notify("Không đọc được dòng dữ liệu nào.", "err");
+    if (!confirm(`Import ${rws.length} số khung từ file hãng vào danh sách chờ?`)) return;
+    setBusy(true);
+    let ins = 0, upd = 0, skipped = [];
+    for (let i = 0; i < rws.length; i += 500) {
+      const { data, error } = await supabase.rpc("fn_import_pool", { p_rows: rws.slice(i, i + 500) });
+      if (error) { setBusy(false); return notify(errMsg(error), "err"); }
+      ins += data.inserted; upd += data.updated; skipped = skipped.concat(data.skipped || []);
+    }
+    setBusy(false); loadPoolCount();
+    notify(`Import xong: ${ins} mới, ${upd} cập nhật.` +
+      (skipped.length ? ` Bỏ qua ${skipped.length}: ${skipped.slice(0, 3).map((x) => `${x.frame} (${x.ly_do})`).join("; ")}${skipped.length > 3 ? "…" : ""}` : ""),
+      skipped.length ? "err" : "ok");
+  };
+
+  const exportPoolConLai = async () => {
+    const { data, error } = await supabase.rpc("fn_pool_con_lai");
+    if (error) return notify(errMsg(error), "err");
+    if (!data?.length) return notify("Không còn số khung nào chờ gán — toàn bộ danh sách hãng đã vào kho/phiếu. 🎉");
+    downloadCSV(`doi_chieu_chua_gan_${new Date().toISOString().slice(0, 10)}.csv`,
+      [["frame_number", "vehicle_id"], ...data.map((r) => [r.frame_number, r.vehicle_id])]);
+    notify(`Đã xuất ${data.length} số khung hãng có nhưng chưa thấy thực tế — dùng làm bảng đối chiếu thiếu.`);
+  };
 
   const newDraft = () => { setRows([]); setDraftId(null); setDraftCode(""); };
 
@@ -151,6 +216,44 @@ export default function QuetGom() {
           <input className="inp font-mono !text-[13px]" placeholder="Hoặc gõ/dán số khung, cách nhau xuống dòng…" value={manual} onChange={(e) => setManual(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addManual()} />
           <button className="btn-ghost whitespace-nowrap" onClick={addManual}>+ Thêm</button>
         </div>
+      </div>
+
+      <div className="card">
+        <div className="flex items-center gap-2 flex-wrap mb-1.5">
+          <div className="font-extrabold mr-auto">🔎 Tìm từ danh sách hãng {poolCount !== null && <span className="text-xs font-normal text-[#8A93A0]">({poolCount} số khung trong danh sách chờ)</span>}</div>
+          {canImport && (
+            <>
+              <label className="btn-ghost !text-xs cursor-pointer">⬆ Import file hãng (CSV)
+                <input type="file" accept=".csv,text/csv" className="hidden" onChange={(e) => { if (e.target.files[0]) importPoolCSV(e.target.files[0]); e.target.value = ""; }} />
+              </label>
+              <button className="btn-ghost !text-xs" onClick={exportPoolConLai}>⬇ CSV chưa gán (đối chiếu)</button>
+              <button className="btn-ghost !text-xs hover:text-danger" onClick={async () => { if (confirm("Xóa TOÀN BỘ danh sách chờ từ hãng? (không ảnh hưởng tồn kho/phiếu nháp)")) { const { error } = await supabase.rpc("fn_xoa_pool"); if (error) return notify(errMsg(error), "err"); loadPoolCount(); notify("Đã xóa danh sách chờ."); } }}>🗑</button>
+            </>
+          )}
+        </div>
+        <p className="text-[11px] text-[#8A93A0] mb-2">Nhìn tem xe → gõ 3–6 ký tự cuối số khung → chạm chọn, xe tự vào danh sách đang gom với đúng mẫu xe theo file hãng (không lo chọn nhầm model). Kho vẫn do mình chọn ở ô trên.</p>
+        <input className="inp font-mono !text-[14px]" placeholder="Gõ đuôi số khung, VD: 429407…" value={poolQ} onChange={(e) => setPoolQ(e.target.value.toUpperCase())} />
+        {poolQ.trim().length >= 3 && (
+          <div className="mt-1.5 border border-[#E6EAEF] rounded-xl overflow-hidden">
+            {poolHits.length === 0 && <div className="px-3 py-2.5 text-sm text-[#8A93A0]">Không thấy trong danh sách hãng — kiểm tra lại số hoặc dùng quét camera/gõ tay ở trên.</div>}
+            {poolHits.map((h) => {
+              const v = vOf(h.vehicle_id);
+              const free = h.state === "Chờ gán";
+              return (
+                <button key={h.frame_number} className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left border-b border-[#F2F4F7] last:border-0 ${free ? "hover:bg-[#F0FDF6] cursor-pointer" : "opacity-60"}`} onClick={() => pickPool(h)}>
+                  <span className="font-mono font-bold text-[13px]">{h.frame_number}</span>
+                  <span className="text-xs text-[#5A6572]">{v ? `${v.name} ${v.color}` : h.vehicle_id}</span>
+                  <span className="ml-auto">
+                    {free ? <Badge tone="green">Chờ gán</Badge>
+                      : h.state === "Đang ở phiếu" ? <Badge tone="amber">Ở phiếu {h.ref}</Badge>
+                      : h.state === "Đã bán" ? <Badge tone="gray">Đã bán</Badge>
+                      : <Badge tone="blue">Kho {locNameOf(h.ref)}</Badge>}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div className="card">
