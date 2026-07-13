@@ -266,13 +266,20 @@ export default function QuetGom() {
         </div>
         <p className="text-[11px] text-[#8A93A0] mb-2">Nhìn tem xe → gõ 3–6 ký tự cuối số khung → chạm chọn, xe tự vào danh sách đang gom với đúng mẫu xe theo file hãng (không lo chọn nhầm model). Kho vẫn do mình chọn ở ô trên.</p>
         <div className="flex gap-1.5">
-          <input className="inp font-mono !text-[14px]" placeholder="Gõ đuôi số khung, VD: 429407…" value={poolQ} onChange={(e) => setPoolQ(e.target.value.toUpperCase())} />
+          <input className="inp font-mono !text-[14px]" placeholder="Gõ đuôi số khung, VD: 429407…" value={poolQ} onChange={(e) => { setPoolQ(e.target.value.toUpperCase()); setPoolPage(1); }} />
           <button className={`btn !px-3 !text-xs whitespace-nowrap ${poolOpen ? "bg-navy-900 text-white" : "bg-[#EEF1F4] text-[#3B4552]"}`} onClick={togglePoolList}>📋 {poolOpen ? "Ẩn danh sách" : "Xem danh sách chờ"}</button>
         </div>
         {poolOpen && (
           <div className="mt-2.5">
             {poolAll === null ? <div className="text-sm text-[#8A93A0]">Đang tải danh sách…</div> : (() => {
-              const filtered = poolAll.filter((x) => !poolFilter || x.state === poolFilter);
+              const q = poolQ.trim().toUpperCase();
+              const filtered = poolAll.filter((x) => {
+                if (poolFilter && x.state !== poolFilter) return false;
+                if (!q) return true;
+                const v = vOf(x.vehicle_id);
+                const label = `${x.frame_number} ${x.vehicle_id} ${v ? v.name + " " + v.color : ""}`.toUpperCase();
+                return label.includes(q);
+              });
               const counts = poolAll.reduce((m, x) => ({ ...m, [x.state]: (m[x.state] || 0) + 1 }), {});
               return (
                 <>
@@ -301,7 +308,7 @@ export default function QuetGom() {
                         </tr>
                       );
                     })}
-                    {filtered.length === 0 && <tr><td className="td" colSpan={5}>Không có số khung nào ở trạng thái này.</td></tr>}
+                    {filtered.length === 0 && <tr><td className="td" colSpan={5}>{q ? `Không có số khung nào khớp "${q}"${poolFilter ? ` ở trạng thái ${poolFilter}` : ""}.` : "Không có số khung nào ở trạng thái này."}</td></tr>}
                     </tbody>
                   </table></div>
                   <Pager total={filtered.length} page={poolPage} setPage={setPoolPage} pageSize={poolPageSize} setPageSize={setPoolPageSize} />
@@ -310,7 +317,7 @@ export default function QuetGom() {
             })()}
           </div>
         )}
-        {poolQ.trim().length >= 3 && (
+        {!poolOpen && poolQ.trim().length >= 3 && (
           <div className="mt-1.5 border border-[#E6EAEF] rounded-xl overflow-hidden">
             {poolHits.length === 0 && <div className="px-3 py-2.5 text-sm text-[#8A93A0]">Không thấy trong danh sách hãng — kiểm tra lại số hoặc dùng quét camera/gõ tay ở trên.</div>}
             {poolHits.map((h) => {
