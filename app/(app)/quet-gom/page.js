@@ -34,7 +34,7 @@ export default function QuetGom() {
   const [poolAll, setPoolAll] = useState(null);   // null = chua tai
   const [poolFilter, setPoolFilter] = useState("");
   const [poolPage, setPoolPage] = useState(1);
-  const [poolPageSize, setPoolPageSize] = useState(20);
+  const [poolPageSize, setPoolPageSize] = useState(10);
 
   const [batches, setBatches] = useState([]);
   const [selBatch, setSelBatch] = useState("");   // "" = tat ca cac lo
@@ -491,11 +491,36 @@ export default function QuetGom() {
                       );
                     })}</tbody>
                   </table></div>
-                  <div className="flex gap-1.5 items-center mt-2 flex-wrap">
-                    <span className="text-[11px] font-bold text-[#5A6572] shrink-0">Thêm xe:</span>
-                    <div className="!w-64"><VehicleSearch vehicles={vehicles} value={edVid} onChange={setEdVid} /></div>
-                    <input className="inp !w-56 !py-2 font-mono !text-[12.5px]" placeholder="Số khung…" value={edFrame} onChange={(e) => setEdFrame(e.target.value.toUpperCase())} onKeyDown={(e) => e.key === "Enter" && edAddRow()} />
-                    <button className="btn-ghost !px-3 !py-2 !text-xs" onClick={edAddRow}>+ Thêm</button>
+                  <div className="mt-2">
+                    <div className="flex gap-1.5 items-center flex-wrap">
+                      <span className="text-[11px] font-bold text-[#5A6572] shrink-0">Thêm xe:</span>
+                      <div className="relative">
+                        <input className="inp !w-64 !py-2 font-mono !text-[12.5px]" placeholder="Gõ 3–6 ký tự cuối số khung…" value={edFrame} onChange={(e) => setEdFrame(e.target.value.toUpperCase())} onKeyDown={(e) => e.key === "Enter" && edAddRow()} />
+                        {edFrame.trim().length >= 3 && poolAll !== null && (() => {
+                          const q = edFrame.trim().toUpperCase();
+                          const hits = poolAll.filter((x) => x.frame_number.includes(q) && x.state === "Chờ gán" && !editRows.some((r) => r.frame === x.frame_number)).slice(0, 8);
+                          if (hits.length === 0) return null;
+                          return (
+                            <div className="absolute z-30 left-0 right-0 mt-1 bg-white border border-[#D5DBE3] rounded-xl shadow-lg overflow-hidden min-w-[320px]">
+                              <div className="px-3 py-1.5 text-[10.5px] font-bold bg-[#F8FAFC] text-[#5A6572]">Gợi ý từ danh sách hãng (tất cả các lô) — chạm để thêm:</div>
+                              {hits.map((h) => {
+                                const v = vOf(h.vehicle_id);
+                                return (
+                                  <button key={h.frame_number} className="w-full flex items-center gap-2.5 px-3 py-2 text-left border-t border-[#F2F4F7] hover:bg-[#F0FDF6]"
+                                    onClick={() => { setEditRows((p) => [...p, { frame: h.frame_number, vehicle_id: h.vehicle_id }]); setEdFrame(""); }}>
+                                    <span className="font-mono font-bold text-[12.5px]">{h.frame_number}</span>
+                                    <span className="text-[11px] text-[#5A6572] ml-auto">{v ? `${v.name} ${v.color}` : h.vehicle_id}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                      <div className="!w-56"><VehicleSearch vehicles={vehicles} value={edVid} onChange={setEdVid} /></div>
+                      <button className="btn-ghost !px-3 !py-2 !text-xs" onClick={edAddRow}>+ Thêm tay</button>
+                    </div>
+                    <p className="text-[10.5px] text-[#8A93A0] mt-1">Gõ số khung → chọn từ gợi ý là tự điền mẫu xe. Xe không có trong danh sách hãng thì chọn mẫu xe ở ô bên + bấm "Thêm tay".</p>
                   </div>
                 </td></tr>
               ),

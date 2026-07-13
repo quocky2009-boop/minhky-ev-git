@@ -2,7 +2,7 @@
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Field, Badge, Toast, VehicleSearch, LocPicker, FramePicker, Pager, pageSlice } from "@/components/ui";
+import { Field, Badge, Toast, VehicleSearch, LocSearch, FramePicker, Pager, pageSlice } from "@/components/ui";
 import { fmtVND, fmtDate, fmtTime, errMsg } from "@/lib/format";
 import { CUSTOMER_TYPES, CUSTOMER_SOURCES, PAYMENT_METHODS, DOC_STATUSES } from "@/lib/const";
 
@@ -218,7 +218,7 @@ function BanHangInner() {
           </div>
           <div className="grid gap-x-4 md:grid-cols-3 sm:grid-cols-2">
             <Field label="Xe (gõ để tìm)" required><VehicleSearch vehicles={vehicles} value={f.vehicle_id} onChange={(v) => set("vehicle_id", v)} /></Field>
-            <Field label="Kho / cửa hàng xuất xe" required><LocPicker locations={locations} value={f.location_code} onChange={(v) => set("location_code", v)} /></Field>
+            <Field label="Kho / cửa hàng xuất xe (gõ để tìm)" required><LocSearch locations={locations} value={f.location_code} onChange={(v) => set("location_code", v)} /></Field>
             <Field label={`Chọn xe bán (${units.length} xe sẵn sàng tại kho)`} required>
               {f.vehicle_id && f.location_code
                 ? <FramePicker units={units} selected={frames} onToggle={(fr) => setFrames((p) => p.includes(fr) ? p.filter((x) => x !== fr) : [...p, fr])} />
