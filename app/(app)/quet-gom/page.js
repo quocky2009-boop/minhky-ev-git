@@ -1,24 +1,35 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Field, Badge, Toast, VehicleSearch, LocSearch } from "@/components/ui";
-import { errMsg, downloadCSV } from "@/lib/format";
+import { errMsg, downloadCSV, fmtTime } from "@/lib/format";
 import Scanner from "@/components/Scanner";
 
 export default function QuetGom() {
   const { supabase, vehicles, locations, profile, loading, refresh } = useCatalog();
   const { toast, notify } = useToast();
   const [loc, setLoc] = useState("");
-  const [vid, setVid] = useState("");         // model dang quet
-  const [rows, setRows] = useState([]);        // {frame, vehicle_id}
+  const [vid, setVid] = useState("");          // mau xe dang quet
+  const [rows, setRows] = useState([]);         // {frame, vehicle_id}
   const [manual, setManual] = useState("");
   const [showScanner, setShowScanner] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [draftId, setDraftId] = useState(null);  // dang sua phieu nao
+  const [draftCode, setDraftCode] = useState("");
+  const [drafts, setDrafts] = useState([]);
+  const [dTab, setDTab] = useState("Nháp");
+
+  const loadDrafts = async () => {
+    const { data } = await supabase.from("import_drafts").select("*").order("updated_at", { ascending: false }).limit(200);
+    setDrafts(data || []);
+  };
+  useEffect(() => { if (!loading) loadDrafts(); }, [loading]);
 
   if (loading || !profile) return <div className="card">Đang tải dữ liệu…</div>;
   const canImport = ["CEO", "ADMIN"].includes(profile.role);
-  const vName = (id) => { const v = vehicles.find((x) => x.id === id); return v ? `${v.name} ${v.color}` : id; };
+  const vOf = (id) => vehicles.find((x) => x.id === id);
   const locLabel = locations.find((l) => l.code === loc)?.name || "";
+  const locNameOf = (c) => locations.find((l) => l.code === c)?.name || c;
 
   const addFrames = (list) => {
     if (!vid) return notify("Chọn mẫu xe đang quét trước (dãy nào quét dãy đó).", "err");
@@ -31,31 +42,64 @@ export default function QuetGom() {
       return [...prev, ...fresh.map((f) => ({ frame: f, vehicle_id: vid }))];
     });
   };
+  const addManual = () => { addFrames(manual.split(/[\n,;\s]+/)); setManual(""); };
+  const editFrame = (i, val) => setRows((p) => p.map((r, j) => (j === i ? { ...r, frame: val.toUpperCase() } : r)));
 
-  const addManual = () => {
-    addFrames(manual.split(/[\n,;\s]+/));
-    setManual("");
+  const newDraft = () => { setRows([]); setDraftId(null); setDraftCode(""); };
+
+  const saveDraft = async () => {
+    if (!loc) return notify("Chọn kho trước khi lưu phiếu.", "err");
+    if (rows.length === 0) return notify("Chưa có số khung nào để lưu.", "err");
+    const frames = rows.map((r) => r.frame.trim()).filter(Boolean);
+    if (frames.length !== rows.length) return notify("Có dòng số khung đang để trống — điền hoặc xóa dòng đó.", "err");
+    if (new Set(frames).size !== frames.length) return notify("Có số khung bị trùng trong phiếu — kiểm tra lại các dòng.", "err");
+    setBusy(true);
+    const { data, error } = await supabase.rpc("fn_luu_phieu_nhap", {
+      p: { id: draftId || "", location_code: loc, rows: rows.map((r) => ({ frame_number: r.frame.trim(), vehicle_id: r.vehicle_id })) },
+    });
+    setBusy(false);
+    if (error) return notify(errMsg(error), "err");
+    setDraftCode(data);
+    if (!draftId) {
+      const { data: d } = await supabase.from("import_drafts").select("id").eq("code", data).single();
+      if (d) setDraftId(d.id);
+    }
+    notify(`Đã lưu phiếu nhập nháp ${data} (${rows.length} xe · ${locLabel}). Sửa tiếp hoặc chuyển Admin/BGĐ nhập vào kho.`);
+    loadDrafts();
   };
 
-  // Nhom theo model de hien thi
-  const groups = {};
-  rows.forEach((r) => { (groups[r.vehicle_id] = groups[r.vehicle_id] || []).push(r.frame); });
-
-  const exportCSV = () => {
-    if (rows.length === 0) return notify("Chưa có số khung nào.", "err");
-    downloadCSV(`quet_${loc || "kho"}_${new Date().toISOString().slice(0, 10)}.csv`,
-      [["frame_number", "vehicle_id"], ...rows.map((r) => [r.frame, r.vehicle_id])]);
-    notify(`Đã xuất ${rows.length} số khung — gửi file này qua Zalo cho Admin/BGĐ để import vào kho ${locLabel || "(nhớ ghi rõ kho nào)"}.`);
+  const exportRows = (rws, tag) => {
+    downloadCSV(`${tag}_${new Date().toISOString().slice(0, 10)}.csv`,
+      [["frame_number", "vehicle_id"], ...rws.map((r) => [r.frame_number || r.frame, r.vehicle_id])]);
   };
 
-  const importNow = async () => {
+  const importDraft = async (d) => {
+    if (!confirm(`Nhập phiếu ${d.code} (${(d.rows || []).length} xe) vào ${locNameOf(d.location_code)}?`)) return;
+    setBusy(true);
+    const { data, error } = await supabase.rpc("fn_nhap_tu_phieu", { p_id: d.id });
+    setBusy(false);
+    if (error) return notify(errMsg(error), "err");
+    const sk = data?.skipped || [];
+    notify(`Phiếu ${d.code}: đã nhập ${data?.inserted || 0} xe (chứng từ ${data?.doc}).` +
+      (sk.length ? ` Bỏ qua ${sk.length} số khung: ${sk.slice(0, 3).map((x) => `${x.frame} (${x.ly_do})`).join("; ")}${sk.length > 3 ? "…" : ""}` : ""),
+      sk.length ? "err" : "ok");
+    if (draftId === d.id) newDraft();
+    loadDrafts(); refresh();
+  };
+
+  const importCurrent = async () => {
     if (!loc) return notify("Chọn kho trước khi nhập thẳng.", "err");
     if (rows.length === 0) return notify("Chưa có số khung nào.", "err");
-    if (!confirm(`Nhập thẳng ${rows.length} xe vào ${locLabel}?`)) return;
+    if (draftId) {
+      const d = drafts.find((x) => x.id === draftId);
+      await saveDraft();
+      return importDraft(d || { id: draftId, code: draftCode, rows, location_code: loc });
+    }
+    if (!confirm(`Nhập thẳng ${rows.length} xe vào ${locLabel} (không lưu phiếu nháp)?`)) return;
     setBusy(true);
     const { data, error } = await supabase.rpc("fn_import_units", {
       p_loc: loc,
-      p_rows: rows.map((r) => ({ frame_number: r.frame, vehicle_id: r.vehicle_id, note: "Kiểm kê đầu kỳ" })),
+      p_rows: rows.map((r) => ({ frame_number: r.frame.trim(), vehicle_id: r.vehicle_id, note: "Kiểm kê đầu kỳ" })),
     });
     setBusy(false);
     if (error) return notify(errMsg(error), "err");
@@ -64,9 +108,25 @@ export default function QuetGom() {
       (sk.length ? ` Bỏ qua ${sk.length}: ${sk.slice(0, 3).map((x) => `${x.frame} (${x.ly_do})`).join("; ")}${sk.length > 3 ? "…" : ""}` : ""),
       sk.length ? "err" : "ok");
     if (!sk.length) setRows([]);
-    else setRows((prev) => prev.filter((r) => sk.some((x) => x.frame === r.frame)));
     refresh();
   };
+
+  const openDraft = (d) => {
+    setRows((d.rows || []).map((r) => ({ frame: r.frame_number, vehicle_id: r.vehicle_id })));
+    setLoc(d.location_code); setDraftId(d.id); setDraftCode(d.code);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    notify(`Đang mở phiếu ${d.code} để sửa — sửa xong nhớ bấm "Lưu phiếu nháp".`);
+  };
+
+  const delDraft = async (d) => {
+    if (!confirm(`Xóa phiếu nháp ${d.code}?`)) return;
+    const { error } = await supabase.rpc("fn_xoa_phieu_nhap", { p_id: d.id });
+    if (error) return notify(errMsg(error), "err");
+    if (draftId === d.id) newDraft();
+    notify(`Đã xóa phiếu ${d.code}.`); loadDrafts();
+  };
+
+  const shown = drafts.filter((d) => d.status === dTab);
 
   return (
     <div className="flex flex-col gap-4">
@@ -74,15 +134,19 @@ export default function QuetGom() {
       {showScanner && <Scanner onClose={() => setShowScanner(false)} onAdd={addFrames} />}
 
       <div className="card">
-        <div className="font-extrabold text-base">Quét gom số khung → CSV</div>
-        <p className="text-xs text-[#5A6572] mb-3">Dùng cho kiểm kê / nhập tồn đầu kỳ: đứng ở dãy xe nào thì chọn đúng mẫu xe đó rồi quét liên tục; sang dãy khác đổi mẫu xe quét tiếp. Xong bấm Xuất CSV gửi Admin — trang này không tự thay đổi tồn kho.</p>
+        <div className="font-extrabold text-base">Quét gom số khung</div>
+        <p className="text-xs text-[#5A6572] mb-3">Đứng dãy xe nào chọn đúng mẫu xe đó rồi quét liên tục; sang dãy khác đổi mẫu xe quét tiếp. Quét xong bấm <b>Lưu phiếu nháp</b> — phiếu sửa được trước khi Admin/BGĐ nhập vào kho. Trang này không tự thay đổi tồn.</p>
+        {draftId && (
+          <div className="flex items-center gap-2 bg-[#FDF6E3] border border-[#F5C542] rounded-xl px-3 py-2 mb-3 text-[13px]">
+            <span className="font-bold">✏ Đang sửa phiếu {draftCode}</span>
+            <button className="btn-ghost !px-2.5 !py-1 !text-xs ml-auto" onClick={newDraft}>+ Phiếu mới</button>
+          </div>
+        )}
         <div className="grid gap-x-4 md:grid-cols-2">
           <Field label="Kho / cửa hàng đang kiểm" required><LocSearch locations={locations} value={loc} onChange={setLoc} /></Field>
           <Field label="Mẫu xe đang quét (dãy hiện tại)" required><VehicleSearch vehicles={vehicles} value={vid} onChange={setVid} /></Field>
         </div>
-        <div className="flex gap-2 flex-wrap">
-          <button className="btn-primary !py-3 flex-1 min-w-[200px]" disabled={!vid} onClick={() => setShowScanner(true)}>📷 Quét camera / chụp OCR</button>
-        </div>
+        <button className="btn-primary !py-3 w-full" disabled={!vid} onClick={() => setShowScanner(true)}>📷 Quét camera / chụp OCR</button>
         <div className="flex gap-1.5 mt-2">
           <input className="inp font-mono !text-[13px]" placeholder="Hoặc gõ/dán số khung, cách nhau xuống dòng…" value={manual} onChange={(e) => setManual(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addManual()} />
           <button className="btn-ghost whitespace-nowrap" onClick={addManual}>+ Thêm</button>
@@ -92,23 +156,62 @@ export default function QuetGom() {
       <div className="card">
         <div className="flex items-center gap-2 flex-wrap mb-2.5">
           <div className="font-extrabold mr-auto">Đã gom: {rows.length} xe {locLabel && `· ${locLabel}`}</div>
-          <button className="btn-ok !text-xs" onClick={exportCSV}>⬇ Xuất CSV gửi Admin</button>
-          {canImport && <button className="btn-primary !text-xs" disabled={busy} onClick={importNow}>{busy ? "Đang nhập…" : "⚡ Nhập thẳng vào kho (Admin/BGĐ)"}</button>}
-          {rows.length > 0 && <button className="btn-danger !text-xs" onClick={() => confirm("Xóa toàn bộ danh sách đã quét?") && setRows([])}>Làm lại</button>}
+          <button className="btn-primary !text-xs" disabled={busy} onClick={saveDraft}>💾 Lưu phiếu nháp</button>
+          <button className="btn-ok !text-xs" onClick={() => rows.length ? (exportRows(rows, `quet_${loc || "kho"}`), notify(`Đã xuất ${rows.length} số khung — gửi Zalo cho Admin/BGĐ kèm tên kho.`)) : notify("Chưa có số khung nào.", "err")}>⬇ Xuất CSV</button>
+          {canImport && <button className="btn-primary !text-xs" disabled={busy} onClick={importCurrent}>{busy ? "Đang xử lý…" : "⚡ Nhập thẳng vào kho"}</button>}
+          {rows.length > 0 && <button className="btn-danger !text-xs" onClick={() => confirm("Xóa toàn bộ danh sách đang gom?") && newDraft()}>Làm lại</button>}
         </div>
-        {Object.keys(groups).length === 0 && <div className="text-sm text-[#8A93A0]">Chưa quét xe nào. Chọn mẫu xe rồi bấm nút quét.</div>}
-        {Object.entries(groups).map(([id, frames]) => (
-          <div key={id} className="mb-2.5">
-            <div className="text-[13px] font-extrabold mb-1"><Badge tone="blue">{frames.length}</Badge> {vName(id)}</div>
-            <div className="flex gap-1.5 flex-wrap">
-              {frames.map((fr) => (
-                <span key={fr} className="inline-flex items-center gap-1 bg-[#F3F5F8] rounded-lg px-2 py-1 font-mono text-[11.5px]">
-                  {fr}<button className="text-[#C6CDD6] hover:text-danger" onClick={() => setRows((p) => p.filter((r) => r.frame !== fr))}>✕</button>
-                </span>
-              ))}
-            </div>
-          </div>
-        ))}
+        {rows.length === 0 ? <div className="text-sm text-[#8A93A0]">Chưa quét xe nào. Chọn mẫu xe rồi bấm nút quét, hoặc mở một phiếu nháp bên dưới để sửa.</div> : (
+          <div className="overflow-x-auto"><table className="w-full border-collapse">
+            <thead><tr><th className="th w-10">STT</th><th className="th">Hãng</th><th className="th">Tên xe</th><th className="th">Màu</th><th className="th">Số khung (sửa được)</th><th className="th w-8"></th></tr></thead>
+            <tbody>{rows.map((r, i) => {
+              const v = vOf(r.vehicle_id);
+              return (
+                <tr key={i} className="hover:bg-[#F8FAFC]">
+                  <td className="td text-center text-xs text-[#8A93A0]">{i + 1}</td>
+                  <td className="td text-xs">{v?.brand || "?"}</td>
+                  <td className="td font-semibold text-[13px]">{v?.name || r.vehicle_id}</td>
+                  <td className="td text-xs">{v?.color || ""}</td>
+                  <td className="td"><input className="inp !py-1.5 !text-[12.5px] font-mono !w-56 max-w-full" value={r.frame} onChange={(e) => editFrame(i, e.target.value)} /></td>
+                  <td className="td"><button className="text-[#C6CDD6] hover:text-danger" title="Xóa dòng" onClick={() => setRows((p) => p.filter((_, j) => j !== i))}>✕</button></td>
+                </tr>
+              );
+            })}</tbody>
+          </table></div>
+        )}
+      </div>
+
+      <div className="card">
+        <div className="flex items-center gap-2 flex-wrap mb-2.5">
+          <div className="font-extrabold mr-auto">Danh sách phiếu nhập nháp</div>
+          {["Nháp", "Đã nhập"].map((t) => (
+            <button key={t} className={`btn !px-3 !py-2 !text-xs ${dTab === t ? "bg-navy-900 text-white" : "bg-[#EEF1F4] text-[#3B4552]"}`} onClick={() => setDTab(t)}>
+              {t} ({drafts.filter((d) => d.status === t).length})
+            </button>
+          ))}
+        </div>
+        {shown.length === 0 ? <div className="text-sm text-[#8A93A0]">Chưa có phiếu nào ở mục này.</div> : (
+          <div className="overflow-x-auto"><table className="w-full border-collapse">
+            <thead><tr><th className="th">Phiếu</th><th className="th">Kho</th><th className="th">Số xe</th><th className="th">Người tạo</th><th className="th">Cập nhật</th><th className="th">Trạng thái</th><th className="th"></th></tr></thead>
+            <tbody>{shown.map((d) => (
+              <tr key={d.id} className="hover:bg-[#F8FAFC]">
+                <td className="td font-bold">{d.code}{d.imported_doc && <div className="text-[10.5px] text-[#8A93A0] font-normal">→ {d.imported_doc}</div>}</td>
+                <td className="td text-xs">{locNameOf(d.location_code)}</td>
+                <td className="td font-bold text-center">{(d.rows || []).length}</td>
+                <td className="td text-xs">{d.created_by_name}</td>
+                <td className="td text-xs">{fmtTime(d.updated_at)}</td>
+                <td className="td">{d.status === "Nháp" ? <Badge tone="amber">Nháp</Badge> : <Badge tone="green">Đã nhập{d.imported_by_name ? ` · ${d.imported_by_name}` : ""}</Badge>}</td>
+                <td className="td"><div className="flex gap-1.5 flex-wrap">
+                  {d.status === "Nháp" && <button className="btn-ghost !px-2.5 !py-1 !text-xs" onClick={() => openDraft(d)}>✏ Mở sửa</button>}
+                  <button className="btn-ghost !px-2.5 !py-1 !text-xs" onClick={() => exportRows(d.rows || [], d.code)}>CSV</button>
+                  {canImport && d.status === "Nháp" && <button className="btn-primary !px-2.5 !py-1 !text-xs" disabled={busy} onClick={() => importDraft(d)}>⚡ Nhập</button>}
+                  {d.status === "Nháp" && <button className="btn-ghost !px-2 !py-1 !text-xs hover:text-danger" onClick={() => delDraft(d)}>🗑</button>}
+                </div></td>
+              </tr>
+            ))}</tbody>
+          </table></div>
+        )}
+        <p className="text-[11px] text-[#8A93A0] mt-2">Sales lưu phiếu nháp → Quản lý/Admin/BGĐ mở sửa nếu cần → Admin/BGĐ bấm ⚡ Nhập là xe vào kho, phiếu chuyển sang "Đã nhập" kèm mã chứng từ.</p>
       </div>
     </div>
   );

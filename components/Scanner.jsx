@@ -14,6 +14,7 @@ const beep = () => {
 };
 
 export default function Scanner({ onAdd, onClose }) {
+  const [last, setLast] = useState("");
   const [tab, setTab] = useState("scan");
   const [codes, setCodes] = useState([]);        // ma da quet trong phien
   const [err, setErr] = useState("");
@@ -65,6 +66,7 @@ export default function Scanner({ onAdd, onClose }) {
             setCodes((p) => {
               if (p.includes(v)) return p;
               beep();
+              setLast(v);
               return [...p, v];
             });
           },
@@ -124,7 +126,13 @@ export default function Scanner({ onAdd, onClose }) {
 
         {tab === "scan" && (
           <>
-            <div id="mk-scan-region" className="rounded-xl overflow-hidden bg-black min-h-[240px]" />
+            <div id="mk-scan-region" className="rounded-xl overflow-hidden bg-black min-h-[140px] [&_video]:!max-h-[30vh] [&_video]:!w-full [&_video]:!object-cover" />
+            {last && (
+              <div className="mt-2 flex items-center gap-2 bg-[#E5F6EE] rounded-xl px-3 py-2.5">
+                <span className="text-[11px] font-bold text-[#0E7A4A] shrink-0">✓ Vừa quét:</span>
+                <span className="font-mono font-extrabold text-[15px] text-[#0E7A4A] tracking-wide break-all">{last}</span>
+              </div>
+            )}
             <p className="text-[11px] text-[#5A6572] mt-2">Đưa mã vào giữa khung, giữ máy cách tem 10–20cm cho nét. Mã vạch 1D: để mã nằm NGANG, chiếm gần hết chiều rộng khung. Quét trúng kêu "bíp" và tự thêm — quét liên tục nhiều xe không cần bấm gì. Trên điện thoại Android/Chrome tốc độ đọc mã vạch nhanh nhất.</p>
           </>
         )}
