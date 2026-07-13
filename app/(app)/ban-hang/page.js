@@ -64,6 +64,30 @@ function BanHangInner() {
   };
   useEffect(() => { loadOrders(); }, []);
 
+  // Go so khung -> tim xe san sang toan he thong -> tu dien mau xe + kho + tick so khung
+  const [fq, setFq] = useState("");
+  const [fHits, setFHits] = useState([]);
+  useEffect(() => {
+    const q = fq.trim().toUpperCase();
+    if (q.length < 3) { setFHits([]); return; }
+    const t = setTimeout(async () => {
+      const { data } = await supabase.from("vehicle_units")
+        .select("frame_number, vehicle_id, location_code")
+        .eq("status", "TON_KHO").ilike("frame_number", `%${q}%`).limit(10);
+      setFHits(data || []);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [fq]);
+  const pickFrame = (u) => {
+    if (f.vehicle_id && (f.vehicle_id !== u.vehicle_id || f.location_code !== u.location_code) && frames.length > 0) {
+      if (!confirm("Xe này khác mẫu/kho với các số khung đã chọn — chuyển sang xe/kho mới và bỏ chọn cũ?")) return;
+      setFrames([]);
+    }
+    setF((p) => ({ ...p, vehicle_id: u.vehicle_id, location_code: u.location_code }));
+    setFrames((p) => (p.includes(u.frame_number) ? p : [...p, u.frame_number]));
+    setFq(""); setFHits([]);
+  };
+
   // ===== Dieu chinh don ban (2 cap) — hooks phai nam TRUOC return som =====
   const [adjF, setAdjF] = useState({ new_price: "", reason: "" });
   const [pendAdj, setPendAdj] = useState([]);
@@ -172,7 +196,26 @@ function BanHangInner() {
       {!show && <button className="btn-primary self-start" onClick={() => setShow(true)}>+ Tạo đơn bán mới</button>}
       {show && (
         <div className="card">
-          <div className="font-extrabold text-base mb-4">Tạo đơn bán — chọn xe theo số khung</div>
+          <div className="font-extrabold text-base mb-3">Tạo đơn bán — chọn xe theo số khung</div>
+          <div className="mb-3 relative">
+            <label className="lbl">⚡ Tìm nhanh: gõ 3–6 ký tự cuối số khung (tự điền mẫu xe + kho)</label>
+            <input className="inp font-mono !text-[14px]" placeholder="VD: 429407…" value={fq} onChange={(e) => setFq(e.target.value.toUpperCase())} />
+            {fq.trim().length >= 3 && (
+              <div className="absolute z-30 left-0 right-0 mt-1 bg-white border border-[#D5DBE3] rounded-xl shadow-lg overflow-hidden">
+                {fHits.length === 0 && <div className="px-3 py-2.5 text-sm text-[#8A93A0]">Không có xe sẵn sàng nào khớp — xe đã bán/đang chuyển sẽ không hiện ở đây.</div>}
+                {fHits.map((u) => {
+                  const v = vehicles.find((x) => x.id === u.vehicle_id);
+                  return (
+                    <button key={u.frame_number} className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left border-b border-[#F2F4F7] last:border-0 hover:bg-[#F0FDF6]" onClick={() => pickFrame(u)}>
+                      <span className="font-mono font-bold text-[13px]">{u.frame_number}</span>
+                      <span className="text-xs text-[#5A6572]">{v ? `${v.name} ${v.color}` : u.vehicle_id}</span>
+                      <span className="ml-auto text-[11px] text-[#8A93A0]">{locations.find((l) => l.code === u.location_code)?.name || u.location_code}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
           <div className="grid gap-x-4 md:grid-cols-3 sm:grid-cols-2">
             <Field label="Xe (gõ để tìm)" required><VehicleSearch vehicles={vehicles} value={f.vehicle_id} onChange={(v) => set("vehicle_id", v)} /></Field>
             <Field label="Kho / cửa hàng xuất xe" required><LocPicker locations={locations} value={f.location_code} onChange={(v) => set("location_code", v)} /></Field>

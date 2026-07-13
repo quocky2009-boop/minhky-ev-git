@@ -32,7 +32,7 @@ const TYPES = [
 ];
 
 export default function BaoCao() {
-  const { supabase, vehicles, locations, brands, loading, getQty, totalQty, regionQty, regions } = useCatalog();
+  const { supabase, vehicles, locations, brands, loading, getQty, totalQty, regionQty, regions , customFields } = useCatalog();
   const { toast, notify } = useToast();
   const [type, setType] = useState("ban");
   const [preset, setPreset] = useState("month");
@@ -53,6 +53,8 @@ export default function BaoCao() {
   const locName = (c) => locations.find((l) => l.code === c)?.name || c || "";
   const vOf = (id) => vehicles.find((x) => x.id === id);
 
+  const [itemsMap, setItemsMap] = useState({}); // sale_code -> dong ban kem
+
   // ===== Nap du lieu xem truoc =====
   const load = async () => {
     setBusy(true);
@@ -60,7 +62,10 @@ export default function BaoCao() {
     if (type === "ban") {
       let q = supabase.from("sales_orders").select("*").gte("sale_date", from).lte("sale_date", to).order("sale_date", { ascending: false }).limit(3000);
       if (fLoc) q = q.eq("location_code", fLoc);
-      const { data } = await q;
+      const [{ data }, { data: si }] = await Promise.all([q, supabase.from("sale_items").select("sale_code, item_type, name, qty, unit_price, amount").limit(10000)]);
+      const im = {};
+      (si || []).forEach((x) => { (im[x.sale_code] = im[x.sale_code] || []).push(x); });
+      setItemsMap(im);
       setRows((data || []).filter((s) => !fBrand || vOf(s.vehicle_id)?.brand === fBrand));
     } else if (type === "dieuchuyen") {
       let q = supabase.from("transfer_orders").select("*").gte("requested_at", from).lte("requested_at", toEnd).order("requested_at", { ascending: false }).limit(3000);
@@ -96,10 +101,33 @@ export default function BaoCao() {
   const doExport = () => {
     if (rows.length === 0) return notify("Không có dữ liệu trong phạm vi đã chọn.", "err");
     const suffix = type === "ton" ? iso(new Date()) : `${from}_den_${to}`;
-    if (type === "ban") downloadCSV(`ban_hang_${suffix}.csv`,
-      [["Ma_Don","Ngay","Kho","Xe","Mau","So_Khung","SL","Khach","SDT","Loai_Khach","Nguon","Gia_Niem_Yet","Gia_Ban","Thanh_Toan","NV_Ban","Ho_So","Bao_Hanh"],
-       ...rows.map((s) => { const v = vOf(s.vehicle_id);
-         return [s.code, s.sale_date, locName(s.location_code), v?.name || s.vehicle_id, v?.color || "", s.frame_number, s.quantity, s.customer_name, s.customer_phone, s.customer_type, s.customer_source, s.list_price, s.sale_price, s.payment_method, s.seller_name, s.document_status, s.warranty_status]; })]);
+    if (type === "ban") {
+      const cfs = customFields.filter((c) => c.entity === "sales_order");
+      downloadCSV(`ban_hang_${suffix}.csv`,
+        [["Ma_Don","Ngay_Ban","Kho_Ban","Hang","Ma_Xe","Ten_Xe","Mau","So_Khung","SL",
+          "Khach_Hang","SDT","CCCD","Dia_Chi","Loai_Khach","Nguon_Khach",
+          "Gia_Niem_Yet","Gia_Ban","Thanh_Tien_Xe","Tong_Ban_Kem","Tong_Don",
+          "Da_Thanh_Toan","Con_Lai","Trang_Thai_TT","Hinh_Thuc_TT",
+          "Trang_Thai_Ho_So","Bao_Hanh","NV_Ban","Ghi_Chu","Chi_Tiet_Ban_Kem",
+          ...cfs.map((c) => c.label.replace(/,/g, " "))],
+         ...rows.map((s) => {
+           const v = vOf(s.vehicle_id);
+           const its = itemsMap[s.code] || [];
+           const kem = its.reduce((sm, x) => sm + x.amount, 0);
+           const tienXe = s.sale_price * s.quantity;
+           const tong = tienXe + kem;
+           const paid = s.paid_amount || 0;
+           const ttTrangThai = paid <= 0 ? "Chưa TT" : paid < tong ? "Một phần" : "Đã đủ";
+           const kemText = its.map((x) => `${x.name} x${x.qty} = ${x.amount}`).join(" ; ");
+           return [s.code, s.sale_date, locName(s.location_code), v?.brand || "", s.vehicle_id, v?.name || s.vehicle_id, v?.color || "",
+             s.frame_number, s.quantity,
+             s.customer_name, s.customer_phone, s.customer_cccd || "", s.customer_address || "", s.customer_type, s.customer_source,
+             s.list_price, s.sale_price, tienXe, kem, tong,
+             paid, Math.max(tong - paid, 0), ttTrangThai, s.payment_method,
+             s.document_status, s.warranty_status, s.seller_name, (s.note || "").replace(/\n/g, " "), kemText,
+             ...cfs.map((c) => { const val = s.extra?.[c.field_key]; return val === undefined || val === null || val === "" ? "" : (c.field_type === "checkbox" ? (val ? "Có" : "Không") : String(val)); })];
+         })]);
+    }
     else if (type === "dieuchuyen") downloadCSV(`dieu_chuyen_${suffix}.csv`,
       [["Phieu","Ngay_Tao","Xe","Kho_Di","Kho_Den","SL","Nguoi_Tao","Nguoi_Nhan","Trang_Thai","Ghi_Chu"],
        ...rows.map((t) => { const v = vOf(t.vehicle_id);
