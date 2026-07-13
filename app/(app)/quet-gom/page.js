@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Field, Badge, Toast, VehicleSearch, LocSearch } from "@/components/ui";
+import { Field, Badge, Toast, VehicleSearch, LocSearch, Pager, pageSlice } from "@/components/ui";
 import { errMsg, downloadCSV, fmtTime } from "@/lib/format";
 import Scanner from "@/components/Scanner";
 
@@ -23,6 +23,35 @@ export default function QuetGom() {
   const [poolHits, setPoolHits] = useState([]);
   const [poolCount, setPoolCount] = useState(null);
   const fileRef = { current: null };
+
+  const [poolOpen, setPoolOpen] = useState(false);
+  const [poolAll, setPoolAll] = useState(null);   // null = chua tai
+  const [poolFilter, setPoolFilter] = useState("");
+  const [poolPage, setPoolPage] = useState(1);
+  const [poolPageSize, setPoolPageSize] = useState(20);
+
+  const loadPoolAll = async () => {
+    const [{ data: pool }, { data: units }, { data: drafts_ }] = await Promise.all([
+      supabase.from("frame_pool").select("frame_number, vehicle_id").order("vehicle_id").limit(5000),
+      supabase.from("vehicle_units").select("frame_number, status, location_code").limit(10000),
+      supabase.from("import_drafts").select("code, rows").eq("status", "Nháp").limit(500),
+    ]);
+    const uMap = {};
+    (units || []).forEach((u) => { uMap[u.frame_number] = u; });
+    const dMap = {};
+    (drafts_ || []).forEach((d) => (d.rows || []).forEach((r) => { if (!dMap[r.frame_number]) dMap[r.frame_number] = d.code; }));
+    setPoolAll((pool || []).map((x) => {
+      const u = uMap[x.frame_number];
+      if (u) return { ...x, state: u.status === "DA_BAN" ? "Đã bán" : "Đã trong kho", ref: u.location_code };
+      if (dMap[x.frame_number]) return { ...x, state: "Đang ở phiếu", ref: dMap[x.frame_number] };
+      return { ...x, state: "Chờ gán", ref: "" };
+    }));
+  };
+  const togglePoolList = async () => {
+    const next = !poolOpen;
+    setPoolOpen(next);
+    if (next) { setPoolAll(null); await loadPoolAll(); }
+  };
 
   const loadPoolCount = async () => {
     const { count } = await supabase.from("frame_pool").select("*", { count: "exact", head: true });
@@ -95,7 +124,7 @@ export default function QuetGom() {
       if (error) { setBusy(false); return notify(errMsg(error), "err"); }
       ins += data.inserted; upd += data.updated; skipped = skipped.concat(data.skipped || []);
     }
-    setBusy(false); loadPoolCount();
+    setBusy(false); loadPoolCount(); if (poolOpen) loadPoolAll();
     notify(`Import xong: ${ins} mới, ${upd} cập nhật.` +
       (skipped.length ? ` Bỏ qua ${skipped.length}: ${skipped.slice(0, 3).map((x) => `${x.frame} (${x.ly_do})`).join("; ")}${skipped.length > 3 ? "…" : ""}` : ""),
       skipped.length ? "err" : "ok");
@@ -232,7 +261,51 @@ export default function QuetGom() {
           )}
         </div>
         <p className="text-[11px] text-[#8A93A0] mb-2">Nhìn tem xe → gõ 3–6 ký tự cuối số khung → chạm chọn, xe tự vào danh sách đang gom với đúng mẫu xe theo file hãng (không lo chọn nhầm model). Kho vẫn do mình chọn ở ô trên.</p>
-        <input className="inp font-mono !text-[14px]" placeholder="Gõ đuôi số khung, VD: 429407…" value={poolQ} onChange={(e) => setPoolQ(e.target.value.toUpperCase())} />
+        <div className="flex gap-1.5">
+          <input className="inp font-mono !text-[14px]" placeholder="Gõ đuôi số khung, VD: 429407…" value={poolQ} onChange={(e) => setPoolQ(e.target.value.toUpperCase())} />
+          <button className={`btn !px-3 !text-xs whitespace-nowrap ${poolOpen ? "bg-navy-900 text-white" : "bg-[#EEF1F4] text-[#3B4552]"}`} onClick={togglePoolList}>📋 {poolOpen ? "Ẩn danh sách" : "Xem danh sách chờ"}</button>
+        </div>
+        {poolOpen && (
+          <div className="mt-2.5">
+            {poolAll === null ? <div className="text-sm text-[#8A93A0]">Đang tải danh sách…</div> : (() => {
+              const filtered = poolAll.filter((x) => !poolFilter || x.state === poolFilter);
+              const counts = poolAll.reduce((m, x) => ({ ...m, [x.state]: (m[x.state] || 0) + 1 }), {});
+              return (
+                <>
+                  <div className="flex gap-1.5 flex-wrap mb-2">
+                    {["", "Chờ gán", "Đang ở phiếu", "Đã trong kho", "Đã bán"].map((st) => (
+                      <button key={st} className={`btn !px-3 !py-1.5 !text-xs ${poolFilter === st ? "bg-navy-900 text-white" : "bg-[#EEF1F4] text-[#3B4552]"}`} onClick={() => { setPoolFilter(st); setPoolPage(1); }}>
+                        {st === "" ? `Tất cả (${poolAll.length})` : `${st} (${counts[st] || 0})`}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="overflow-x-auto"><table className="w-full border-collapse">
+                    <thead><tr><th className="th w-10">STT</th><th className="th">Xe (theo file hãng)</th><th className="th">Số khung</th><th className="th">Trạng thái</th><th className="th w-20"></th></tr></thead>
+                    <tbody>{pageSlice(filtered, poolPage, poolPageSize).map((x, i) => {
+                      const v = vOf(x.vehicle_id);
+                      const free = x.state === "Chờ gán";
+                      return (
+                        <tr key={x.frame_number} className="hover:bg-[#F8FAFC]">
+                          <td className="td text-center text-xs text-[#8A93A0]">{(poolPage - 1) * poolPageSize + i + 1}</td>
+                          <td className="td text-[13px] font-semibold">{v ? `${v.name} ${v.color}` : x.vehicle_id}<div className="text-[10.5px] text-[#8A93A0] font-normal">{x.vehicle_id}</div></td>
+                          <td className="td font-mono text-[12.5px]">{x.frame_number}</td>
+                          <td className="td">{free ? <Badge tone="green">Chờ gán</Badge>
+                            : x.state === "Đang ở phiếu" ? <Badge tone="amber">Ở phiếu {x.ref}</Badge>
+                            : x.state === "Đã bán" ? <Badge tone="gray">Đã bán</Badge>
+                            : <Badge tone="blue">Kho {locNameOf(x.ref)}</Badge>}</td>
+                          <td className="td">{free && <button className="btn-primary !px-2.5 !py-1 !text-xs" onClick={() => { pickPool({ ...x }); loadPoolAll(); }}>+ Chọn</button>}</td>
+                        </tr>
+                      );
+                    })}
+                    {filtered.length === 0 && <tr><td className="td" colSpan={5}>Không có số khung nào ở trạng thái này.</td></tr>}
+                    </tbody>
+                  </table></div>
+                  <Pager total={filtered.length} page={poolPage} setPage={setPoolPage} pageSize={poolPageSize} setPageSize={setPoolPageSize} />
+                </>
+              );
+            })()}
+          </div>
+        )}
         {poolQ.trim().length >= 3 && (
           <div className="mt-1.5 border border-[#E6EAEF] rounded-xl overflow-hidden">
             {poolHits.length === 0 && <div className="px-3 py-2.5 text-sm text-[#8A93A0]">Không thấy trong danh sách hãng — kiểm tra lại số hoặc dùng quét camera/gõ tay ở trên.</div>}
