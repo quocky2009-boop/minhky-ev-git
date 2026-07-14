@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Field, Badge, Toast, KPI, Pager, pageSlice } from "@/components/ui";
+import { Field, Badge, Toast, KPI, Pager, pageSlice, pageClamp } from "@/components/ui";
 import { fmtVND, fmtNum, fmtTime, fmtDate, downloadCSV } from "@/lib/format";
 
 const iso = (d) => d.toISOString().slice(0, 10);
@@ -29,6 +29,7 @@ const TYPES = [
   { key: "dieuchuyen", label: "Điều chuyển" },
   { key: "lichsu", label: "Lịch sử giao dịch tồn" },
   { key: "ton", label: "Tồn kho hiện tại" },
+  { key: "tonsk", label: "Tồn kho theo số khung" },
 ];
 
 export default function BaoCao() {
@@ -54,6 +55,7 @@ export default function BaoCao() {
   const vOf = (id) => vehicles.find((x) => x.id === id);
 
   const [itemsMap, setItemsMap] = useState({}); // sale_code -> dong ban kem
+  const [skq, setSkq] = useState(""); // tim theo so khung / ten xe
 
   // ===== Nap du lieu xem truoc =====
   const load = async () => {
@@ -75,6 +77,13 @@ export default function BaoCao() {
       let q = supabase.from("inventory_txns").select("*").gte("created_at", from).lte("created_at", toEnd).order("created_at", { ascending: false }).limit(5000);
       const { data } = await q;
       setRows((data || []).filter((t) => !fLoc || t.from_location === fLoc || t.to_location === fLoc));
+    } else if (type === "tonsk") {
+      let q = supabase.from("vehicle_units")
+        .select("frame_number, vehicle_id, location_code, status, imported_at, import_doc, is_placeholder, note")
+        .in("status", ["TON_KHO", "DANG_CHUYEN"]).order("imported_at", { ascending: false }).limit(10000);
+      if (fLoc) q = q.eq("location_code", fLoc);
+      const { data } = await q;
+      setRows((data || []).filter((u) => !fBrand || vOf(u.vehicle_id)?.brand === fBrand));
     } else {
       // Ton hien tai: khong theo ngay
       setRows(vehicles.filter((v) => (!fBrand || v.brand === fBrand) && (fLoc ? getQty(v.id, fLoc) > 0 : totalQty(v.id) > 0)));
@@ -178,7 +187,7 @@ export default function BaoCao() {
             <button key={t.key} className={`btn !px-3 !py-2 !text-xs ${type === t.key ? "bg-brand text-white" : "bg-[#EEF1F4] text-[#3B4552]"}`} onClick={() => setType(t.key)}>{t.label}</button>
           ))}
         </div>
-        {type !== "ton" && (
+        {type !== "ton" && type !== "tonsk" && (
           <div className="flex gap-1.5 flex-wrap items-end mb-1">
             {PRESETS.map((p) => (
               <button key={p.key} className={`btn !px-3 !py-2 !text-xs ${preset === p.key ? "bg-navy-900 text-white" : "bg-[#EEF1F4] text-[#3B4552]"}`} onClick={() => pickPreset(p.key)}>{p.label}</button>
@@ -197,7 +206,7 @@ export default function BaoCao() {
             </select>
           )}
           <button className="btn-primary ml-auto" onClick={doExport} disabled={busy || rows.length === 0}>⬇ Xuất CSV ({fmtNum(rows.length)} dòng)</button>
-          {type === "ton" && <button className="btn-ghost !text-xs" onClick={exportTonChiTiet}>⬇ CSV chi tiết theo số khung</button>}
+          {(type === "ton" || type === "tonsk") && <button className="btn-ghost !text-xs" onClick={exportTonChiTiet}>⬇ CSV chi tiết theo số khung</button>}
         </div>
       </div>
 
@@ -240,9 +249,51 @@ export default function BaoCao() {
               ))}</tbody>
             </table>
           )}
-          {rows.length === 0 && !busy && <div className="text-sm text-[#8A93A0] py-4">Không có dữ liệu trong phạm vi đã chọn — thử nới khung ngày hoặc bỏ bớt bộ lọc.</div>}
+          {type === "tonsk" && (() => {
+            const kw = skq.trim().toLowerCase();
+            const list = rows.filter((u) => {
+              if (!kw) return true;
+              const v = vOf(u.vehicle_id);
+              return `${u.frame_number} ${u.vehicle_id} ${v ? v.name + " " + v.color : ""}`.toLowerCase().includes(kw);
+            });
+            const pg = pageSlice(list, page, pageSize);
+            const today = new Date();
+            return (
+              <>
+                <div className="mb-2.5">
+                  <input className="inp !w-full md:!w-96" placeholder="🔎 Tìm theo số khung hoặc tên xe…" value={skq} onChange={(e) => { setSkq(e.target.value); setPage(1); }} />
+                </div>
+                <div className="overflow-x-auto"><table className="w-full border-collapse">
+                  <thead><tr><th className="th w-10">STT</th><th className="th">Hãng</th><th className="th">Tên xe</th><th className="th">Màu</th><th className="th">Số khung</th><th className="th">Kho</th><th className="th">Ngày nhập</th><th className="th">Ngày tồn</th><th className="th">Trạng thái</th></tr></thead>
+                  <tbody>{pg.map((u, i) => {
+                    const v = vOf(u.vehicle_id);
+                    const l = locations.find((x) => x.code === u.location_code);
+                    const days = Math.floor((today - new Date(u.imported_at)) / 86400000);
+                    return (
+                      <tr key={u.frame_number} className="hover:bg-[#F8FAFC]">
+                        <td className="td text-center text-xs text-[#8A93A0]">{(pageClamp(page, list.length, pageSize) - 1) * pageSize + i + 1}</td>
+                        <td className="td text-xs">{v?.brand || "?"}</td>
+                        <td className="td font-semibold text-[13px]">{v?.name || u.vehicle_id}</td>
+                        <td className="td text-xs">{v?.color || ""}</td>
+                        <td className="td font-mono text-[12.5px]">{u.frame_number}{u.is_placeholder && <Badge tone="amber">tạm</Badge>}</td>
+                        <td className="td text-xs">{l?.name || u.location_code}</td>
+                        <td className="td text-xs whitespace-nowrap">{fmtDate(u.imported_at)}</td>
+                        <td className="td text-center"><span className={days >= 90 ? "text-danger font-bold" : days >= 60 ? "text-[#A25F00] font-bold" : ""}>{days}</span></td>
+                        <td className="td">{u.status === "TON_KHO" ? <Badge tone="green">Tồn kho</Badge> : <Badge tone="blue">Đang chuyển</Badge>}</td>
+                      </tr>
+                    );
+                  })}
+                  {list.length === 0 && <tr><td className="td" colSpan={9}>{kw ? `Không có xe nào khớp "${skq}".` : "Không có xe tồn nào."}</td></tr>}
+                  </tbody>
+                </table></div>
+                <div className="text-xs text-[#8A93A0] mt-2">Tổng: <b>{list.length}</b> xe{kw ? ` khớp tìm kiếm` : " đang tồn"}. Ngày tồn ≥60 vàng, ≥90 đỏ.</div>
+                <Pager total={list.length} page={page} setPage={setPage} pageSize={pageSize} setPageSize={setPageSize} />
+              </>
+            );
+          })()}
+                    {rows.length === 0 && !busy && <div className="text-sm text-[#8A93A0] py-4">Không có dữ liệu trong phạm vi đã chọn — thử nới khung ngày hoặc bỏ bớt bộ lọc.</div>}
         </div>
-        <Pager total={rows.length} page={page} setPage={setPage} pageSize={pageSize} setPageSize={setPageSize} />
+        {type !== "tonsk" && <Pager total={rows.length} page={page} setPage={setPage} pageSize={pageSize} setPageSize={setPageSize} />}
       </div>
     </div>
   );
