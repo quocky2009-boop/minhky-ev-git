@@ -24,6 +24,8 @@ export default function DMXe() {
   const [uLoading, setULoading] = useState(false);
   const [skq, setSkq] = useState("");
   const [uFBrand, setUFBrand] = useState("");
+  const uSort = useSortable();
+  const [uFLoc, setUFLoc] = useState("");
   const [uPage, setUPage] = useState(1);
   const [uPageSize, setUPageSize] = useState(20);
   const [euFrame, setEuFrame] = useState(null); // dang sua chiec nao (frame goc)
@@ -211,22 +213,37 @@ export default function DMXe() {
             <select className="inp !w-auto" value={uFBrand} onChange={(e) => { setUFBrand(e.target.value); setUPage(1); }}>
               <option value="">Hãng: tất cả</option>{brands.map((b) => <option key={b.name}>{b.name}</option>)}
             </select>
+            <select className="inp !w-auto" value={uFLoc} onChange={(e) => { setUFLoc(e.target.value); setUPage(1); }}>
+              <option value="">Kho: tất cả</option>{locations.map((l) => <option key={l.code} value={l.code}>{l.name}</option>)}
+            </select>
             <button className="btn-ghost !text-xs" onClick={loadUnits}>↻ Tải lại</button>
           </div>
           {uLoading ? <div className="text-sm text-[#8A93A0] py-4">Đang tải danh sách xe…</div> : (() => {
             const kw = skq.trim().toLowerCase();
-            const list2 = units.filter((u) => {
+            const list2f = units.filter((u) => {
               const v = vehicles.find((x) => x.id === u.vehicle_id);
               if (uFBrand && v?.brand !== uFBrand) return false;
+              if (uFLoc && u.location_code !== uFLoc) return false;
               if (!kw) return true;
               return `${u.frame_number} ${u.vehicle_id} ${v ? v.name + " " + v.color : ""}`.toLowerCase().includes(kw);
+            });
+            const nowMs = Date.now();
+            const list2 = uSort.sortFn(list2f, {
+              brand: (u) => vehicles.find((x) => x.id === u.vehicle_id)?.brand || "",
+              name: (u) => vehicles.find((x) => x.id === u.vehicle_id)?.name || "",
+              color: (u) => vehicles.find((x) => x.id === u.vehicle_id)?.color || "",
+              frame: (u) => u.frame_number,
+              kho: (u) => locations.find((x) => x.code === u.location_code)?.name || u.location_code,
+              nhap: (u) => new Date(u.imported_at).getTime(),
+              ton: (u) => Math.floor((nowMs - new Date(u.imported_at)) / 86400000),
+              tt: (u) => u.status,
             });
             const pg = pageSlice(list2, uPage, uPageSize);
             const today = new Date();
             return (
               <>
                 <div className="overflow-x-auto"><table className="w-full border-collapse">
-                  <thead><tr><th className="th w-10">STT</th><th className="th">Hãng</th><th className="th">Tên xe</th><th className="th">Màu</th><th className="th">Số khung</th><th className="th">Kho</th><th className="th">Ngày nhập</th><th className="th">Ngày tồn</th><th className="th">Trạng thái</th><th className="th"></th></tr></thead>
+                  <thead><tr><th className="th w-10">STT</th><Th label="Hãng" k="brand" sort={uSort} /><Th label="Tên xe" k="name" sort={uSort} /><Th label="Màu" k="color" sort={uSort} /><Th label="Số khung" k="frame" sort={uSort} /><Th label="Kho" k="kho" sort={uSort} /><Th label="Ngày nhập" k="nhap" sort={uSort} /><Th label="Ngày tồn" k="ton" sort={uSort} /><Th label="Trạng thái" k="tt" sort={uSort} /><th className="th"></th></tr></thead>
                   <tbody>{pg.map((u, i) => {
                     const v = vehicles.find((x) => x.id === u.vehicle_id);
                     const l = locations.find((x) => x.code === u.location_code);
