@@ -150,6 +150,44 @@ export function FramePicker({ units, selected, onToggle, emptyText = "Kho này c
   );
 }
 
+// ===== Go tim Khach hang (mã / tên / SDT) + tao moi =====
+export function CustomerSearch({ customers, value, onPick, onCreate }) {
+  const [q, setQ] = useSt("");
+  const [open, setOpen] = useSt(false);
+  const cur = customers.find((c) => String(c.id) === String(value));
+  const kw = q.trim().toLowerCase();
+  const hits = kw.length >= 1 ? customers.filter((c) =>
+    (c.code + " " + c.name + " " + c.phone).toLowerCase().includes(kw)).slice(0, 12) : [];
+  if (cur) {
+    return (
+      <div className="flex items-center gap-2 border border-[#D5DBE3] rounded-xl px-3 py-2.5 bg-[#F0FDF6]">
+        <div className="flex-1 min-w-0"><b>{cur.name}</b> <span className="text-xs text-[#5A6572]">· {cur.code} · {cur.phone}</span></div>
+        <button className="text-[#8A93A0] hover:text-danger text-sm" onClick={() => { onPick(null); setQ(""); }}>Đổi khách</button>
+      </div>
+    );
+  }
+  return (
+    <div className="relative">
+      <input className="inp" placeholder="Gõ mã KH / tên / SĐT để tìm khách cũ…" value={q}
+        onChange={(e) => { setQ(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)} />
+      {open && kw.length >= 1 && (
+        <div className="absolute z-30 left-0 right-0 mt-1 bg-white border border-[#D5DBE3] rounded-xl shadow-lg overflow-hidden max-h-64 overflow-y-auto">
+          {hits.map((c) => (
+            <button key={c.id} className="w-full flex items-center gap-2 px-3 py-2.5 text-left border-b border-[#F2F4F7] last:border-0 hover:bg-[#F0FDF6]"
+              onClick={() => { onPick(c); setOpen(false); setQ(""); }}>
+              <b className="text-[13px]">{c.name}</b>
+              <span className="text-xs text-[#5A6572]">{c.code} · {c.phone}</span>
+              {c.status === "Đã mua" && <Badge tone="green">Đã mua</Badge>}
+            </button>
+          ))}
+          <button className="w-full text-left px-3 py-2.5 hover:bg-[#EEF3FF] text-brand font-bold text-[13px]"
+            onClick={() => { onCreate(q.trim()); setOpen(false); setQ(""); }}>+ Tạo khách mới{q.trim() ? ` "${q.trim()}"` : ""}</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ===== V3: Go tim Kho/Cua hang (thay dropdown) =====
 export function LocSearch({ locations, value, onChange, exclude, placeholder = "Gõ để tìm kho / cửa hàng…" }) {
   const items = locations.filter((l) => l.code !== exclude && l.status === "Hoạt động");

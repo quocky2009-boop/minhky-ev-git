@@ -143,6 +143,29 @@ export default function BaoCao() {
     notify("Đã xuất file CSV (mở được bằng Excel).");
   };
 
+  const exportTonChiTiet = async () => {
+    let q = supabase.from("vehicle_units")
+      .select("frame_number, vehicle_id, location_code, status, imported_at, import_doc, is_placeholder, note")
+      .in("status", ["TON_KHO", "DANG_CHUYEN"])
+      .order("location_code").order("vehicle_id").limit(10000);
+    if (fLoc) q = q.eq("location_code", fLoc);
+    const { data } = await q;
+    let units = (data || []).filter((u) => !fBrand || vOf(u.vehicle_id)?.brand === fBrand);
+    if (units.length === 0) return notify("Không có xe tồn nào khớp bộ lọc.", "err");
+    const today = new Date();
+    downloadCSV(`ton_kho_chi_tiet_${iso(today)}.csv`,
+      [["Khu_Vuc", "Kho", "Hang", "Ma_Xe", "Ten_Xe", "Mau", "So_Khung", "So_Khung_Tam", "Ngay_Nhap_Kho", "So_Ngay_Ton", "Trang_Thai", "Phieu_Nhap", "Gia_Niem_Yet", "Ghi_Chu"],
+       ...units.map((u) => {
+         const v = vOf(u.vehicle_id);
+         const l = locations.find((x) => x.code === u.location_code);
+         const days = Math.floor((today - new Date(u.imported_at)) / 86400000);
+         return [l?.region || "", l?.name || u.location_code, v?.brand || "", u.vehicle_id, v?.name || "", v?.color || "",
+           u.frame_number, u.is_placeholder ? "Tạm" : "", fmtTime(u.imported_at), days,
+           u.status === "TON_KHO" ? "Tồn kho" : "Đang chuyển", u.import_doc || "", v?.list_price ?? "", (u.note || "").replace(/\n/g, " ")];
+       })]);
+    notify(`Đã xuất ${units.length} xe tồn chi tiết theo số khung.`);
+  };
+
   const preview = pageSlice(rows, page, pageSize);
 
   return (
