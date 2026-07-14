@@ -13,6 +13,7 @@ export default function KhachHang() {
   const [lastBuy, setLastBuy] = useState({}); // customer_id -> don gan nhat
   const [q, setQ] = useState("");
   const [fStatus, setFStatus] = useState("");
+  const [fType, setFType] = useState("");
   const [show, setShow] = useState(false);
   const empty = { id: "", name: "", phone: "", cccd: "", address: "", note: "" };
   const [f, setF] = useState(empty);
@@ -77,6 +78,7 @@ export default function KhachHang() {
   const filtered = list.filter((c) => {
     if (fStatus === "mua" && !bought(c)) return false;
     if (fStatus === "hoso" && bought(c)) return false;
+    if (fType && (c.customer_type || "") !== fType) return false;
     const t = (c.code + c.name + c.phone + (c.address || "") + (c.note || "")).toLowerCase();
     return !q || t.includes(q.toLowerCase());
   });
@@ -115,13 +117,17 @@ export default function KhachHang() {
         <div className="flex gap-2 flex-wrap items-center mb-3">
           <div className="font-extrabold mr-auto">Danh sách khách hàng ({filtered.length})</div>
           <input className="inp !w-64" placeholder="Tìm tên, SĐT, mã KH, địa chỉ…" value={q} onChange={(e) => setQ(e.target.value)} />
+          <select className="inp !w-auto" value={fType} onChange={(e) => setFType(e.target.value)}>
+            <option value="">Loại khách: tất cả</option>
+            {[...new Set(["Khách lẻ", "Khách buôn", "CBNV", ...list.map((c) => c.customer_type).filter(Boolean)])].map((t) => <option key={t}>{t}</option>)}
+          </select>
           <select className="inp !w-auto" value={fStatus} onChange={(e) => setFStatus(e.target.value)}>
             <option value="">Tất cả</option><option value="mua">Đã mua xe</option><option value="hoso">Hồ sơ (chưa mua)</option>
           </select>
         </div>
         <div className="overflow-x-auto"><table className="w-full border-collapse">
-          <thead><tr><Th label="Mã KH" k="code" sort={sort} /><Th label="Khách hàng" k="ten" sort={sort} /><Th label="Xe đã mua gần nhất" k="xe" sort={sort} /><Th label="Trạng thái" k="tt" sort={sort} /><Th label="Sales phụ trách" k="nv" sort={sort} /><th className="th">Ghi chú</th><th className="th"></th></tr></thead>
-          <tbody>{pageSlice(sort.sortFn(filtered, { code: (c) => c.code, ten: (c) => c.name, xe: (c) => lastBuy[c.id] ? vName(lastBuy[c.id].vehicle_id) : "", tt: (c) => (bought(c) ? "Đã mua" : "Hồ sơ"), nv: (c) => c.assigned_name || c.created_by_name }), page, pageSize).map((c) => {
+          <thead><tr><Th label="Mã KH" k="code" sort={sort} /><Th label="Khách hàng" k="ten" sort={sort} /><Th label="Loại khách" k="loai" sort={sort} /><Th label="Xe đã mua gần nhất" k="xe" sort={sort} /><Th label="Trạng thái" k="tt" sort={sort} /><Th label="Sales phụ trách" k="nv" sort={sort} /><th className="th">Ghi chú</th><th className="th"></th></tr></thead>
+          <tbody>{pageSlice(sort.sortFn(filtered, { code: (c) => c.code, ten: (c) => c.name, loai: (c) => c.customer_type || "", xe: (c) => lastBuy[c.id] ? vName(lastBuy[c.id].vehicle_id) : "", tt: (c) => (bought(c) ? "Đã mua" : "Hồ sơ"), nv: (c) => c.assigned_name || c.created_by_name }), page, pageSize).map((c) => {
             const lb = lastBuy[c.id];
             const hist = history[c.id] || [];
             const total = hist.reduce((s, o) => s + o.sale_price * o.quantity, 0);
@@ -129,6 +135,7 @@ export default function KhachHang() {
               <tr key={c.id} className="hover:bg-[#F8FAFC]">
                 <td className="td font-bold">{c.code}</td>
                 <td className="td"><b>{c.name}</b><div className="text-[11px] text-[#8A93A0]">{c.phone}{c.address ? " · " + c.address : ""}</div></td>
+                <td className="td text-xs">{c.customer_type ? <Badge tone={c.customer_type === "Khách buôn" ? "purple" : c.customer_type === "CBNV" ? "blue" : "gray"}>{c.customer_type}</Badge> : <span className="text-[#C6CDD6]">—</span>}</td>
                 <td className="td text-xs">{lb ? <><b>{vName(lb.vehicle_id)}</b><div className="text-[#8A93A0]">{fmtDate(lb.sale_date)} · {locName(lb.location_code)}</div></> : <span className="text-[#C6CDD6]">—</span>}</td>
                 <td className="td">{bought(c) ? <Badge tone="green">Đã mua</Badge> : <Badge tone="gray">Hồ sơ</Badge>}</td>
                 <td className="td text-xs">{c.assigned_name || c.created_by_name}</td>
@@ -139,7 +146,7 @@ export default function KhachHang() {
                 </div></td>
               </tr>,
               openId === c.id && (
-                <tr key={c.id + "h"}><td colSpan={7} className="td bg-[#F8FAFC]">
+                <tr key={c.id + "h"}><td colSpan={8} className="td bg-[#F8FAFC]">
                   {hist.length === 0 ? <span className="text-sm text-[#8A93A0]">Khách này chưa có đơn mua nào trên hệ thống.</span> : (
                     <div>
                       <div className="text-xs font-bold mb-2">Đã mua {hist.reduce((s, o) => s + o.quantity, 0)} xe · Tổng giá trị: <span className="text-brand">{fmtVND(total)}</span></div>

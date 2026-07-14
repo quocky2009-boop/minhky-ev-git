@@ -1,8 +1,8 @@
 "use client";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Field, Toast, stockBadge, Badge, Pager, pageSlice , useSortable, Th } from "@/components/ui";
-import { fmtVND, errMsg, parseCSV } from "@/lib/format";
+import { Field, Toast, stockBadge, Badge, Pager, pageSlice, pageClamp, useSortable, Th, LocSearch, VehicleSearch } from "@/components/ui";
+import { fmtVND, fmtDate, errMsg, parseCSV } from "@/lib/format";
 
 export default function DMXe() {
   const { supabase, vehicles, brands, loading, totalQty, refresh } = useCatalog();
@@ -18,6 +18,35 @@ export default function DMXe() {
   const [editId, setEditId] = useState(null);
   const sort = useSortable();
   const [newId, setNewId] = useState(""); // doi ma noi bo
+  const [tab, setTab] = useState("loai"); // loai | sokhung
+  const { locations } = useCatalog();
+  const [units, setUnits] = useState([]);
+  const [uLoading, setULoading] = useState(false);
+  const [skq, setSkq] = useState("");
+  const [uFBrand, setUFBrand] = useState("");
+  const [uPage, setUPage] = useState(1);
+  const [uPageSize, setUPageSize] = useState(20);
+  const [euFrame, setEuFrame] = useState(null); // dang sua chiec nao (frame goc)
+  const [eu, setEu] = useState({ new_frame: "", vehicle_id: "", location_code: "", engine_number: "", note: "" });
+  const loadUnits = async () => {
+    setULoading(true);
+    const { data } = await supabase.from("vehicle_units")
+      .select("frame_number, vehicle_id, location_code, status, imported_at, is_placeholder, engine_number, note")
+      .in("status", ["TON_KHO", "DANG_CHUYEN"]).order("imported_at", { ascending: false }).limit(10000);
+    setUnits(data || []); setULoading(false);
+  };
+  useEffect(() => { if (!loading && tab === "sokhung" && units.length === 0) loadUnits(); }, [loading, tab]);
+  const startEditUnit = (u) => {
+    setEuFrame(u.frame_number);
+    setEu({ new_frame: u.frame_number, vehicle_id: u.vehicle_id, location_code: u.location_code, engine_number: u.engine_number || "", note: u.note || "" });
+  };
+  const saveUnit = async () => {
+    const { error } = await supabase.rpc("fn_sua_unit", {
+      p: { frame_number: euFrame, new_frame: eu.new_frame, vehicle_id: eu.vehicle_id, location_code: eu.location_code, engine_number: eu.engine_number, note: eu.note },
+    });
+    if (error) return notify(errMsg(error), "err");
+    notify("Đã cập nhật thông tin xe."); setEuFrame(null); loadUnits(); refresh();
+  };
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
 
   const doiMa = async (oldId) => {
@@ -97,6 +126,12 @@ export default function DMXe() {
   return (
     <div className="flex flex-col gap-4">
       <Toast toast={toast} />
+      <div className="flex gap-1 bg-[#EEF1F4] rounded-lg p-0.5 self-start">
+        <button className={`!px-4 !py-2 !text-xs rounded-md font-bold ${tab === "loai" ? "bg-white shadow text-brand" : "text-[#5A6572]"}`} onClick={() => setTab("loai")}>◈ Theo loại xe</button>
+        <button className={`!px-4 !py-2 !text-xs rounded-md font-bold ${tab === "sokhung" ? "bg-white shadow text-brand" : "text-[#5A6572]"}`} onClick={() => setTab("sokhung")}># Theo số khung</button>
+      </div>
+
+      {tab === "loai" && <>
       <div className="flex gap-2 flex-wrap items-center">
         <button className="btn-primary" onClick={() => { setEditId(null); setF(empty); setShow(!show); }}>+ Thêm xe mới</button>
         <button className="btn-ghost" onClick={exportCSV}>⬇ Xuất CSV</button>
@@ -166,6 +201,74 @@ export default function DMXe() {
         </table></div>
         <Pager total={list.length} page={page} setPage={setPage} pageSize={pageSize} setPageSize={setPageSize} />
       </div>
+      </>}
+
+      {tab === "sokhung" && (
+        <div className="card">
+          <div className="flex gap-2 flex-wrap items-center mb-3">
+            <div className="font-extrabold mr-auto">Xe theo số khung {units.length > 0 && <span className="text-xs font-normal text-[#8A93A0]">({units.length} xe đang tồn)</span>}</div>
+            <input className="inp !w-64" placeholder="🔎 Tìm số khung hoặc tên xe…" value={skq} onChange={(e) => { setSkq(e.target.value); setUPage(1); }} />
+            <select className="inp !w-auto" value={uFBrand} onChange={(e) => { setUFBrand(e.target.value); setUPage(1); }}>
+              <option value="">Hãng: tất cả</option>{brands.map((b) => <option key={b.name}>{b.name}</option>)}
+            </select>
+            <button className="btn-ghost !text-xs" onClick={loadUnits}>↻ Tải lại</button>
+          </div>
+          {uLoading ? <div className="text-sm text-[#8A93A0] py-4">Đang tải danh sách xe…</div> : (() => {
+            const kw = skq.trim().toLowerCase();
+            const list2 = units.filter((u) => {
+              const v = vehicles.find((x) => x.id === u.vehicle_id);
+              if (uFBrand && v?.brand !== uFBrand) return false;
+              if (!kw) return true;
+              return `${u.frame_number} ${u.vehicle_id} ${v ? v.name + " " + v.color : ""}`.toLowerCase().includes(kw);
+            });
+            const pg = pageSlice(list2, uPage, uPageSize);
+            const today = new Date();
+            return (
+              <>
+                <div className="overflow-x-auto"><table className="w-full border-collapse">
+                  <thead><tr><th className="th w-10">STT</th><th className="th">Hãng</th><th className="th">Tên xe</th><th className="th">Màu</th><th className="th">Số khung</th><th className="th">Kho</th><th className="th">Ngày nhập</th><th className="th">Ngày tồn</th><th className="th">Trạng thái</th><th className="th"></th></tr></thead>
+                  <tbody>{pg.map((u, i) => {
+                    const v = vehicles.find((x) => x.id === u.vehicle_id);
+                    const l = locations.find((x) => x.code === u.location_code);
+                    const days = Math.floor((today - new Date(u.imported_at)) / 86400000);
+                    return [
+                      <tr key={u.frame_number} className={euFrame === u.frame_number ? "bg-[#FDF6E3]" : "hover:bg-[#F8FAFC]"}>
+                        <td className="td text-center text-xs text-[#8A93A0]">{(pageClamp(uPage, list2.length, uPageSize) - 1) * uPageSize + i + 1}</td>
+                        <td className="td text-xs">{v?.brand || "?"}</td>
+                        <td className="td font-semibold text-[13px]">{v?.name || u.vehicle_id}</td>
+                        <td className="td text-xs">{v?.color || ""}</td>
+                        <td className="td font-mono text-[12.5px]">{u.frame_number}{u.is_placeholder && <Badge tone="amber">tạm</Badge>}</td>
+                        <td className="td text-xs">{l?.name || u.location_code}</td>
+                        <td className="td text-xs whitespace-nowrap">{fmtDate(u.imported_at)}</td>
+                        <td className="td text-center"><span className={days >= 90 ? "text-danger font-bold" : days >= 60 ? "text-[#A25F00] font-bold" : ""}>{days}</span></td>
+                        <td className="td">{u.status === "TON_KHO" ? <Badge tone="green">Tồn kho</Badge> : <Badge tone="blue">Đang chuyển</Badge>}</td>
+                        <td className="td">{u.status !== "DA_BAN" && <button className={`!px-2.5 !py-1 !text-xs ${euFrame === u.frame_number ? "btn-primary" : "btn-ghost"}`} onClick={() => euFrame === u.frame_number ? setEuFrame(null) : startEditUnit(u)}>{euFrame === u.frame_number ? "Đóng" : "✎ Sửa"}</button>}</td>
+                      </tr>,
+                      euFrame === u.frame_number && (
+                        <tr key={u.frame_number + "e"}><td colSpan={10} className="td bg-[#FFFDF5]">
+                          <div className="grid gap-x-4 md:grid-cols-3 sm:grid-cols-2">
+                            <Field label="Số khung"><input className="inp font-mono !text-[13px]" value={eu.new_frame} onChange={(e) => setEu((p) => ({ ...p, new_frame: e.target.value.toUpperCase() }))} /></Field>
+                            <Field label="Mẫu xe (gõ tìm)"><VehicleSearch vehicles={vehicles} value={eu.vehicle_id} onChange={(v) => setEu((p) => ({ ...p, vehicle_id: v }))} /></Field>
+                            <Field label="Kho hiện tại (gõ tìm)"><LocSearch locations={locations} value={eu.location_code} onChange={(v) => setEu((p) => ({ ...p, location_code: v }))} /></Field>
+                            <Field label="Số máy (tùy chọn)"><input className="inp font-mono !text-[13px]" value={eu.engine_number} onChange={(e) => setEu((p) => ({ ...p, engine_number: e.target.value }))} /></Field>
+                            <Field label="Ghi chú"><input className="inp" value={eu.note} onChange={(e) => setEu((p) => ({ ...p, note: e.target.value }))} /></Field>
+                          </div>
+                          <div className="flex gap-2"><button className="btn-ok !text-xs" onClick={saveUnit}>💾 Lưu thông tin xe</button><button className="btn-ghost !text-xs" onClick={() => setEuFrame(null)}>Hủy</button></div>
+                          <p className="text-[10.5px] text-[#8A93A0] mt-1.5">Đổi số khung / mẫu xe / kho của đúng chiếc này. Xe đã bán không sửa được ở đây.</p>
+                        </td></tr>
+                      ),
+                    ];
+                  })}
+                  {list2.length === 0 && <tr><td className="td" colSpan={10}>{kw ? `Không có xe nào khớp "${skq}".` : "Không có xe tồn nào."}</td></tr>}
+                  </tbody>
+                </table></div>
+                <div className="text-xs text-[#8A93A0] mt-2">Tổng: <b>{list2.length}</b> xe{kw ? " khớp tìm kiếm" : " đang tồn"}. Ngày tồn ≥60 vàng, ≥90 đỏ.</div>
+                <Pager total={list2.length} page={uPage} setPage={setUPage} pageSize={uPageSize} setPageSize={setUPageSize} />
+              </>
+            );
+          })()}
+        </div>
+      )}
     </div>
   );
 }
