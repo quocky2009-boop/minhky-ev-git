@@ -1,7 +1,7 @@
 "use client";
 import { useState, useRef } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Field, Toast, stockBadge, Badge, Pager, pageSlice } from "@/components/ui";
+import { Field, Toast, stockBadge, Badge, Pager, pageSlice , useSortable, Th } from "@/components/ui";
 import { fmtVND, errMsg, parseCSV } from "@/lib/format";
 
 export default function DMXe() {
@@ -16,9 +16,22 @@ export default function DMXe() {
   const empty = { brand: "VinFast", name: "", color: "", mfr_code: "", list_price: "", min_stock: 2 };
   const [f, setF] = useState(empty);
   const [editId, setEditId] = useState(null);
+  const sort = useSortable();
+  const [newId, setNewId] = useState(""); // doi ma noi bo
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
 
+  const doiMa = async (oldId) => {
+    const v = newId.trim();
+    if (!v) return notify("Gõ mã nội bộ mới trước.", "err");
+    if (!confirm(`Đổi mã nội bộ:\n${oldId}\n→ ${v.toUpperCase().replace(/\s+/g, "_")}\n\nToàn bộ tồn kho, số khung, lịch sử, đơn bán, phiếu nháp, danh sách hãng... sẽ tự chuyển theo mã mới. Tiếp tục?`)) return;
+    const { error } = await supabase.rpc("fn_doi_ma_xe", { p_old: oldId, p_new: v });
+    if (error) return notify(errMsg(error), "err");
+    notify("Đã đổi mã nội bộ — mọi dữ liệu liên quan đã chuyển theo mã mới.");
+    setNewId(""); setEditId(null); setShow(false); setF(empty); refresh();
+  };
+
   const startEdit = (v) => {
+    setNewId("");
     setEditId(v.id);
     setF({ brand: v.brand, name: v.name, color: v.color, mfr_code: v.mfr_code || "", list_price: v.list_price, min_stock: v.min_stock });
     setShow(true);
@@ -107,6 +120,16 @@ export default function DMXe() {
             <Field label="Giá niêm yết"><input type="number" className="inp" value={f.list_price} onChange={(e) => set("list_price", e.target.value)} /></Field>
             <Field label="Tồn tối thiểu"><input type="number" className="inp" value={f.min_stock} onChange={(e) => set("min_stock", e.target.value)} /></Field>
           </div>
+          {editId && (
+            <div className="bg-[#F8FAFC] border border-[#E6EAEF] rounded-xl p-3 mb-3">
+              <div className="text-xs font-bold mb-1">Đổi mã nội bộ (hiện tại: <span className="font-mono">{editId}</span>)</div>
+              <div className="flex gap-1.5 flex-wrap items-center">
+                <input className="inp !w-80 font-mono !text-[12.5px]" placeholder="Mã nội bộ mới…" value={newId} onChange={(e) => setNewId(e.target.value.toUpperCase())} />
+                <button className="btn-ghost !text-xs !py-2" onClick={() => doiMa(editId)}>Đổi mã</button>
+              </div>
+              <p className="text-[10.5px] text-[#8A93A0] mt-1">Toàn bộ dữ liệu gắn mã cũ (tồn, số khung, lịch sử, đơn bán, phiếu nháp, danh sách hãng, xe khách quan tâm) tự chuyển sang mã mới trong 1 giao dịch.</p>
+            </div>
+          )}
           <div className="flex gap-2.5 items-center flex-wrap">
             <button className="btn-ok" onClick={editId ? saveEdit : add}>{editId ? "Lưu thay đổi" : "Lưu vào danh mục"}</button>
             <button className="btn-ghost" onClick={() => { setShow(false); setEditId(null); setF(empty); }}>Đóng</button>
@@ -126,8 +149,8 @@ export default function DMXe() {
           </select>
         </div>
         <div className="overflow-x-auto"><table className="w-full border-collapse">
-          <thead><tr><th className="th">Mã nội bộ</th><th className="th">Mã hãng</th><th className="th">Hãng</th><th className="th">Tên xe</th><th className="th">Màu</th><th className="th">Giá niêm yết</th><th className="th">Tồn min</th><th className="th">Tổng tồn</th><th className="th">Cảnh báo</th><th className="th"></th></tr></thead>
-          <tbody>{pageSlice(list, page, pageSize).map((v) => {
+          <thead><tr><Th label="Mã nội bộ" k="id" sort={sort} /><Th label="Mã hãng" k="mfr" sort={sort} /><Th label="Hãng" k="brand" sort={sort} /><Th label="Tên xe" k="name" sort={sort} /><Th label="Màu" k="color" sort={sort} /><Th label="Giá niêm yết" k="price" sort={sort} /><Th label="Tồn min" k="min" sort={sort} /><Th label="Tổng tồn" k="qty" sort={sort} /><th className="th">Cảnh báo</th><th className="th"></th></tr></thead>
+          <tbody>{pageSlice(sort.sortFn(list, { id: (v) => v.id, mfr: (v) => v.mfr_code || "", brand: (v) => v.brand, name: (v) => v.name, color: (v) => v.color, price: (v) => v.list_price, min: (v) => v.min_stock, qty: (v) => totalQty(v.id) }), page, pageSize).map((v) => {
             const qty = totalQty(v.id);
             return (
               <tr key={v.id}>

@@ -187,3 +187,37 @@ export function Pager({ total, page, setPage, pageSize, setPageSize }) {
     </div>
   );
 }
+
+
+// ===== SORT THEO COT (dung chung cho cac bang) =====
+export function useSortable() {
+  const [sortKey, setSortKey] = useSt("");
+  const [sortDir, setSortDir] = useSt("asc");
+  const toggle = (k) => {
+    if (sortKey !== k) { setSortKey(k); setSortDir("asc"); }
+    else if (sortDir === "asc") setSortDir("desc");
+    else { setSortKey(""); setSortDir("asc"); }
+  };
+  const sortFn = (arr, getters) => {
+    if (!sortKey || !getters[sortKey]) return arr;
+    const g = getters[sortKey];
+    return [...arr].sort((a, b) => {
+      const x = g(a), y = g(b);
+      if (x == null && y == null) return 0;
+      if (x == null) return 1;
+      if (y == null) return -1;
+      const c = typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y), "vi", { numeric: true });
+      return sortDir === "desc" ? -c : c;
+    });
+  };
+  return { sortKey, sortDir, toggle, sortFn };
+}
+
+export function Th({ label, k, sort, className = "" }) {
+  const active = sort.sortKey === k;
+  return (
+    <th className={`th cursor-pointer select-none whitespace-nowrap ${active ? "text-brand" : ""} ${className}`} title="Bấm để sắp xếp" onClick={() => sort.toggle(k)}>
+      {label} <span className={`text-[9px] ${active ? "" : "text-[#C6CDD6]"}`}>{active ? (sort.sortDir === "asc" ? "▲" : "▼") : "⇅"}</span>
+    </th>
+  );
+}

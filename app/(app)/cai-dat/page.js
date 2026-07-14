@@ -17,7 +17,15 @@ export default function CaiDat() {
   const [newBrand, setNewBrand] = useState("");
   const [reg, setReg] = useState(null);
   const [hook, setHook] = useState(null);
-  const [bk, setBk] = useState(null); // {pk, bh, ftg, dk}
+  const [bk, setBk] = useState(null);
+  const [pf, setPf] = useState(null); // phieu in
+  const savePf = async () => {
+    for (const [key, val] of [["cty_ten", pf.ten.trim()], ["cty_diachi", pf.dc.trim()], ["cty_sdt", pf.sdt.trim()], ["phieu_footer", pf.ft.trim()]]) {
+      const { error } = await supabase.rpc("fn_set_setting", { p_key: key, p_value: val });
+      if (error) return notify(errMsg(error), "err");
+    }
+    notify("Đã lưu thông tin in phiếu xuất."); setPf(null); refresh();
+  }; // {pk, bh, ftg, dk}
 
   const saveBk = async () => {
     const cln = (x) => x.split(/\n+/).map((y) => y.trim()).filter(Boolean).join("\n");
@@ -153,6 +161,30 @@ export default function CaiDat() {
               <button className="btn-ok !py-2 !text-xs" onClick={saveHook}>Lưu</button>
               <button className="btn-ghost !py-2 !text-xs" onClick={() => setHook(null)}>Hủy</button>
               {settings.discord_webhook && <button className="btn-danger !py-2 !text-xs" onClick={() => { setHook(""); }}>Xóa URL (rồi bấm Lưu để tắt)</button>}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="card">
+        <div className="font-extrabold mb-1">Phiếu xuất bán (thông tin in trên phiếu)</div>
+        <p className="text-xs text-[#5A6572] mb-3">Nội dung hiển thị trên phiếu xuất khi bấm 🖨 In ở trang Xuất bán: phần đầu phiếu (tên đơn vị, địa chỉ, điện thoại) và lời cảm ơn chân trang.</p>
+        {pf === null ? (
+          <div className="text-sm">
+            <b>{settings.cty_ten || "HỆ THỐNG XE ĐIỆN MINH KỲ"}</b>
+            <div className="text-xs text-[#5A6572]">{settings.cty_diachi || "(chưa có địa chỉ)"} · {settings.cty_sdt || "(chưa có SĐT)"}</div>
+            <div className="text-xs text-[#8A93A0] italic mt-1">"{settings.phieu_footer || "Cảm ơn Quý khách đã tin tưởng Minh Kỳ EV. Kính chúc Quý khách thượng lộ bình an!"}"</div>
+            <button className="btn-ghost !text-xs mt-2" onClick={() => setPf({ ten: settings.cty_ten || "HỆ THỐNG XE ĐIỆN MINH KỲ", dc: settings.cty_diachi || "", sdt: settings.cty_sdt || "", ft: settings.phieu_footer || "Cảm ơn Quý khách đã tin tưởng Minh Kỳ EV. Kính chúc Quý khách thượng lộ bình an!" })}>✎ Sửa</button>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2 max-w-xl">
+            <div><label className="lbl">Tên đơn vị (in đậm đầu phiếu)</label><input className="inp" value={pf.ten} onChange={(e) => setPf((p) => ({ ...p, ten: e.target.value }))} /></div>
+            <div><label className="lbl">Địa chỉ</label><input className="inp" value={pf.dc} onChange={(e) => setPf((p) => ({ ...p, dc: e.target.value }))} /></div>
+            <div><label className="lbl">Số điện thoại</label><input className="inp" value={pf.sdt} onChange={(e) => setPf((p) => ({ ...p, sdt: e.target.value }))} /></div>
+            <div><label className="lbl">Lời cảm ơn chân trang</label><input className="inp" value={pf.ft} onChange={(e) => setPf((p) => ({ ...p, ft: e.target.value }))} /></div>
+            <div className="flex gap-2">
+              <button className="btn-ok !text-xs" onClick={savePf}>Lưu</button>
+              <button className="btn-ghost !text-xs" onClick={() => setPf(null)}>Hủy</button>
             </div>
           </div>
         )}

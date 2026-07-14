@@ -2,7 +2,7 @@
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Field, Badge, Toast, VehicleSearch, LocSearch, FramePicker, Pager, pageSlice } from "@/components/ui";
+import { Field, Badge, Toast, VehicleSearch, LocSearch, FramePicker, Pager, pageSlice , useSortable, Th } from "@/components/ui";
 import { fmtVND, fmtDate, fmtTime, errMsg } from "@/lib/format";
 import { CUSTOMER_TYPES, CUSTOMER_SOURCES, PAYMENT_METHODS, DOC_STATUSES } from "@/lib/const";
 
@@ -63,6 +63,7 @@ function BanHangInner() {
     loadOrders(); if (detail?.id === o.id) setDetail(null);
   };
   useEffect(() => { loadOrders(); }, []);
+  const sort = useSortable();
 
   // Go so khung -> tim xe san sang toan he thong -> tu dien mau xe + kho + tick so khung
   const [fq, setFq] = useState("");
@@ -126,8 +127,10 @@ function BanHangInner() {
     });
     setBusy(false);
     if (error) return notify(errMsg(error), "err");
-    notify(`Đã lưu đơn ${data} (${frames.length} xe). Tồn kho đã trừ tự động. Phần thu tiền ghi nhận ở app thu-chi riêng.`);
+    notify(`Đã lưu đơn ${data} (${frames.length} xe). Tồn kho đã trừ tự động — bấm "🖨 In phiếu" trong cửa sổ chi tiết để in cho khách.`);
     setF(empty); setFrames([]); setItems([]); setShow(false); refresh(); loadOrders();
+    const { data: newO } = await supabase.from("sales_orders").select("*").eq("code", data).single();
+    if (newO) openDetail(newO);
   };
 
   const updateOrder = async (id, field, value) => {
@@ -156,6 +159,83 @@ function BanHangInner() {
 
   const addItem = (item_type, name, unit_price) => setItems((p) => [...p, { item_type, name, qty: 1, unit_price }]);
   const setItem = (i, k, v) => setItems((p) => p.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
+
+  // ===== IN PHIEU XUAT BAN =====
+  const printOrder = async (o) => {
+    const { data: its } = await supabase.from("sale_items").select("*").eq("sale_code", o.code);
+    const v = vehicles.find((x) => x.id === o.vehicle_id);
+    const l = locations.find((x) => x.code === o.location_code);
+    const items = its || [];
+    const kem = items.reduce((sm, x) => sm + x.amount, 0);
+    const tienXe = o.sale_price * o.quantity;
+    const tong = tienXe + kem;
+    const paid = o.paid_amount || 0;
+    const row = (t, r) => `<tr><td>${t}</td><td class="r">${r}</td></tr>`;
+    const money = (n) => new Intl.NumberFormat("vi-VN").format(n) + " đ";
+    const html = `<!DOCTYPE html><html lang="vi"><head><meta charset="utf-8"><title>${o.code}</title><style>
+      *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',Arial,sans-serif}
+      body{padding:24px;max-width:720px;margin:0 auto;color:#111;font-size:13px;line-height:1.5}
+      .hd{display:flex;justify-content:space-between;gap:12px;border-bottom:2px solid #111;padding-bottom:10px;margin-bottom:12px}
+      .cty{font-size:15px;font-weight:800}.sub{font-size:11.5px;color:#444}
+      h1{font-size:19px;text-align:center;margin:14px 0 2px;letter-spacing:.5px}
+      .mid{text-align:center;font-size:12px;color:#444;margin-bottom:14px}
+      h2{font-size:12.5px;text-transform:uppercase;margin:14px 0 6px;border-bottom:1px solid #bbb;padding-bottom:3px}
+      table{width:100%;border-collapse:collapse}
+      .kv td{padding:2.5px 0;vertical-align:top}.kv td:first-child{color:#555;width:34%}
+      .bill td,.bill th{border:1px solid #999;padding:5px 8px}.bill th{background:#f0f0f0;text-align:left;font-size:12px}
+      .r{text-align:right}.b{font-weight:800}
+      .chu{font-style:italic;margin-top:6px}
+      .sig{display:flex;justify-content:space-between;margin-top:34px;text-align:center}
+      .sig div{width:45%}.sig .t{font-weight:700}.sig .s{font-size:11px;color:#555;margin-bottom:56px}
+      .ft{text-align:center;font-size:11.5px;color:#555;margin-top:24px;border-top:1px dashed #aaa;padding-top:8px}
+      @media print{body{padding:8px}.noprint{display:none}}
+    </style></head><body>
+      <div class="hd">
+        <div>
+          <div class="cty">${settings.cty_ten || "HỆ THỐNG XE ĐIỆN MINH KỲ"}</div>
+          <div class="sub">${settings.cty_diachi || ""}</div>
+          <div class="sub">${settings.cty_sdt ? "ĐT: " + settings.cty_sdt : ""}</div>
+        </div>
+        <div class="sub" style="text-align:right">Số phiếu: <b>${o.code}</b><br/>Ngày: ${new Date(o.sale_date).toLocaleDateString("vi-VN")}<br/>Điểm bán: ${l?.name || o.location_code}</div>
+      </div>
+      <h1>PHIẾU XUẤT BÁN XE</h1>
+      <div class="mid">(Kiêm biên nhận giao xe cho khách hàng)</div>
+      <h2>Thông tin khách hàng</h2>
+      <table class="kv">
+        ${row("Họ tên khách hàng", `<b>${o.customer_name}</b>`)}
+        ${row("Số điện thoại", o.customer_phone)}
+        ${o.customer_cccd ? row("CCCD", o.customer_cccd) : ""}
+        ${o.customer_address ? row("Địa chỉ", o.customer_address) : ""}
+      </table>
+      <h2>Thông tin xe</h2>
+      <table class="kv">
+        ${row("Loại xe", `<b>${v ? v.brand + " " + v.name + " — màu " + v.color : o.vehicle_id}</b>`)}
+        ${row("Số khung", `<b style="font-family:monospace">${o.frame_number}</b>`)}
+        ${row("Số lượng", o.quantity + " xe")}
+      </table>
+      <h2>Thanh toán</h2>
+      <table class="bill">
+        <tr><th>Nội dung</th><th style="width:60px">SL</th><th style="width:110px" class="r">Đơn giá</th><th style="width:120px" class="r">Thành tiền</th></tr>
+        <tr><td>${v ? v.name + " " + v.color : o.vehicle_id}</td><td>${o.quantity}</td><td class="r">${money(o.sale_price)}</td><td class="r">${money(tienXe)}</td></tr>
+        ${items.map((x) => `<tr><td>${x.name}</td><td>${x.qty}</td><td class="r">${money(x.unit_price)}</td><td class="r">${money(x.amount)}</td></tr>`).join("")}
+        <tr><td colspan="3" class="r b">TỔNG CỘNG</td><td class="r b">${money(tong)}</td></tr>
+        <tr><td colspan="3" class="r">Đã thanh toán (${o.payment_method})</td><td class="r">${money(paid)}</td></tr>
+        <tr><td colspan="3" class="r b">Còn lại</td><td class="r b">${money(Math.max(tong - paid, 0))}</td></tr>
+      </table>
+      <div class="chu">Bằng chữ (tổng cộng): <b>${docTien(tong)}</b></div>
+      ${o.note ? `<div style="margin-top:8px"><b>Ghi chú:</b> ${o.note}</div>` : ""}
+      <div class="sig">
+        <div><div class="t">KHÁCH HÀNG</div><div class="s">(Ký, ghi rõ họ tên)</div><div>${o.customer_name}</div></div>
+        <div><div class="t">NHÂN VIÊN BÁN HÀNG</div><div class="s">(Ký, ghi rõ họ tên)</div><div>${o.seller_name}</div></div>
+      </div>
+      <div class="ft">${settings.phieu_footer || "Cảm ơn Quý khách đã tin tưởng Minh Kỳ EV. Kính chúc Quý khách thượng lộ bình an!"}</div>
+      <div class="noprint" style="text-align:center;margin-top:18px"><button onclick="window.print()" style="padding:10px 26px;font-size:14px;font-weight:700;cursor:pointer">🖨 In / Lưu PDF</button></div>
+    </body></html>`;
+    const w = window.open("", "_blank");
+    if (!w) return notify("Trình duyệt chặn cửa sổ mới — cho phép popup cho trang này rồi bấm In lại.", "err");
+    w.document.write(html); w.document.close();
+    setTimeout(() => { try { w.print(); } catch (e) {} }, 400);
+  };
 
   const openDetail = async (o) => {
     setDetail({ ...o, _items: null, _pays: null, _adjs: null });
@@ -340,8 +420,8 @@ function BanHangInner() {
       <div className="card">
         <div className="font-extrabold mb-2.5">{canEdit ? "Đơn bán gần đây" : "Đơn bán của tôi"} ({orders.length})</div>
         <div className="overflow-x-auto"><table className="w-full border-collapse">
-          <thead><tr><th className="th">Mã đơn</th><th className="th">Ngày</th><th className="th">Xe · Số khung</th><th className="th">Kho xuất</th><th className="th">Khách</th><th className="th">Giá bán</th><th className="th">Thanh toán</th><th className="th">NV bán</th><th className="th">Hồ sơ</th><th className="th">Bảo hành</th><th className="th"></th></tr></thead>
-          <tbody>{pageSlice(orders, page, pageSize).map((s) => {
+          <thead><tr><Th label="Mã đơn" k="code" sort={sort} /><Th label="Ngày" k="date" sort={sort} /><Th label="Xe · Số khung" k="xe" sort={sort} /><Th label="Kho xuất" k="kho" sort={sort} /><Th label="Khách" k="kh" sort={sort} /><Th label="Giá bán" k="gia" sort={sort} /><Th label="Thanh toán" k="tt" sort={sort} /><Th label="NV bán" k="nv" sort={sort} /><th className="th">Hồ sơ</th><th className="th">Bảo hành</th><th className="th"></th></tr></thead>
+          <tbody>{pageSlice(sort.sortFn(orders, { code: (o) => o.code, date: (o) => o.sale_date, xe: (o) => vehicles.find((x) => x.id === o.vehicle_id)?.name || o.vehicle_id, kho: (o) => locations.find((l) => l.code === o.location_code)?.name || o.location_code, kh: (o) => o.customer_name, gia: (o) => o.sale_price * o.quantity, tt: (o) => (o.paid_amount || 0) - orderTotal(o), nv: (o) => o.seller_name }), page, pageSize).map((s) => {
             const v = vehicles.find((x) => x.id === s.vehicle_id);
             const l = locations.find((x) => x.code === s.location_code);
             return (
@@ -360,7 +440,7 @@ function BanHangInner() {
                 <td className="td">{canEdit ? (
                   <select className="inp !w-auto !py-1 !text-xs" value={s.warranty_status} onChange={(e) => updateOrder(s.id, "p_warranty", e.target.value)}><option>Chưa kích hoạt</option><option>Đã kích hoạt</option></select>
                 ) : (s.warranty_status === "Đã kích hoạt" ? <Badge tone="green">Đã kích hoạt</Badge> : <Badge tone="gray">Chưa kích hoạt</Badge>)}</td>
-                <td className="td"><button className="btn-ghost !px-2.5 !py-1 !text-xs" onClick={() => openDetail(s)}>Chi tiết</button></td>
+                <td className="td"><div className="flex gap-1.5"><button className="btn-ghost !px-2.5 !py-1 !text-xs" onClick={() => openDetail(s)}>Chi tiết</button><button className="btn-ghost !px-2 !py-1 !text-xs" title="In phiếu xuất" onClick={() => printOrder(s)}>🖨</button></div></td>
               </tr>
             );
           })}</tbody>
@@ -375,6 +455,7 @@ function BanHangInner() {
             <div className="bg-white rounded-2xl w-[560px] max-w-full max-h-[88vh] overflow-y-auto p-4" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center mb-3">
                 <div className="font-extrabold text-base mr-auto">Chi tiết đơn {detail.code}</div>
+                <button className="btn-primary !px-3 !py-1.5 !text-xs" onClick={() => printOrder(detail)}>🖨 In phiếu</button>
                 <button className="btn-ghost !px-3 !py-1.5 !text-xs" onClick={() => setDetail(null)}>✕</button>
               </div>
               <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[13px]">
@@ -469,6 +550,29 @@ function BanHangInner() {
       })()}
     </div>
   );
+}
+
+// Doc so tien bang chu tieng Viet
+const DOC_SO = ["không", "một", "hai", "ba", "bốn", "năm", "sáu", "bảy", "tám", "chín"];
+function doc3so(n, full) {
+  const tr = Math.floor(n / 100), ch = Math.floor((n % 100) / 10), dv = n % 10;
+  let out = "";
+  if (full || tr > 0) out += DOC_SO[tr] + " trăm";
+  if (ch > 1) { out += " " + DOC_SO[ch] + " mươi"; if (dv === 1) out += " mốt"; else if (dv === 5) out += " lăm"; else if (dv > 0) out += " " + DOC_SO[dv]; }
+  else if (ch === 1) { out += " mười"; if (dv === 5) out += " lăm"; else if (dv > 0) out += " " + DOC_SO[dv]; }
+  else if (dv > 0) { if (out) out += " lẻ"; out += " " + DOC_SO[dv]; }
+  return out.trim();
+}
+function docTien(n) {
+  if (!n || n <= 0) return "Không đồng";
+  const ty = Math.floor(n / 1e9), tr = Math.floor((n % 1e9) / 1e6), ng = Math.floor((n % 1e6) / 1e3), le = n % 1e3;
+  let out = "";
+  if (ty > 0) out += doc3so(ty, false) + " tỷ ";
+  if (tr > 0) out += doc3so(tr, ty > 0) + " triệu ";
+  if (ng > 0) out += doc3so(ng, ty > 0 || tr > 0) + " nghìn ";
+  if (le > 0) out += doc3so(le, out !== "");
+  out = out.trim() + " đồng";
+  return out.charAt(0).toUpperCase() + out.slice(1);
 }
 
 export default function BanHang() {

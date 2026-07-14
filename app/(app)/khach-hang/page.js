@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Field, Badge, Toast, KPI, Pager, pageSlice } from "@/components/ui";
+import { Field, Badge, Toast, KPI, Pager, pageSlice , useSortable, Th } from "@/components/ui";
 import { fmtVND, fmtDate, errMsg } from "@/lib/format";
 
 const digits = (p) => (p || "").replace(/\D/g, "");
@@ -21,6 +21,7 @@ export default function KhachHang() {
   const [history, setHistory] = useState({});
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+  const sort = useSortable();
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
 
   const load = async () => {
@@ -119,8 +120,8 @@ export default function KhachHang() {
           </select>
         </div>
         <div className="overflow-x-auto"><table className="w-full border-collapse">
-          <thead><tr><th className="th">Mã KH</th><th className="th">Khách hàng</th><th className="th">Xe đã mua gần nhất</th><th className="th">Trạng thái</th><th className="th">Sales phụ trách</th><th className="th">Ghi chú</th><th className="th"></th></tr></thead>
-          <tbody>{pageSlice(filtered, page, pageSize).map((c) => {
+          <thead><tr><Th label="Mã KH" k="code" sort={sort} /><Th label="Khách hàng" k="ten" sort={sort} /><Th label="Xe đã mua gần nhất" k="xe" sort={sort} /><Th label="Trạng thái" k="tt" sort={sort} /><Th label="Sales phụ trách" k="nv" sort={sort} /><th className="th">Ghi chú</th><th className="th"></th></tr></thead>
+          <tbody>{pageSlice(sort.sortFn(filtered, { code: (c) => c.code, ten: (c) => c.name, xe: (c) => lastBuy[c.id] ? vName(lastBuy[c.id].vehicle_id) : "", tt: (c) => (bought(c) ? "Đã mua" : "Hồ sơ"), nv: (c) => c.assigned_name || c.created_by_name }), page, pageSize).map((c) => {
             const lb = lastBuy[c.id];
             const hist = history[c.id] || [];
             const total = hist.reduce((s, o) => s + o.sale_price * o.quantity, 0);
