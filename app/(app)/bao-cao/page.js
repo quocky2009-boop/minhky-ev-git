@@ -108,7 +108,7 @@ export default function BaoCao() {
           "Khach_Hang","SDT","CCCD","Dia_Chi","Loai_Khach","Nguon_Khach",
           "Gia_Niem_Yet","Gia_Ban","Thanh_Tien_Xe","Tong_Ban_Kem","Tong_Don",
           "Da_Thanh_Toan","Con_Lai","Trang_Thai_TT","Hinh_Thuc_TT",
-          "Trang_Thai_Ho_So","Bao_Hanh","NV_Ban","Ghi_Chu","Chi_Tiet_Ban_Kem",
+          "Trang_Thai_Ho_So","Bao_Hanh","NV_Ban","Tra_Gop_Cong_Ty","Tra_Gop_So_Tien","Ghi_Chu","Chi_Tiet_Ban_Kem",
           ...cfs.map((c) => c.label.replace(/,/g, " "))],
          ...rows.map((s) => {
            const v = vOf(s.vehicle_id);
@@ -124,7 +124,7 @@ export default function BaoCao() {
              s.customer_name, s.customer_phone, s.customer_cccd || "", s.customer_address || "", s.customer_type, s.customer_source,
              s.list_price, s.sale_price, tienXe, kem, tong,
              paid, Math.max(tong - paid, 0), ttTrangThai, s.payment_method,
-             s.document_status, s.warranty_status, s.seller_name, (s.note || "").replace(/\n/g, " "), kemText,
+             s.document_status, s.warranty_status, s.seller_name, s.extra?.tra_gop_cong_ty || "", s.extra?.tra_gop_so_tien || "", (s.note || "").replace(/\n/g, " "), kemText,
              ...cfs.map((c) => { const val = s.extra?.[c.field_key]; return val === undefined || val === null || val === "" ? "" : (c.field_type === "checkbox" ? (val ? "Có" : "Không") : String(val)); })];
          })]);
     }
@@ -174,6 +174,7 @@ export default function BaoCao() {
             </select>
           )}
           <button className="btn-primary ml-auto" onClick={doExport} disabled={busy || rows.length === 0}>⬇ Xuất CSV ({fmtNum(rows.length)} dòng)</button>
+          {type === "ton" && <button className="btn-ghost !text-xs" onClick={exportTonChiTiet}>⬇ CSV chi tiết theo số khung</button>}
         </div>
       </div>
 

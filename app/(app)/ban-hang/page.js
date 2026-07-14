@@ -3,6 +3,7 @@ import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Field, Badge, Toast, VehicleSearch, LocSearch, FramePicker, Pager, pageSlice , useSortable, Th } from "@/components/ui";
+import Scanner from "@/components/Scanner";
 import { fmtVND, fmtDate, fmtTime, errMsg } from "@/lib/format";
 import { CUSTOMER_TYPES, CUSTOMER_SOURCES, PAYMENT_METHODS, DOC_STATUSES } from "@/lib/const";
 
@@ -26,7 +27,7 @@ function BanHangInner() {
   const [orders, setOrders] = useState([]);
   const [units, setUnits] = useState([]);
   const [frames, setFrames] = useState([]);
-  const empty = { vehicle_id: params.get("xe") || "", location_code: "", customer_name: "", customer_phone: "", customer_cccd: "", customer_address: "", customer_type: "Khách lẻ", customer_source: "Khách vãng lai", sale_price: "", paid_amount: "", payment_method: "Chuyển khoản", document_status: "Đang làm đăng ký", note: "", extra: {} };
+  const empty = { vehicle_id: params.get("xe") || "", location_code: "", customer_name: "", customer_phone: "", customer_cccd: "", customer_address: "", customer_type: "Khách lẻ", customer_source: "Khách vãng lai", sale_price: "", paid_amount: "", payment_method: "Chuyển khoản", tra_gop_ct: "", tra_gop_tien: "", document_status: "Đang làm đăng ký", note: "", extra: {} };
   const [f, setF] = useState(empty);
   const [show, setShow] = useState(!!params.get("xe"));
   const [busy, setBusy] = useState(false);
@@ -68,6 +69,16 @@ function BanHangInner() {
   // Go so khung -> tim xe san sang toan he thong -> tu dien mau xe + kho + tick so khung
   const [fq, setFq] = useState("");
   const [fHits, setFHits] = useState([]);
+  const [showScan, setShowScan] = useState(false);
+  const scanPickFrames = async (list) => {
+    for (const code of list.map((x) => x.trim().toUpperCase()).filter(Boolean)) {
+      const { data: u } = await supabase.from("vehicle_units")
+        .select("frame_number, vehicle_id, location_code, status").eq("frame_number", code).maybeSingle();
+      if (!u) { notify(`Số khung ${code} không có trên hệ thống.`, "err"); continue; }
+      if (u.status !== "TON_KHO") { notify(`Xe ${code} không sẵn sàng bán (${u.status === "DA_BAN" ? "đã bán" : "đang chuyển"}).`, "err"); continue; }
+      pickFrame(u);
+    }
+  };
   useEffect(() => {
     const q = fq.trim().toUpperCase();
     if (q.length < 3) { setFHits([]); return; }
@@ -120,6 +131,11 @@ function BanHangInner() {
     cfields.forEach((c) => {
       if (c.field_type === "formula") extra[c.field_key] = calcFormula(c.formula, f.sale_price || vehicle?.list_price, taxRate);
     });
+    if (f.payment_method === "Trả góp") {
+      if (!f.tra_gop_ct) { setBusy(false); return notify("Chọn đơn vị trả góp.", "err"); }
+      extra.tra_gop_cong_ty = f.tra_gop_ct;
+      extra.tra_gop_so_tien = Number(f.tra_gop_tien) || 0;
+    } else { delete extra.tra_gop_cong_ty; delete extra.tra_gop_so_tien; }
     const { data, error } = await supabase.rpc("fn_ban_hang", {
       p: { ...f, frames, extra, sale_price: f.sale_price ? Number(f.sale_price) : null,
         paid_amount: Number(f.paid_amount) || 0,
@@ -223,6 +239,7 @@ function BanHangInner() {
         <tr><td colspan="3" class="r b">Còn lại</td><td class="r b">${money(Math.max(tong - paid, 0))}</td></tr>
       </table>
       <div class="chu">Bằng chữ (tổng cộng): <b>${docTien(tong)}</b></div>
+      ${o.extra?.tra_gop_cong_ty ? `<div style="margin-top:6px"><b>Trả góp:</b> ${o.extra.tra_gop_cong_ty}${Number(o.extra.tra_gop_so_tien) > 0 ? " — số tiền trả góp " + money(Number(o.extra.tra_gop_so_tien)) : ""}</div>` : ""}
       ${o.note ? `<div style="margin-top:8px"><b>Ghi chú:</b> ${o.note}</div>` : ""}
       <div class="sig">
         <div><div class="t">KHÁCH HÀNG</div><div class="s">(Ký, ghi rõ họ tên)</div><div>${o.customer_name}</div></div>
@@ -273,13 +290,17 @@ function BanHangInner() {
   return (
     <div className="flex flex-col gap-4">
       <Toast toast={toast} />
+      {showScan && <Scanner onClose={() => setShowScan(false)} onAdd={scanPickFrames} />}
       {!show && <button className="btn-primary self-start" onClick={() => setShow(true)}>+ Tạo đơn bán mới</button>}
       {show && (
         <div className="card">
           <div className="font-extrabold text-base mb-3">Tạo đơn bán — chọn xe theo số khung</div>
           <div className="mb-3 relative">
             <label className="lbl">⚡ Tìm nhanh: gõ 3–6 ký tự cuối số khung (tự điền mẫu xe + kho)</label>
-            <input className="inp font-mono !text-[14px]" placeholder="VD: 429407…" value={fq} onChange={(e) => setFq(e.target.value.toUpperCase())} />
+            <div className="flex gap-1.5">
+              <input className="inp font-mono !text-[14px]" placeholder="VD: 429407…" value={fq} onChange={(e) => setFq(e.target.value.toUpperCase())} />
+              <button className="btn-primary !px-4 whitespace-nowrap" title="Quét mã QR/mã vạch số khung" onClick={() => setShowScan(true)}>📷 Quét</button>
+            </div>
             {fq.trim().length >= 3 && (
               <div className="absolute z-30 left-0 right-0 mt-1 bg-white border border-[#D5DBE3] rounded-xl shadow-lg overflow-hidden">
                 {fHits.length === 0 && <div className="px-3 py-2.5 text-sm text-[#8A93A0]">Không có xe sẵn sàng nào khớp — xe đã bán/đang chuyển sẽ không hiện ở đây.</div>}
@@ -383,6 +404,17 @@ function BanHangInner() {
                 {PAYMENT_METHODS.map((m) => <option key={m}>{m}</option>)}
               </select>
             </div>
+            {f.payment_method === "Trả góp" && (
+              <div className="w-full flex items-center gap-2 flex-wrap bg-[#FDF6E3] rounded-lg px-3 py-2">
+                <span className="text-xs font-bold text-[#A25F00]">Trả góp:</span>
+                <select className="inp !w-auto !py-1.5 !text-xs" value={f.tra_gop_ct} onChange={(e) => set("tra_gop_ct", e.target.value)}>
+                  <option value="">— Chọn đơn vị trả góp —</option>
+                  {(settings.cong_ty_tra_gop || "Home Credit\nShinhanbank\nHD Saison\nFE Credit").split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean).map((x) => <option key={x}>{x}</option>)}
+                </select>
+                <span className="text-xs text-[#5A6572]">Số tiền trả góp:</span>
+                <input type="number" min="0" className="inp !w-36 !py-1.5 !text-xs" value={f.tra_gop_tien} onChange={(e) => set("tra_gop_tien", e.target.value)} placeholder="0" />
+              </div>
+            )}
             <div className="w-full text-[10.5px] text-[#8A93A0]">Các trường thanh toán chỉ để tra cứu giao dịch bán xe — không phải sổ quỹ. Ghi sổ tiền ở app thu-chi riêng.</div>
           </div>
 
@@ -471,7 +503,7 @@ function BanHangInner() {
                 <div><span className="text-[#8A93A0]">Nguồn khách:</span> {detail.customer_source}</div>
                 <div><span className="text-[#8A93A0]">Giá niêm yết:</span> {fmtVND(detail.list_price)}</div>
                 <div><span className="text-[#8A93A0]">Giá bán:</span> <b className="text-brand">{fmtVND(detail.sale_price)}</b></div>
-                <div><span className="text-[#8A93A0]">Hình thức TT:</span> {detail.payment_method}</div>
+                <div><span className="text-[#8A93A0]">Hình thức TT:</span> {detail.payment_method}{detail.extra?.tra_gop_cong_ty ? ` — ${detail.extra.tra_gop_cong_ty}${detail.extra.tra_gop_so_tien ? ` (${fmtVND(Number(detail.extra.tra_gop_so_tien))})` : ""}` : ""}</div>
                 <div><span className="text-[#8A93A0]">Trạng thái TT:</span> {payBadge(detail)}</div>
                 <div><span className="text-[#8A93A0]">Đã thanh toán:</span> <b>{fmtVND(detail.paid_amount || 0)}</b></div>
                 <div><span className="text-[#8A93A0]">Còn lại:</span> <b className={orderTotal(detail) - (detail.paid_amount || 0) > 0 ? "text-danger" : "text-[#0E7A4A]"}>{fmtVND(Math.max(orderTotal(detail) - (detail.paid_amount || 0), 0))}</b></div>
