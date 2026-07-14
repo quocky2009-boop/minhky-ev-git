@@ -15,7 +15,7 @@ export default function KhachHang() {
   const [fStatus, setFStatus] = useState("");
   const [fType, setFType] = useState("");
   const [show, setShow] = useState(false);
-  const empty = { id: "", name: "", phone: "", cccd: "", address: "", note: "" };
+  const empty = { id: "", name: "", phone: "", cccd: "", address: "", customer_type: "Khách lẻ", note: "" };
   const [f, setF] = useState(empty);
   const [dup, setDup] = useState(null);
   const [openId, setOpenId] = useState(null);
@@ -57,7 +57,7 @@ export default function KhachHang() {
   };
 
   const startEdit = (c) => {
-    setF({ id: c.id, name: c.name, phone: c.phone, cccd: c.cccd || "", address: c.address || "", note: c.note || "" });
+    setF({ id: c.id, name: c.name, phone: c.phone, cccd: c.cccd || "", address: c.address || "", customer_type: c.customer_type || "Khách lẻ", note: c.note || "" });
     setShow(true); window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -104,6 +104,9 @@ export default function KhachHang() {
             </Field>
             <Field label="CCCD"><input className="inp" value={f.cccd} onChange={(e) => set("cccd", e.target.value)} /></Field>
             <Field label="Địa chỉ"><input className="inp" value={f.address} onChange={(e) => set("address", e.target.value)} /></Field>
+            <Field label="Loại khách"><select className="inp" value={f.customer_type} onChange={(e) => set("customer_type", e.target.value)}>
+              <option>Khách lẻ</option><option>Khách buôn</option><option>CBNV</option><option>Khách VIP</option>
+            </select></Field>
             <Field label="Ghi chú"><input className="inp" value={f.note} onChange={(e) => set("note", e.target.value)} /></Field>
           </div>
           <div className="flex gap-2.5">
