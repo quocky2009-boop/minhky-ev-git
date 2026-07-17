@@ -1,10 +1,36 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Field, Badge, Toast } from "@/components/ui";
 import { errMsg } from "@/lib/format";
 
 const TYPE_LABELS = { text: "Chữ", number: "Số", dropdown: "Danh sách chọn", checkbox: "Tick chọn", formula: "Công thức tự tính" };
+
+const PERM_LIST = [
+  { group: "Kho & hàng hóa", items: [
+    { key: "nhap_hang", label: "Nhập hàng vào kho" },
+    { key: "xuat_ban", label: "Tạo đơn xuất bán" },
+    { key: "dieu_chuyen", label: "Tạo phiếu điều chuyển" },
+    { key: "dieu_chinh", label: "Đề xuất điều chỉnh tồn" },
+    { key: "duyet_dieu_chinh", label: "Duyệt điều chỉnh tồn" },
+    { key: "kiem_ke", label: "Kiểm kê" },
+    { key: "nhap_tu_phieu", label: "Nhập kho từ phiếu quét gom" },
+  ] },
+  { group: "Đơn bán", items: [
+    { key: "xac_nhan_hd", label: "Xác nhận đã xuất hóa đơn" },
+    { key: "sua_thanh_toan", label: "Cập nhật số tiền đã thanh toán" },
+    { key: "duyet_sua_don", label: "Duyệt điều chỉnh giá đơn" },
+  ] },
+  { group: "Dữ liệu", items: [
+    { key: "sua_danh_muc", label: "Thêm/sửa danh mục xe, kho, NCC" },
+    { key: "sua_unit", label: "Sửa thông tin xe theo số khung" },
+    { key: "sua_khach", label: "Thêm/sửa khách hàng" },
+  ] },
+  { group: "Quản trị", items: [
+    { key: "xem_bao_cao", label: "Xem báo cáo" },
+    { key: "cai_dat", label: "Vào trang Cài đặt" },
+  ] },
+];
 
 export default function CaiDat() {
   const { supabase, profile, loading, settings, customFields, brands, refresh, taxRate, regions } = useCatalog();
@@ -19,6 +45,19 @@ export default function CaiDat() {
   const [hook, setHook] = useState(null);
   const [bk, setBk] = useState(null);
   const [pf, setPf] = useState(null); // phieu in
+  const [perms, setPerms] = useState(null);
+  const loadPerms = async () => {
+    const { data } = await supabase.from("role_perms").select("*");
+    const m = {};
+    (data || []).forEach((r) => { m[`${r.role}|${r.perm}`] = r.allowed; });
+    setPerms(m);
+  };
+  useEffect(() => { if (profile?.role === "CEO") loadPerms(); }, [profile]);
+  const togglePerm = async (role, perm, cur) => {
+    const { error } = await supabase.rpc("fn_set_quyen", { p_role: role, p_perm: perm, p_allowed: !cur });
+    if (error) return notify(errMsg(error), "err");
+    setPerms((p) => ({ ...p, [`${role}|${perm}`]: !cur }));
+  };
   const savePf = async () => {
     for (const [key, val] of [["cty_ten", pf.ten.trim()], ["cty_diachi", pf.dc.trim()], ["cty_sdt", pf.sdt.trim()], ["phieu_footer", pf.ft.trim()]]) {
       const { error } = await supabase.rpc("fn_set_setting", { p_key: key, p_value: val });
@@ -165,6 +204,32 @@ export default function CaiDat() {
           </div>
         )}
       </div>
+
+      {profile.role === "CEO" && (
+        <div className="card">
+          <div className="font-extrabold mb-1">Phân quyền theo vai trò</div>
+          <p className="text-xs text-[#5A6572] mb-3">Tích/bỏ tích để cho phép từng vai trò làm gì. Quyền được kiểm tra ở cả giao diện lẫn database. <b>BGĐ luôn có toàn quyền</b> (không chỉnh được, tránh tự khóa mình ra ngoài).</p>
+          {perms === null ? <div className="text-sm text-[#8A93A0]">Đang tải phân quyền…</div> : (
+            <div className="overflow-x-auto"><table className="w-full border-collapse">
+              <thead><tr><th className="th">Quyền</th><th className="th text-center">Sales</th><th className="th text-center">Cửa hàng trưởng</th><th className="th text-center">Admin</th><th className="th text-center">BGĐ</th></tr></thead>
+              <tbody>{PERM_LIST.map((g) => [
+                <tr key={g.group}><td className="td font-extrabold text-[11px] uppercase bg-[#F3F5F8]" colSpan={5}>{g.group}</td></tr>,
+                ...g.items.map((it) => (
+                  <tr key={it.key} className="hover:bg-[#F8FAFC]">
+                    <td className="td text-[13px]">{it.label}</td>
+                    {["SALES", "MANAGER", "ADMIN"].map((r) => (
+                      <td key={r} className="td text-center">
+                        <input type="checkbox" className="w-4 h-4 cursor-pointer" checked={!!perms[`${r}|${it.key}`]} onChange={() => togglePerm(r, it.key, !!perms[`${r}|${it.key}`])} />
+                      </td>
+                    ))}
+                    <td className="td text-center"><span className="text-[#0E7A4A] font-bold">✓</span></td>
+                  </tr>
+                )),
+              ])}</tbody>
+            </table></div>
+          )}
+        </div>
+      )}
 
       <div className="card">
         <div className="font-extrabold mb-1">Phiếu xuất bán (thông tin in trên phiếu)</div>

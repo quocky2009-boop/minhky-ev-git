@@ -581,7 +581,7 @@ function BanHangInner() {
       <div className="card">
         <div className="font-extrabold mb-2.5">{canEdit ? "Đơn bán gần đây" : "Đơn bán của tôi"} ({orders.length})</div>
         <div className="overflow-x-auto"><table className="w-full border-collapse">
-          <thead><tr><Th label="Mã đơn" k="code" sort={sort} /><Th label="Ngày" k="date" sort={sort} /><Th label="Xe · Số khung" k="xe" sort={sort} /><Th label="Kho xuất" k="kho" sort={sort} /><Th label="Khách" k="kh" sort={sort} /><Th label="Giá bán" k="gia" sort={sort} /><Th label="Thanh toán" k="tt" sort={sort} /><Th label="NV bán" k="nv" sort={sort} /><th className="th">Hồ sơ</th><th className="th">Bảo hành</th><th className="th"></th></tr></thead>
+          <thead><tr><Th label="Mã đơn" k="code" sort={sort} /><Th label="Ngày" k="date" sort={sort} /><Th label="Xe · Số khung" k="xe" sort={sort} /><Th label="Kho xuất" k="kho" sort={sort} /><Th label="Khách" k="kh" sort={sort} /><Th label="Giá bán" k="gia" sort={sort} /><Th label="Thanh toán" k="tt" sort={sort} /><th className="th">Hóa đơn</th><Th label="NV bán" k="nv" sort={sort} /><th className="th">Hồ sơ</th><th className="th">Bảo hành</th><th className="th"></th></tr></thead>
           <tbody>{pageSlice(sort.sortFn(orders, { code: (o) => o.code, date: (o) => o.sale_date, xe: (o) => vehicles.find((x) => x.id === o.vehicle_id)?.name || o.vehicle_id, kho: (o) => locations.find((l) => l.code === o.location_code)?.name || o.location_code, kh: (o) => o.customer_name, gia: (o) => o.sale_price * o.quantity, tt: (o) => (o.paid_amount || 0) - orderTotal(o), nv: (o) => o.seller_name }), page, pageSize).map((s) => {
             const v = vehicles.find((x) => x.id === s.vehicle_id);
             const l = locations.find((x) => x.code === s.location_code);
@@ -594,6 +594,7 @@ function BanHangInner() {
                 <td className="td">{s.customer_name}<div className="text-[11px] text-[#8A93A0]">{s.customer_phone} · {s.customer_source}</div></td>
                 <td className="td font-bold">{fmtVND(s.sale_price)}</td>
                 <td className="td">{payBadge(s)}</td>
+                <td className="td">{(s.invoice_status || "Chờ xuất HĐ") === "Đã xuất HĐ" ? <Badge tone="green">✓ HĐ {s.invoice_no}</Badge> : <Badge tone="amber">Chờ xuất HĐ</Badge>}</td>
                 <td className="td">{s.seller_name}</td>
                 <td className="td">{canEdit ? (
                   <select className="inp !w-auto !py-1 !text-xs" value={s.document_status} onChange={(e) => updateOrder(s.id, "p_doc", e.target.value)}>{DOC_STATUSES.map((c) => <option key={c}>{c}</option>)}</select>
