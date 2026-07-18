@@ -4,9 +4,10 @@ import { useCatalog, useToast } from "@/lib/useData";
 import { Field, Badge, Toast, LocPicker } from "@/components/ui";
 import { errMsg, downloadCSV } from "@/lib/format";
 import Scanner from "@/components/Scanner";
+import { printPhieuKiemKho } from "@/lib/printKiemKho";
 
 export default function KiemKe() {
-  const { supabase, vehicles, locations, loading, refresh } = useCatalog();
+  const { supabase, vehicles, locations, settings, loading, refresh } = useCatalog();
   const { toast, notify } = useToast();
   const [method, setMethod] = useState("frame"); // frame | qty
   const [loc, setLoc] = useState("");
@@ -15,6 +16,8 @@ export default function KiemKe() {
   const [actual, setActual] = useState({});
   const [busy, setBusy] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
+  const [pScope, setPScope] = useState("all");
+  const [pCode, setPCode] = useState("");
 
   const loadUnits = async () => {
     if (!loc) { setUnits([]); return; }
@@ -120,6 +123,36 @@ export default function KiemKe() {
       {showScanner && <Scanner onClose={() => setShowScanner(false)}
         onAdd={(list) => setScan((p) => [...new Set([...p.split(/[\n,;\s]+/).map(x=>x.trim()).filter(Boolean), ...list])].join("\n"))} />}
       <div className="font-extrabold text-base">Phiên kiểm kê tồn thực tế</div>
+
+      <div className="mb-3 mt-2 p-3 rounded-xl border border-[#E3E8EF] bg-[#F8FAFC]">
+        <div className="font-bold text-sm mb-1">🖨 In phiếu kiểm kho theo số khung (mang đi đối chiếu thực tế)</div>
+        <p className="text-[11.5px] text-[#5A6572] mb-2">Mỗi điểm 1 trang: danh sách số khung + tên xe hệ thống đang ghi nhận, có cột tick ✓ / ghi chú và phần tổng hợp thừa–thiếu ở cuối. Cầm đi đọc số khung, tick là xong.</p>
+        <div className="flex gap-2 flex-wrap items-center">
+          <select className="inp !w-auto" value={pScope} onChange={(e) => { setPScope(e.target.value); setPCode(""); }}>
+            <option value="all">Toàn hệ thống (tất cả điểm)</option>
+            <option value="region">Theo khu vực</option>
+            <option value="loc">Một điểm cụ thể</option>
+          </select>
+          {pScope === "region" && (
+            <select className="inp !w-auto" value={pCode} onChange={(e) => setPCode(e.target.value)}>
+              <option value="">— Chọn khu vực —</option>
+              {[...new Set(locations.map((l) => l.region).filter(Boolean))].map((r) => <option key={r}>{r}</option>)}
+            </select>
+          )}
+          {pScope === "loc" && (
+            <select className="inp !w-auto" value={pCode} onChange={(e) => setPCode(e.target.value)}>
+              <option value="">— Chọn điểm —</option>
+              {locations.map((l) => <option key={l.code} value={l.code}>{l.name} ({l.region})</option>)}
+            </select>
+          )}
+          <button className="btn-primary !text-xs" disabled={pScope !== "all" && !pCode}
+            onClick={() => printPhieuKiemKho({ supabase, scope: pScope, code: pCode,
+              label: pScope === "all" ? "Toàn hệ thống" : pScope === "region" ? "Khu vực " + pCode : (locations.find((l) => l.code === pCode)?.name || pCode),
+              locations, vehicles, settings })}>
+            🖨 In phiếu kiểm kho
+          </button>
+        </div>
+      </div>
       <div className="flex gap-1.5 my-3">
         <button className={`btn !px-3 !py-2 !text-xs ${method === "frame" ? "bg-brand text-white" : "bg-[#EEF1F4] text-[#3B4552]"}`} onClick={() => setMethod("frame")}>Theo số khung (chính xác nhất)</button>
         <button className={`btn !px-3 !py-2 !text-xs ${method === "qty" ? "bg-brand text-white" : "bg-[#EEF1F4] text-[#3B4552]"}`} onClick={() => setMethod("qty")}>Theo số lượng (đếm nhanh)</button>
