@@ -1,320 +1,262 @@
 "use client";
-import { useEffect, useState, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Field, Badge, Toast, KPI, Pager, pageSlice } from "@/components/ui";
+import { Badge, Toast, KPI, Field, LocSearch, Pager, pageSlice } from "@/components/ui";
 import { fmtVND, fmtDate, errMsg, downloadCSV } from "@/lib/format";
 
-const today = () => new Date().toLocaleDateString("sv-SE"); // yyyy-mm-dd theo gio may
+const iso = (d) => d.toLocaleDateString("sv-SE");
+const firstOfMonth = () => { const d = new Date(); return iso(new Date(d.getFullYear(), d.getMonth(), 1)); };
 
-function ThuChiInner() {
-  const params = useSearchParams();
-  const urlTab = params.get("tab");
-  const { supabase, locations, profile, loading, settings } = useCatalog();
+export default function ThuChi() {
+  const { supabase, locations, settings, profile, loading } = useCatalog();
   const { toast, notify } = useToast();
-  const [accounts, setAccounts] = useState([]);
+  const [tab, setTab] = useState("so");
+  const [perms, setPerms] = useState({});
+  const [accs, setAccs] = useState([]);
   const [txns, setTxns] = useState([]);
   const [closings, setClosings] = useState([]);
-  const [bal, setBal] = useState({});
-  const [from, setFrom] = useState(today().slice(0, 8) + "01");
-  const [to, setTo] = useState(today());
+  const [from, setFrom] = useState(firstOfMonth());
+  const [to, setTo] = useState(iso(new Date()));
   const [fAcc, setFAcc] = useState("");
   const [fDir, setFDir] = useState("");
-  // form ghi thu chi
-  const emptyT = { txn_date: today(), account_id: "", direction: "Thu", amount: "", category: "", counterparty: "", description: "" };
-  const [t, setT] = useState(emptyT);
-  const setTf = (k, v) => setT((p) => ({ ...p, [k]: v }));
-  // form quy
-  const [showAcc, setShowAcc] = useState(false);
-  const emptyA = { id: "", name: "", type: "Tiền mặt", location_code: "", bank_info: "", opening_balance: 0, status: "Hoạt động" };
-  const [a, setA] = useState(emptyA);
-  const setAf = (k, v) => setA((p) => ({ ...p, [k]: v }));
-  // chot quy
-  const [closeAcc, setCloseAcc] = useState("");
-  const [closeActual, setCloseActual] = useState("");
-  const [closeNote, setCloseNote] = useState("");
-  const [tab, setTab] = useState(urlTab || "quy");
-  const [bcGroup, setBcGroup] = useState("quy");
-  useEffect(() => { if (urlTab) setTab(urlTab); }, [urlTab]);
+  const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const [busy, setBusy] = useState(false);
+  const [f, setF] = useState({ direction: "Thu", account_id: "", amount: "", category: "", counterparty: "", description: "", txn_date: iso(new Date()) });
+  const [af, setAf] = useState({ id: null, name: "", type: "Tiền mặt", location_code: "", bank_info: "", opening_balance: 0 });
+  const [showAcc, setShowAcc] = useState(false);
+
+  const can = (p) => profile?.role === "CEO" || !!perms[p];
+  const cats = (settings?.thu_chi_categories || "Bán xe\nThu dịch vụ\nThu tiền cọc\nThu công nợ bán xe\nThu khác\nLương\nThuê mặt bằng\nĐiện nước\nNhập hàng\nChi khác").split(/\n+/).map((x) => x.trim()).filter(Boolean);
 
   const load = async () => {
-    const [{ data: ac }, { data: tx }, { data: cl }] = await Promise.all([
-      supabase.from("cash_accounts").select("*").order("type").order("name"),
-      supabase.from("cash_txns").select("*").gte("txn_date", from).lte("txn_date", to).order("txn_date", { ascending: false }).order("id", { ascending: false }).limit(1000),
-      supabase.from("cash_closings").select("*").eq("close_date", today()),
+    if (!profile) return;
+    setBusy(true);
+    let qy = supabase.from("cash_txns").select("*").gte("txn_date", from).lte("txn_date", to).order("txn_date", { ascending: false }).order("id", { ascending: false }).limit(2000);
+    if (fAcc) qy = qy.eq("account_id", fAcc);
+    const [{ data: a }, { data: t }, { data: c }, { data: pm }] = await Promise.all([
+      supabase.from("v_quy_so_du").select("*").order("type").order("name"),
+      qy,
+      supabase.from("cash_closings").select("*").order("close_date", { ascending: false }).limit(60),
+      supabase.from("role_perms").select("perm,allowed").eq("role", profile.role),
     ]);
-    setAccounts(ac || []); setTxns(tx || []); setClosings(cl || []);
+    setAccs(a || []); setTxns(t || []); setClosings(c || []);
+    const m = {}; (pm || []).forEach((x) => { m[x.perm] = x.allowed; }); setPerms(m);
+    setBusy(false);
   };
-  useEffect(() => { if (!loading) load(); }, [loading, from, to]);
-  useEffect(() => { if (!loading) loadBalances(); }, [loading]);
+  useEffect(() => { if (!loading) load(); }, [loading, profile, from, to, fAcc]);
 
   if (loading || !profile) return <div className="card">Đang tải dữ liệu…</div>;
-  if (!["CEO", "ADMIN", "MANAGER"].includes(profile.role)) return <div className="card">Phần Thu - Chi chỉ dành cho BGĐ / Admin / Quản lý.</div>;
-  const canManageAcc = ["CEO", "ADMIN"].includes(profile.role);
+  if (!can("thu_chi_xem")) return <div className="card">Bạn không có quyền xem sổ thu chi.</div>;
 
-  const accName = (id) => accounts.find((x) => x.id === Number(id))?.name || id;
-  const locName = (c) => locations.find((l) => l.code === c)?.name || "";
-  const thuCats = (settings.thu_categories || "Bán xe\nThu khác").split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean);
-  const chiCats = (settings.chi_categories || "Nhập hàng\nChi khác").split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean);
+  const accName = (id) => accs.find((a) => a.id === id)?.name || id;
+  const locName = (c) => locations.find((l) => l.code === c)?.name || c;
 
-  const list = txns.filter((x) => (!fAcc || String(x.account_id) === fAcc) && (!fDir || x.direction === fDir));
-  const sumThu = list.filter((x) => x.direction === "Thu").reduce((s, x) => s + x.amount, 0);
-  const sumChi = list.filter((x) => x.direction === "Chi").reduce((s, x) => s + x.amount, 0);
-
-  const saveTxn = async () => {
-    const { data, error } = await supabase.rpc("fn_ghi_thu_chi", { p: { ...t, amount: Number(t.amount) } });
+  const ghi = async () => {
+    if (!f.account_id) return notify("Chọn quỹ.", "err");
+    if (!(Number(f.amount) > 0)) return notify("Nhập số tiền.", "err");
+    setBusy(true);
+    const { data, error } = await supabase.rpc("fn_ghi_thu_chi", { p: { ...f, amount: Number(f.amount) } });
+    setBusy(false);
     if (error) return notify(errMsg(error), "err");
-    notify(`Đã ghi phiếu ${data}.`); setT({ ...emptyT, account_id: t.account_id }); load(); loadBalances();
-  };
-  const saveAcc = async () => {
-    const { error } = await supabase.rpc("fn_them_quy", { p: { ...a, opening_balance: Number(a.opening_balance) || 0 } });
-    if (error) return notify(errMsg(error), "err");
-    notify(a.id ? "Đã cập nhật quỹ." : "Đã tạo quỹ mới."); setA(emptyA); setShowAcc(false); load(); loadBalances();
-  };
-  const doClose = async () => {
-    if (!closeAcc) return notify("Chọn quỹ cần chốt.", "err");
-    const { error } = await supabase.rpc("fn_chot_quy", { p: { account_id: Number(closeAcc), actual_balance: Number(closeActual) || 0, note: closeNote } });
-    if (error) return notify(errMsg(error), "err");
-    notify("Đã chốt quỹ hôm nay."); setCloseAcc(""); setCloseActual(""); setCloseNote(""); load();
-  };
-  const sendReport = async () => {
-    const { error } = await supabase.rpc("fn_test_discord_thuchi");
-    if (error) return notify(errMsg(error), "err");
-    notify("Đã gửi báo cáo quỹ vào Discord — kiểm tra channel.");
+    notify(`Đã ghi ${f.direction.toLowerCase()} — phiếu ${data}.`);
+    setF((p) => ({ ...p, amount: "", counterparty: "", description: "" })); load();
   };
 
-  // So du hien tai tung quy (goi rpc fn_so_du)
-  const loadBalances = async () => {
-    const { data: ac } = await supabase.from("cash_accounts").select("id");
-    const res = {};
-    for (const x of ac || []) {
-      const { data } = await supabase.rpc("fn_so_du", { p_account: x.id });
-      res[x.id] = data || 0;
-    }
-    setBal(res);
+  const luuQuy = async () => {
+    if (!af.name.trim()) return notify("Nhập tên quỹ.", "err");
+    const { error } = await supabase.rpc("fn_them_quy", { p: af });
+    if (error) return notify(errMsg(error), "err");
+    notify("Đã lưu quỹ."); setAf({ id: null, name: "", type: "Tiền mặt", location_code: "", bank_info: "", opening_balance: 0 }); setShowAcc(false); load();
   };
-  const totalBal = accounts.reduce((s, x) => s + (bal[x.id] || 0), 0);
+
+  const chotQuy = async (acc) => {
+    const a = prompt(`Chốt quỹ "${acc.name}" ngày hôm nay.\nSố dư hệ thống: ${fmtVND(acc.so_du)}\n\nNhập số dư THỰC TẾ đếm được:`);
+    if (a === null) return;
+    const n = prompt("Ghi chú (nếu lệch, ghi rõ nguyên nhân):") || "";
+    const { error } = await supabase.rpc("fn_chot_quy", { p: { account_id: acc.id, actual_balance: Number(a) || 0, note: n } });
+    if (error) return notify(errMsg(error), "err");
+    const lech = (Number(a) || 0) - acc.so_du;
+    notify(lech === 0 ? "Đã chốt quỹ — khớp số dư." : `Đã chốt quỹ — LỆCH ${fmtVND(lech)}.`, lech === 0 ? "ok" : "err");
+    load();
+  };
+
+  const baoCaoDiscord = async () => {
+    const { error } = await supabase.rpc("fn_bao_cao_quy_now");
+    if (error) return notify(errMsg(error), "err");
+    notify("Đã gửi báo cáo số dư quỹ về Discord.");
+  };
+
+  const kw = q.trim().toLowerCase();
+  const rows = txns.filter((t) => {
+    if (fDir && t.direction !== fDir) return false;
+    if (!kw) return true;
+    return `${t.code} ${t.category} ${t.counterparty} ${t.description} ${t.ref_doc}`.toLowerCase().includes(kw);
+  });
+  const tongThu = rows.filter((t) => t.direction === "Thu").reduce((a, b) => a + b.amount, 0);
+  const tongChi = rows.filter((t) => t.direction === "Chi").reduce((a, b) => a + b.amount, 0);
+  const tongQuy = accs.filter((a) => a.status === "Hoạt động").reduce((a, b) => a + Number(b.so_du), 0);
 
   const exportCSV = () => {
     downloadCSV(`thu_chi_${from}_den_${to}.csv`,
-      [["Phieu","Ngay","Quy","Loai","So_Tien","Hang_Muc","Doi_Tuong","Dien_Giai","Nguoi_Ghi"],
-       ...list.map((x) => [x.code, x.txn_date, accName(x.account_id), x.direction, x.amount, x.category, x.counterparty, x.description, x.created_by_name])]);
+      [["Mã phiếu", "Ngày", "Quỹ", "Loại", "Số tiền", "Danh mục", "Đối tượng", "Diễn giải", "Chứng từ gốc", "Người ghi"],
+       ...rows.map((t) => [t.code, t.txn_date, accName(t.account_id), t.direction, t.amount, t.category, t.counterparty, t.description, t.ref_doc, t.created_by_name])]);
+    notify(`Đã xuất ${rows.length} phiếu.`);
   };
 
   return (
     <div className="flex flex-col gap-4">
       <Toast toast={toast} />
-      <div className="flex gap-3 flex-wrap">
-        <KPI label="Tổng số dư các quỹ" value={fmtVND(totalBal)} tone="dark" />
-        <KPI label={`Thu (${fmtDate(from)} – ${fmtDate(to)})`} value={fmtVND(sumThu)} tone="green" />
-        <KPI label={`Chi (${fmtDate(from)} – ${fmtDate(to)})`} value={fmtVND(sumChi)} tone="red" />
-        {canManageAcc && <button className="btn-ghost self-center ml-auto !text-xs" onClick={sendReport}>📨 Gửi báo cáo quỹ Discord ngay</button>}
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="font-extrabold text-lg mr-auto">Thu chi & Quỹ</div>
+        <button className="btn-ghost !text-xs" onClick={baoCaoDiscord}>📤 Gửi số dư về Discord</button>
+        {can("thu_chi_chot") && <button className="btn-ghost !text-xs" onClick={() => setShowAcc(!showAcc)}>{showAcc ? "Đóng" : "+ Quỹ mới"}</button>}
       </div>
 
-      <div className="flex gap-1.5 flex-wrap">
-        {[["quy", "💵 Quỹ tiền"], ["ghi", "✍ Ghi thu chi"], ["chot", "🔒 Chốt quỹ"], ["so", "📒 Sổ thu chi"], ["bc", "📊 Báo cáo"]].map(([k, lb]) => (
-          <button key={k} className={`btn !px-4 !py-2.5 !text-[13px] ${tab === k ? "bg-brand text-white" : "bg-white border border-[#E6EAEF] text-[#3B4552]"}`} onClick={() => setTab(k)}>{lb}</button>
+      <div className="flex gap-3 flex-wrap">
+        <KPI label="Tổng quỹ hiện có" value={fmtVND(tongQuy)} tone="blue" />
+        <KPI label="Thu trong kỳ" value={fmtVND(tongThu)} tone="green" />
+        <KPI label="Chi trong kỳ" value={fmtVND(tongChi)} tone="amber" />
+        <KPI label="Chênh lệch kỳ" value={fmtVND(tongThu - tongChi)} tone={tongThu - tongChi >= 0 ? "green" : "red"} />
+      </div>
+
+      {showAcc && (
+        <div className="card !p-4 border-2 border-brand">
+          <div className="font-extrabold mb-3">{af.id ? "Sửa quỹ" : "Tạo quỹ mới"}</div>
+          <div className="grid gap-3 md:grid-cols-3">
+            <Field label="Tên quỹ" required><input className="inp" value={af.name} onChange={(e) => setAf((p) => ({ ...p, name: e.target.value }))} placeholder="VD: Tiền mặt Km40" /></Field>
+            <Field label="Loại"><select className="inp" value={af.type} onChange={(e) => setAf((p) => ({ ...p, type: e.target.value }))}><option>Tiền mặt</option><option>Ngân hàng</option></select></Field>
+            <Field label="Gắn với điểm"><LocSearch locations={locations} value={af.location_code} onChange={(v) => setAf((p) => ({ ...p, location_code: v }))} placeholder="Không bắt buộc" /></Field>
+            <Field label="Thông tin ngân hàng"><input className="inp" value={af.bank_info} onChange={(e) => setAf((p) => ({ ...p, bank_info: e.target.value }))} /></Field>
+            <Field label="Số dư đầu kỳ"><input type="number" className="inp" value={af.opening_balance} onChange={(e) => setAf((p) => ({ ...p, opening_balance: +e.target.value || 0 }))} /></Field>
+          </div>
+          <div className="flex gap-2 mt-3"><button className="btn-ok" onClick={luuQuy}>Lưu quỹ</button><button className="btn-ghost" onClick={() => setShowAcc(false)}>Hủy</button></div>
+        </div>
+      )}
+
+      <div className="card">
+        <div className="font-extrabold mb-2">Số dư từng quỹ ({accs.length})</div>
+        {accs.length === 0 ? (
+          <div className="text-sm text-[#8A93A0]">Chưa có quỹ nào. {can("thu_chi_chot") ? 'Bấm "+ Quỹ mới" để tạo — cần ít nhất 1 quỹ tiền mặt và 1 quỹ ngân hàng để hệ thống tự ghi phiếu thu.' : "Nhờ Admin/BGĐ tạo quỹ."}</div>
+        ) : (
+          <div className="grid gap-2 md:grid-cols-2">
+            {accs.map((a) => (
+              <div key={a.id} className={`p-3 rounded-xl border ${a.status === "Hoạt động" ? "border-[#E3E8EF]" : "border-[#EEE] bg-[#FAFAFA]"}`}>
+                <div className="flex items-center gap-2">
+                  <div className="mr-auto">
+                    <div className="font-bold text-sm">{a.name}</div>
+                    <div className="text-[11px] text-[#8A93A0]">{a.type}{a.location_code ? " · " + locName(a.location_code) : ""}</div>
+                  </div>
+                  <Badge tone={a.type === "Tiền mặt" ? "amber" : "blue"}>{a.type}</Badge>
+                </div>
+                <div className="text-xl font-extrabold mt-1 text-brand">{fmtVND(a.so_du)}</div>
+                <div className="flex gap-1.5 mt-2">
+                  {can("thu_chi_chot") && <button className="btn-ghost !px-2.5 !py-1 !text-xs" onClick={() => chotQuy(a)}>Chốt quỹ</button>}
+                  {can("thu_chi_chot") && <button className="btn-ghost !px-2 !py-1 !text-xs" onClick={() => { setAf({ id: a.id, name: a.name, type: a.type, location_code: a.location_code || "", bank_info: a.bank_info || "", opening_balance: a.opening_balance }); setShowAcc(true); }}>✎</button>}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="flex gap-1.5">
+        {[["so", "Sổ thu chi"], ["ghi", "Ghi phiếu"], ["chot", "Lịch sử chốt quỹ"]].map(([k, v]) => (
+          <button key={k} className={`btn !px-3 !py-2 !text-xs ${tab === k ? "bg-brand text-white" : "bg-[#EEF1F4]"}`} onClick={() => { setTab(k); setPage(1); }}>{v}</button>
         ))}
       </div>
 
-      {/* QUY TIEN */}
-      {tab === "quy" && (
-      <div className="card">
-        <div className="flex items-center mb-2.5">
-          <div className="font-extrabold mr-auto">Quỹ tiền ({accounts.length})</div>
-          {canManageAcc && <button className="btn-primary !py-2 !text-xs" onClick={() => { setA(emptyA); setShowAcc(!showAcc); }}>+ Thêm quỹ</button>}
-        </div>
-        {showAcc && (
-          <div className="bg-[#F8FAFC] rounded-xl p-3.5 mb-3">
-            <div className="grid gap-x-3.5 md:grid-cols-3 sm:grid-cols-2">
-              <Field label="Tên quỹ" required><input className="inp" value={a.name} onChange={(e) => setAf("name", e.target.value)} placeholder="VD: Quỹ tiền mặt 322 QT" /></Field>
-              <Field label="Loại"><select className="inp" value={a.type} onChange={(e) => setAf("type", e.target.value)}><option>Tiền mặt</option><option>Ngân hàng</option></select></Field>
-              <Field label="Gắn điểm bán (tùy chọn)"><select className="inp" value={a.location_code} onChange={(e) => setAf("location_code", e.target.value)}>
-                <option value="">— Không gắn —</option>{locations.map((l) => <option key={l.code} value={l.code}>{l.name}</option>)}
-              </select></Field>
-              {a.type === "Ngân hàng" && <Field label="Thông tin TK"><input className="inp" value={a.bank_info} onChange={(e) => setAf("bank_info", e.target.value)} placeholder="VD: VCB 0123456789 - Cty Minh Kỳ" /></Field>}
-              <Field label="Số dư đầu kỳ"><input type="number" className="inp" value={a.opening_balance} onChange={(e) => setAf("opening_balance", e.target.value)} /></Field>
-              {a.id && <Field label="Trạng thái"><select className="inp" value={a.status} onChange={(e) => setAf("status", e.target.value)}><option>Hoạt động</option><option>Khóa</option></select></Field>}
-            </div>
-            <button className="btn-ok !py-2 !text-xs" onClick={saveAcc}>{a.id ? "Lưu thay đổi" : "Tạo quỹ"}</button>
-          </div>
-        )}
-        <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(250px,1fr))" }}>
-          {accounts.map((x) => {
-            const cl = closings.find((c) => c.account_id === x.id);
-            return (
-              <div key={x.id} className="border border-[#E6EAEF] rounded-xl p-3.5">
-                <div className="flex items-start gap-2">
-                  <div className="flex-1">
-                    <div className="font-extrabold text-[14px]">{x.type === "Tiền mặt" ? "💵" : "🏦"} {x.name}</div>
-                    <div className="text-[11px] text-[#8A93A0]">{x.type}{x.location_code ? ` · ${locName(x.location_code)}` : ""}{x.bank_info ? ` · ${x.bank_info}` : ""}</div>
-                  </div>
-                  {canManageAcc && <button className="text-[#8A93A0] hover:text-brand text-xs" onClick={() => { setA({ id: x.id, name: x.name, type: x.type, location_code: x.location_code || "", bank_info: x.bank_info, opening_balance: x.opening_balance, status: x.status }); setShowAcc(true); window.scrollTo({ top: 0, behavior: "smooth" }); }}>✎</button>}
-                </div>
-                <div className="text-xl font-extrabold tabular-nums mt-1.5">{fmtVND(bal[x.id] || 0)}</div>
-                <div className="mt-1">{cl ? (cl.diff === 0 ? <Badge tone="green">Đã chốt hôm nay · khớp</Badge> : <Badge tone="red">Đã chốt · lệch {fmtVND(cl.diff)}</Badge>) : <Badge tone="amber">Chưa chốt hôm nay</Badge>}</div>
-              </div>
-            );
-          })}
-          {accounts.length === 0 && <div className="text-sm text-[#8A93A0]">Chưa có quỹ nào — bấm "+ Thêm quỹ" để tạo (VD: Quỹ tiền mặt từng cửa hàng, TK ngân hàng công ty).</div>}
-        </div>
-      </div>
-      )}
-
-      {/* GHI THU CHI */}
       {tab === "ghi" && (
-      <div className="card">
-        <div className="font-extrabold mb-3">Ghi phiếu thu / chi</div>
-        <div className="grid gap-x-4 md:grid-cols-4 sm:grid-cols-2">
-          <Field label="Ngày" required><input type="date" className="inp" value={t.txn_date} onChange={(e) => setTf("txn_date", e.target.value)} /></Field>
-          <Field label="Quỹ" required><select className="inp" value={t.account_id} onChange={(e) => setTf("account_id", e.target.value)}>
-            <option value="">— Chọn quỹ —</option>{accounts.filter((x) => x.status === "Hoạt động").map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
-          </select></Field>
-          <Field label="Loại phiếu" required>
-            <div className="flex gap-1.5">
-              <button className={`btn flex-1 !py-2.5 ${t.direction === "Thu" ? "bg-ok text-white" : "bg-[#EEF1F4] text-[#3B4552]"}`} onClick={() => setTf("direction", "Thu")}>Thu</button>
-              <button className={`btn flex-1 !py-2.5 ${t.direction === "Chi" ? "bg-[#DC2F3E] text-white" : "bg-[#EEF1F4] text-[#3B4552]"}`} onClick={() => setTf("direction", "Chi")}>Chi</button>
-            </div>
-          </Field>
-          <Field label="Số tiền (đ)" required><input type="number" min="0" className="inp" value={t.amount} onChange={(e) => setTf("amount", e.target.value)} /></Field>
-          <Field label="Hạng mục" required><select className="inp" value={t.category} onChange={(e) => setTf("category", e.target.value)}>
-            <option value="">— Chọn hạng mục —</option>{(t.direction === "Thu" ? thuCats : chiCats).map((c) => <option key={c}>{c}</option>)}
-          </select></Field>
-          <Field label="Đối tượng (khách/NCC/nhân viên)"><input className="inp" value={t.counterparty} onChange={(e) => setTf("counterparty", e.target.value)} /></Field>
-          <Field label="Diễn giải"><input className="inp" value={t.description} onChange={(e) => setTf("description", e.target.value)} /></Field>
-        </div>
-        <button className="btn-ok" onClick={saveTxn}>Lưu phiếu {t.direction.toLowerCase()}</button>
-      </div>
-      )}
-
-      {/* CHOT QUY */}
-      {tab === "chot" && (
-      <div className="card">
-        <div className="font-extrabold">Chốt quỹ cuối ngày ({fmtDate(today())})</div>
-        <p className="text-xs text-[#5A6572] mb-3">Đếm tiền thực tế trong két / kiểm tra số dư tài khoản, nhập vào đây. Hệ thống so với số dư sổ sách và lưu chênh lệch. 21h00 mỗi tối, báo cáo tổng hợp tự gửi vào Discord kèm cảnh báo quỹ chưa chốt.</p>
-        <div className="flex gap-2 flex-wrap items-end">
-          <div><label className="lbl">Quỹ</label><select className="inp !w-auto" value={closeAcc} onChange={(e) => setCloseAcc(e.target.value)}>
-            <option value="">— Chọn quỹ —</option>{accounts.filter((x) => x.status === "Hoạt động").map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
-          </select></div>
-          {closeAcc && <div className="text-sm pb-2.5">Số dư sổ sách: <b>{fmtVND(bal[Number(closeAcc)] || 0)}</b></div>}
-          <div><label className="lbl">Thực tế đếm được (đ)</label><input type="number" className="inp !w-44" value={closeActual} onChange={(e) => setCloseActual(e.target.value)} /></div>
-          {closeAcc && closeActual !== "" && (
-            <div className="text-sm pb-2.5">Chênh: <b className={Number(closeActual) - (bal[Number(closeAcc)] || 0) === 0 ? "text-[#0E7A4A]" : "text-danger"}>{fmtVND(Number(closeActual) - (bal[Number(closeAcc)] || 0))}</b></div>
+        <div className="card">
+          <div className="font-extrabold mb-3">Ghi phiếu thu / chi thủ công</div>
+          {!can("thu_chi_ghi") ? <div className="text-sm text-[#8A93A0]">Bạn không có quyền ghi thu chi.</div> : (
+            <>
+              <div className="grid gap-3 md:grid-cols-3">
+                <Field label="Loại phiếu">
+                  <div className="flex gap-1.5">
+                    {["Thu", "Chi"].map((d) => (
+                      <button key={d} className={`btn !px-4 !py-2 !text-xs ${f.direction === d ? (d === "Thu" ? "btn-ok" : "bg-danger text-white") : "bg-[#EEF1F4]"}`} onClick={() => setF((p) => ({ ...p, direction: d }))}>{d}</button>
+                    ))}
+                  </div>
+                </Field>
+                <Field label="Quỹ" required>
+                  <select className="inp" value={f.account_id} onChange={(e) => setF((p) => ({ ...p, account_id: e.target.value }))}>
+                    <option value="">— Chọn quỹ —</option>
+                    {accs.filter((a) => a.status === "Hoạt động").map((a) => <option key={a.id} value={a.id}>{a.name} ({fmtVND(a.so_du)})</option>)}
+                  </select>
+                </Field>
+                <Field label="Số tiền" required><input type="number" className="inp" value={f.amount} onChange={(e) => setF((p) => ({ ...p, amount: e.target.value }))} /></Field>
+                <Field label="Danh mục">
+                  <select className="inp" value={f.category} onChange={(e) => setF((p) => ({ ...p, category: e.target.value }))}>
+                    <option value="">— Chọn —</option>
+                    {cats.map((c) => <option key={c}>{c}</option>)}
+                  </select>
+                </Field>
+                <Field label="Đối tượng"><input className="inp" value={f.counterparty} onChange={(e) => setF((p) => ({ ...p, counterparty: e.target.value }))} placeholder="Khách / NCC / nhân viên" /></Field>
+                <Field label="Ngày"><input type="date" className="inp" value={f.txn_date} onChange={(e) => setF((p) => ({ ...p, txn_date: e.target.value }))} /></Field>
+                <div className="md:col-span-3"><Field label="Diễn giải"><input className="inp" value={f.description} onChange={(e) => setF((p) => ({ ...p, description: e.target.value }))} /></Field></div>
+              </div>
+              <button className="btn-ok mt-3" disabled={busy} onClick={ghi}>{busy ? "Đang ghi…" : `Ghi phiếu ${f.direction.toLowerCase()}`}</button>
+              <p className="text-[11px] text-[#8A93A0] mt-2">Phiếu thu từ <b>bán xe, dịch vụ, tiền cọc, thu công nợ</b> đã tự động vào quỹ — chỉ ghi tay các khoản khác (lương, mặt bằng, điện nước…).</p>
+            </>
           )}
-          <div className="flex-1 min-w-[160px]"><label className="lbl">Ghi chú</label><input className="inp" value={closeNote} onChange={(e) => setCloseNote(e.target.value)} /></div>
-          <button className="btn-primary" onClick={doClose}>Chốt quỹ</button>
         </div>
-      </div>
       )}
 
-      {/* SO THU CHI */}
       {tab === "so" && (
-      <div className="card">
-        <div className="flex gap-2 flex-wrap items-center mb-3">
-          <div className="font-extrabold mr-auto">Sổ thu chi ({list.length})</div>
-          <input type="date" className="inp !w-auto" value={from} onChange={(e) => setFrom(e.target.value)} />
-          <input type="date" className="inp !w-auto" value={to} onChange={(e) => setTo(e.target.value)} />
-          <select className="inp !w-auto" value={fAcc} onChange={(e) => setFAcc(e.target.value)}>
-            <option value="">Quỹ: tất cả</option>{accounts.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
-          </select>
-          <select className="inp !w-auto" value={fDir} onChange={(e) => setFDir(e.target.value)}>
-            <option value="">Thu & Chi</option><option>Thu</option><option>Chi</option>
-          </select>
-          <button className="btn-ghost !text-xs" onClick={exportCSV}>⬇ Xuất CSV</button>
+        <div className="card">
+          <div className="flex gap-2 items-center mb-3 flex-wrap">
+            <div className="font-extrabold mr-auto">Sổ thu chi ({rows.length})</div>
+            <input type="date" className="inp !w-auto" value={from} onChange={(e) => setFrom(e.target.value)} />
+            <input type="date" className="inp !w-auto" value={to} onChange={(e) => setTo(e.target.value)} />
+            <select className="inp !w-auto" value={fAcc} onChange={(e) => setFAcc(e.target.value)}>
+              <option value="">Quỹ: tất cả</option>
+              {accs.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+            </select>
+            <select className="inp !w-auto" value={fDir} onChange={(e) => { setFDir(e.target.value); setPage(1); }}>
+              <option value="">Thu + Chi</option><option>Thu</option><option>Chi</option>
+            </select>
+            <input className="inp !w-48" placeholder="Tìm mã, diễn giải…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
+            <button className="btn-ghost !text-xs" onClick={exportCSV}>⬇ CSV</button>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            {pageSlice(rows, page, 20).map((t) => (
+              <div key={t.id} className="flex items-center gap-2 p-2.5 rounded-xl border border-[#E3E8EF] text-[13px]">
+                <Badge tone={t.direction === "Thu" ? "green" : "amber"}>{t.direction}</Badge>
+                <div className="mr-auto min-w-0">
+                  <div className="font-semibold truncate">{t.category}{t.counterparty ? " · " + t.counterparty : ""}</div>
+                  <div className="text-[11px] text-[#8A93A0] truncate">{t.code} · {fmtDate(t.txn_date)} · {accName(t.account_id)} · {t.created_by_name}{t.ref_doc ? " · " + t.ref_doc : ""}{t.description ? " · " + t.description : ""}</div>
+                </div>
+                <b className={t.direction === "Thu" ? "text-[#0E7A4A]" : "text-danger"}>{t.direction === "Thu" ? "+" : "−"}{fmtVND(t.amount)}</b>
+              </div>
+            ))}
+            {rows.length === 0 && <div className="text-sm text-[#8A93A0]">Không có phiếu nào trong khoảng ngày này.</div>}
+          </div>
+          <Pager total={rows.length} page={page} setPage={setPage} pageSize={20} setPageSize={() => {}} />
         </div>
-        <div className="overflow-x-auto"><table className="w-full border-collapse">
-          <thead><tr><th className="th">Phiếu</th><th className="th">Ngày</th><th className="th">Quỹ</th><th className="th">Hạng mục</th><th className="th">Thu</th><th className="th">Chi</th><th className="th">Đối tượng · Diễn giải</th><th className="th">Người ghi</th></tr></thead>
-          <tbody>{pageSlice(list, page, pageSize).map((x) => (
-            <tr key={x.id}>
-              <td className="td font-bold">{x.code}</td>
-              <td className="td">{fmtDate(x.txn_date)}</td>
-              <td className="td">{accName(x.account_id)}</td>
-              <td className="td"><Badge tone={x.direction === "Thu" ? "green" : "red"}>{x.category}</Badge></td>
-              <td className="td font-bold text-[#0E7A4A]">{x.direction === "Thu" ? fmtVND(x.amount) : ""}</td>
-              <td className="td font-bold text-danger">{x.direction === "Chi" ? fmtVND(x.amount) : ""}</td>
-              <td className="td text-xs">{x.counterparty}{x.description ? (x.counterparty ? " · " : "") + x.description : ""}</td>
-              <td className="td text-xs">{x.created_by_name}</td>
-            </tr>
-          ))}</tbody>
-        </table></div>
-        <Pager total={list.length} page={page} setPage={setPage} pageSize={pageSize} setPageSize={setPageSize} />
-        <p className="text-[11px] text-[#8A93A0] mt-2">Sổ thu chi không sửa/xóa được — ghi nhầm thì lập phiếu ngược chiều để bù, ghi rõ diễn giải.</p>
-      </div>
       )}
 
-      {/* BAO CAO */}
-      {tab === "bc" && (() => {
-        const accOf = (id) => accounts.find((x) => x.id === id);
-        const keyOf = (x) => {
-          const acc = accOf(x.account_id);
-          const l = acc?.location_code ? locations.find((y) => y.code === acc.location_code) : null;
-          if (bcGroup === "quy") return acc?.name || "Quỹ đã xóa";
-          if (bcGroup === "cuahang") return l ? l.name : "Không gắn điểm bán";
-          if (bcGroup === "khuvuc") return l ? l.region : "Không gắn khu vực";
-          return x.category || "Khác";
-        };
-        const grp = {};
-        txns.forEach((x) => {
-          const k = keyOf(x);
-          grp[k] = grp[k] || { thu: 0, chi: 0, n: 0 };
-          grp[k][x.direction === "Thu" ? "thu" : "chi"] += x.amount;
-          grp[k].n++;
-        });
-        const rows = Object.entries(grp).sort((a, b) => (b[1].thu + b[1].chi) - (a[1].thu + a[1].chi));
-        const tThu = rows.reduce((sm, [, r]) => sm + r.thu, 0);
-        const tChi = rows.reduce((sm, [, r]) => sm + r.chi, 0);
-        const GROUPS = [["quy", "Theo quỹ"], ["cuahang", "Theo cửa hàng"], ["khuvuc", "Theo khu vực"], ["hangmuc", "Theo hạng mục"]];
-        const exportBC = () => {
-          downloadCSV(`bao_cao_thu_chi_${bcGroup}_${from}_den_${to}.csv`,
-            [["Nhom", "Thu", "Chi", "Chenh_Thu_Chi", "So_Phieu"],
-             ...rows.map(([k, r]) => [k, r.thu, r.chi, r.thu - r.chi, r.n]),
-             ["TONG", tThu, tChi, tThu - tChi, txns.length]]);
-        };
-        return (
-          <div className="card">
-            <div className="flex gap-2 flex-wrap items-center mb-3">
-              <div className="font-extrabold mr-auto">Báo cáo tổng hợp thu - chi</div>
-              <input type="date" className="inp !w-auto" value={from} onChange={(e) => setFrom(e.target.value)} />
-              <input type="date" className="inp !w-auto" value={to} onChange={(e) => setTo(e.target.value)} />
-              <button className="btn-ghost !text-xs" onClick={exportBC}>⬇ Xuất CSV</button>
-            </div>
-            <div className="flex gap-1.5 flex-wrap mb-3">
-              {GROUPS.map(([k, lb]) => (
-                <button key={k} className={`btn !px-3 !py-2 !text-xs ${bcGroup === k ? "bg-navy-900 text-white" : "bg-[#EEF1F4] text-[#3B4552]"}`} onClick={() => setBcGroup(k)}>{lb}</button>
-              ))}
-            </div>
-            <p className="text-[11px] text-[#8A93A0] mb-2">Nhóm theo cửa hàng / khu vực dựa trên điểm bán đã gắn với từng quỹ (chỉnh trong tab Quỹ tiền → ✎). Phạm vi: {fmtDate(from)} – {fmtDate(to)}.</p>
-            <div className="overflow-x-auto"><table className="w-full border-collapse">
-              <thead><tr><th className="th">{GROUPS.find(([k]) => k === bcGroup)[1].replace("Theo ", "").toUpperCase()}</th><th className="th">Tổng thu</th><th className="th">Tổng chi</th><th className="th">Chênh (Thu − Chi)</th><th className="th">Số phiếu</th></tr></thead>
-              <tbody>
-                {rows.map(([k, r]) => (
-                  <tr key={k}>
-                    <td className="td font-bold">{k}</td>
-                    <td className="td font-bold text-[#0E7A4A]">{fmtVND(r.thu)}</td>
-                    <td className="td font-bold text-danger">{fmtVND(r.chi)}</td>
-                    <td className="td font-extrabold"><span className={r.thu - r.chi >= 0 ? "text-[#0E7A4A]" : "text-danger"}>{fmtVND(r.thu - r.chi)}</span></td>
-                    <td className="td">{r.n}</td>
-                  </tr>
-                ))}
-                {rows.length === 0 && <tr><td className="td" colSpan={5}>Không có phiếu thu chi trong khoảng ngày đã chọn.</td></tr>}
-                <tr className="bg-[#F3F5F8] font-extrabold">
-                  <td className="td">TỔNG</td>
-                  <td className="td text-[#0E7A4A]">{fmtVND(tThu)}</td>
-                  <td className="td text-danger">{fmtVND(tChi)}</td>
-                  <td className="td"><span className={tThu - tChi >= 0 ? "text-[#0E7A4A]" : "text-danger"}>{fmtVND(tThu - tChi)}</span></td>
-                  <td className="td">{txns.length}</td>
-                </tr>
-              </tbody>
-            </table></div>
-          </div>
-        );
-      })()}
+      {tab === "chot" && (
+        <div className="card">
+          <div className="font-extrabold mb-2">Lịch sử chốt quỹ ({closings.length})</div>
+          <div className="overflow-x-auto"><table className="w-full border-collapse">
+            <thead><tr><th className="th">Ngày</th><th className="th">Quỹ</th><th className="th">Số dư hệ thống</th><th className="th">Thực tế đếm</th><th className="th">Lệch</th><th className="th">Người chốt</th><th className="th">Ghi chú</th></tr></thead>
+            <tbody>{closings.map((c) => (
+              <tr key={c.id} className={c.diff !== 0 ? "bg-[#FFF6F6]" : "hover:bg-[#F8FAFC]"}>
+                <td className="td whitespace-nowrap">{fmtDate(c.close_date)}</td>
+                <td className="td text-[13px]">{accName(c.account_id)}</td>
+                <td className="td">{fmtVND(c.system_balance)}</td>
+                <td className="td">{fmtVND(c.actual_balance)}</td>
+                <td className="td"><b className={c.diff === 0 ? "text-[#0E7A4A]" : "text-danger"}>{fmtVND(c.diff)}</b></td>
+                <td className="td text-xs">{c.closed_by_name}</td>
+                <td className="td text-xs">{c.note}</td>
+              </tr>
+            ))}
+            {closings.length === 0 && <tr><td className="td" colSpan={7}>Chưa chốt quỹ ngày nào.</td></tr>}
+            </tbody>
+          </table></div>
+        </div>
+      )}
     </div>
   );
-}
-
-export default function ThuChi() {
-  return <Suspense fallback={<div className="card">Đang tải…</div>}><ThuChiInner /></Suspense>;
 }

@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Field, Badge, Toast } from "@/components/ui";
-import { errMsg } from "@/lib/format";
+import { errMsg, fmtVND } from "@/lib/format";
 
 const TYPE_LABELS = { text: "Chữ", number: "Số", dropdown: "Danh sách chọn", checkbox: "Tick chọn", formula: "Công thức tự tính" };
 
@@ -26,6 +26,22 @@ const PERM_LIST = [
     { key: "sua_unit", label: "Sửa thông tin xe theo số khung" },
     { key: "sua_khach", label: "Thêm/sửa khách hàng" },
   ] },
+  { group: "Dịch vụ", items: [
+    { key: "dv_tiep_nhan", label: "Tiếp nhận xe vào dịch vụ" },
+    { key: "dv_chan_doan", label: "Chẩn đoán kỹ thuật" },
+    { key: "dv_bao_gia", label: "Lập báo giá / giảm giá" },
+    { key: "dv_thu_tien", label: "Thu tiền dịch vụ" },
+    { key: "dv_nghiem_thu", label: "Nghiệm thu" },
+    { key: "dv_giao_xe", label: "Giao xe cho khách" },
+    { key: "dv_eod", label: "Duyệt công nợ & chốt ngày (EOD)" },
+    { key: "dv_huy_phieu", label: "Hủy phiếu dịch vụ" },
+  ] },
+  { group: "Kho phụ tùng", items: [
+    { key: "pt_danh_muc", label: "Sửa danh mục phụ tùng & bảng giá công" },
+    { key: "pt_nhap", label: "Nhập kho phụ tùng" },
+    { key: "pt_xuat", label: "Xuất vật tư theo phiếu" },
+    { key: "pt_kiem_ke", label: "Kiểm kê phụ tùng" },
+  ] },
   { group: "Quản trị", items: [
     { key: "xem_bao_cao", label: "Xem báo cáo" },
     { key: "cai_dat", label: "Vào trang Cài đặt" },
@@ -33,7 +49,7 @@ const PERM_LIST = [
 ];
 
 export default function CaiDat() {
-  const { supabase, profile, loading, settings, customFields, brands, refresh, taxRate, regions } = useCatalog();
+  const { supabase, profile, loading, settings, customFields, brands, locations, refresh, taxRate, regions } = useCatalog();
   const { toast, notify } = useToast();
   const [tax, setTax] = useState("");
   const [show, setShow] = useState(false);
@@ -46,6 +62,38 @@ export default function CaiDat() {
   const [bk, setBk] = useState(null);
   const [pf, setPf] = useState(null); // phieu in
   const [perms, setPerms] = useState(null);
+  const [collectors, setCollectors] = useState([]);
+  const [staffAll, setStaffAll] = useState([]);
+  const [svcs, setSvcs] = useState([]);
+  const [svcF, setSvcF] = useState({ id: null, code: "", name: "", group_name: "Chung", price: 0 });
+  const [colF, setColF] = useState({ user_id: "", location_code: "", is_primary: true });
+
+  const loadDV = async () => {
+    const [{ data: c }, { data: st }, { data: sv }] = await Promise.all([
+      supabase.from("dv_collectors").select("*"),
+      supabase.from("profiles").select("id,name,role").eq("status", "Hoạt động").order("name"),
+      supabase.from("dv_services").select("*").order("group_name").order("code"),
+    ]);
+    setCollectors(c || []); setStaffAll(st || []); setSvcs(sv || []);
+  };
+  useEffect(() => { if (profile && ["CEO","ADMIN","MANAGER"].includes(profile.role)) loadDV(); }, [profile]);
+
+  const ganNguoiThu = async (active, ovr) => {
+    const u = ovr?.user_id || colF.user_id, l = ovr?.location_code || colF.location_code;
+    const pri = ovr ? ovr.is_primary : colF.is_primary;
+    if (!u || !l) return notify("Chọn nhân viên và điểm.", "err");
+    const { error } = await supabase.rpc("fn_dv_gan_nguoi_thu", { p_user: u, p_loc: l, p_primary: pri, p_active: active });
+    if (error) return notify(errMsg(error), "err");
+    notify(active ? "Đã gán người thu tiền." : "Đã gỡ quyền thu tiền.");
+    setColF({ user_id: "", location_code: "", is_primary: true }); loadDV();
+  };
+
+  const luuSvc = async () => {
+    if (!svcF.code.trim() || !svcF.name.trim()) return notify("Nhập mã và tên dịch vụ.", "err");
+    const { error } = await supabase.rpc("fn_dv_luu_service", { p: svcF });
+    if (error) return notify(errMsg(error), "err");
+    notify("Đã lưu bảng giá."); setSvcF({ id: null, code: "", name: "", group_name: "Chung", price: 0 }); loadDV();
+  };
   const loadPerms = async () => {
     const { data } = await supabase.from("role_perms").select("*");
     const m = {};
@@ -205,19 +253,81 @@ export default function CaiDat() {
         )}
       </div>
 
+      {["CEO","ADMIN","MANAGER"].includes(profile.role) && (
+        <div className="card">
+          <div className="font-extrabold mb-1">🔧 Dịch vụ — Người được chỉ định thu tiền</div>
+          <p className="text-xs text-[#5A6572] mb-3">Chỉ những người trong danh sách này mới bấm được nút thu tiền tại điểm tương ứng (QT-DV-01 mục 7.2). <b>Kỹ thuật viên không được gán</b> — hệ thống tự chặn.</p>
+          <div className="flex gap-2 flex-wrap items-end mb-3">
+            <div><label className="lbl">Nhân viên</label>
+              <select className="inp !w-52" value={colF.user_id} onChange={(e) => setColF((p) => ({ ...p, user_id: e.target.value }))}>
+                <option value="">— Chọn —</option>
+                {staffAll.filter((x) => x.role !== "TECHNICIAN").map((x) => <option key={x.id} value={x.id}>{x.name} ({x.role})</option>)}
+              </select></div>
+            <div><label className="lbl">Điểm</label>
+              <select className="inp !w-52" value={colF.location_code} onChange={(e) => setColF((p) => ({ ...p, location_code: e.target.value }))}>
+                <option value="">— Chọn —</option>
+                {locations.map((l) => <option key={l.code} value={l.code}>{l.name}</option>)}
+              </select></div>
+            <label className="flex items-center gap-1.5 text-xs font-semibold pb-2">
+              <input type="checkbox" className="w-4 h-4" checked={colF.is_primary} onChange={(e) => setColF((p) => ({ ...p, is_primary: e.target.checked }))} /> Thu chính
+            </label>
+            <button className="btn-ok !text-xs !py-2" onClick={() => ganNguoiThu(true)}>+ Gán</button>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            {collectors.map((c) => (
+              <div key={c.id} className="flex items-center gap-2 p-2 rounded-lg border border-[#E3E8EF] text-[13px]">
+                <b className="mr-auto">{staffAll.find((x) => x.id === c.user_id)?.name || c.user_id}</b>
+                <span className="text-xs text-[#8A93A0]">{locations.find((l) => l.code === c.location_code)?.name || c.location_code}</span>
+                <Badge tone={c.is_primary ? "green" : "blue"}>{c.is_primary ? "Thu chính" : "Dự phòng"}</Badge>
+                <Badge tone={c.active ? "green" : "dark"}>{c.active ? "Đang hiệu lực" : "Đã gỡ"}</Badge>
+                {c.active && <button className="btn-ghost !px-2 !py-1 !text-xs !text-danger" onClick={() => ganNguoiThu(false, { user_id: c.user_id, location_code: c.location_code, is_primary: c.is_primary })}>Gỡ</button>}
+              </div>
+            ))}
+            {collectors.length === 0 && <div className="text-sm text-[#8A93A0]">Chưa gán ai — hiện chỉ Admin/BGĐ thu được tiền.</div>}
+          </div>
+        </div>
+      )}
+
+      {["CEO","ADMIN"].includes(profile.role) && (
+        <div className="card">
+          <div className="font-extrabold mb-1">🔧 Dịch vụ — Bảng giá tiền công ({svcs.length})</div>
+          <p className="text-xs text-[#5A6572] mb-3">Danh mục này hiện trong ô chọn khi lập báo giá phiếu dịch vụ.</p>
+          <div className="flex gap-2 flex-wrap items-end mb-3">
+            <div><label className="lbl">Mã</label><input className="inp !w-28" value={svcF.code} onChange={(e) => setSvcF((p) => ({ ...p, code: e.target.value.toUpperCase() }))} placeholder="DVC-009" /></div>
+            <div><label className="lbl">Tên dịch vụ</label><input className="inp !w-64" value={svcF.name} onChange={(e) => setSvcF((p) => ({ ...p, name: e.target.value }))} /></div>
+            <div><label className="lbl">Nhóm</label><input className="inp !w-32" value={svcF.group_name} onChange={(e) => setSvcF((p) => ({ ...p, group_name: e.target.value }))} /></div>
+            <div><label className="lbl">Giá công</label><input type="number" className="inp !w-32" value={svcF.price} onChange={(e) => setSvcF((p) => ({ ...p, price: +e.target.value || 0 }))} /></div>
+            <button className="btn-ok !text-xs !py-2" onClick={luuSvc}>{svcF.id ? "Cập nhật" : "+ Thêm"}</button>
+            {svcF.id && <button className="btn-ghost !text-xs !py-2" onClick={() => setSvcF({ id: null, code: "", name: "", group_name: "Chung", price: 0 })}>Hủy sửa</button>}
+          </div>
+          <div className="overflow-x-auto"><table className="w-full border-collapse">
+            <thead><tr><th className="th">Mã</th><th className="th">Tên dịch vụ</th><th className="th">Nhóm</th><th className="th">Giá công</th><th className="th"></th></tr></thead>
+            <tbody>{svcs.map((sv) => (
+              <tr key={sv.id} className="hover:bg-[#F8FAFC]">
+                <td className="td font-mono text-xs">{sv.code}</td>
+                <td className="td text-[13px] font-semibold">{sv.name}</td>
+                <td className="td text-xs">{sv.group_name}</td>
+                <td className="td"><b>{fmtVND(sv.price)}</b></td>
+                <td className="td"><button className="btn-ghost !px-2 !py-1 !text-xs" onClick={() => setSvcF({ id: sv.id, code: sv.code, name: sv.name, group_name: sv.group_name, price: sv.price })}>✎</button></td>
+              </tr>
+            ))}</tbody>
+          </table></div>
+        </div>
+      )}
+
       {profile.role === "CEO" && (
         <div className="card">
           <div className="font-extrabold mb-1">Phân quyền theo vai trò</div>
           <p className="text-xs text-[#5A6572] mb-3">Tích/bỏ tích để cho phép từng vai trò làm gì. Quyền được kiểm tra ở cả giao diện lẫn database. <b>BGĐ luôn có toàn quyền</b> (không chỉnh được, tránh tự khóa mình ra ngoài).</p>
           {perms === null ? <div className="text-sm text-[#8A93A0]">Đang tải phân quyền…</div> : (
             <div className="overflow-x-auto"><table className="w-full border-collapse">
-              <thead><tr><th className="th">Quyền</th><th className="th text-center">Sales</th><th className="th text-center">Cửa hàng trưởng</th><th className="th text-center">Admin</th><th className="th text-center">BGĐ</th></tr></thead>
+              <thead><tr><th className="th">Quyền</th><th className="th text-center">Sales</th><th className="th text-center">KTV</th><th className="th text-center">Cửa hàng trưởng</th><th className="th text-center">Admin</th><th className="th text-center">BGĐ</th></tr></thead>
               <tbody>{PERM_LIST.map((g) => [
-                <tr key={g.group}><td className="td font-extrabold text-[11px] uppercase bg-[#F3F5F8]" colSpan={5}>{g.group}</td></tr>,
+                <tr key={g.group}><td className="td font-extrabold text-[11px] uppercase bg-[#F3F5F8]" colSpan={6}>{g.group}</td></tr>,
                 ...g.items.map((it) => (
                   <tr key={it.key} className="hover:bg-[#F8FAFC]">
                     <td className="td text-[13px]">{it.label}</td>
-                    {["SALES", "MANAGER", "ADMIN"].map((r) => (
+                    {["SALES", "TECHNICIAN", "MANAGER", "ADMIN"].map((r) => (
                       <td key={r} className="td text-center">
                         <input type="checkbox" className="w-4 h-4 cursor-pointer" checked={!!perms[`${r}|${it.key}`]} onChange={() => togglePerm(r, it.key, !!perms[`${r}|${it.key}`])} />
                       </td>

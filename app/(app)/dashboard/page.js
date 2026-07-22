@@ -8,18 +8,25 @@ import { fmtNum, fmtVND } from "@/lib/format";
 export default function Dashboard() {
   const { supabase, vehicles, locations, profile, loading, getQty, totalQty, regionQty, regions } = useCatalog();
   const [sales, setSales] = useState([]);
+  const [prevSales, setPrevSales] = useState([]);
   const [transfers, setTransfers] = useState([]);
   const [adjusts, setAdjusts] = useState([]);
 
   useEffect(() => {
     (async () => {
-      const first = new Date(); first.setDate(1);
-      const [{ data: s }, { data: t }, { data: a }] = await Promise.all([
+      const now = new Date();
+      const first = new Date(now.getFullYear(), now.getMonth(), 1);
+      const prevFirst = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const prevLast = new Date(now.getFullYear(), now.getMonth(), 0);
+      const [{ data: s }, { data: t }, { data: a }, { data: sp }] = await Promise.all([
         supabase.from("sales_orders").select("*").gte("sale_date", first.toISOString().slice(0, 10)),
         supabase.from("transfer_orders").select("*").eq("status", "Đang chuyển"),
         supabase.from("stock_adjustments").select("*").eq("status", "Chờ duyệt"),
+        supabase.from("sales_orders").select("*")
+          .gte("sale_date", prevFirst.toISOString().slice(0, 10))
+          .lte("sale_date", prevLast.toISOString().slice(0, 10)),
       ]);
-      setSales(s || []); setTransfers(t || []); setAdjusts(a || []);
+      setSales(s || []); setTransfers(t || []); setAdjusts(a || []); setPrevSales(sp || []);
     })();
   }, []);
 
@@ -38,6 +45,17 @@ export default function Dashboard() {
   const byModel = {};
   scopedSales.forEach((s) => { const v = vehicles.find((x) => x.id === s.vehicle_id); if (v) byModel[v.name] = (byModel[v.name] || 0) + s.quantity; });
   const top = Object.entries(byModel).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const banThang = scopedSales.reduce((s, o) => s + o.quantity, 0);
+  const scopedPrev = scope ? prevSales.filter((s) => locRegion(s.location_code) === scope) : prevSales;
+  const banTruoc = scopedPrev.reduce((s, o) => s + o.quantity, 0);
+  const dtTruoc = scopedPrev.reduce((s, o) => s + o.sale_price * o.quantity, 0);
+  const chenh = banThang - banTruoc;
+  const pct = banTruoc > 0 ? Math.round((chenh / banTruoc) * 100) : null;
+  const soSanh = banTruoc === 0 && banThang === 0 ? null : (
+    <span className={`ml-1.5 font-bold ${chenh > 0 ? "text-[#0E7A4A]" : chenh < 0 ? "text-danger" : "text-[#8A93A0]"}`}>
+      {chenh > 0 ? "▲" : chenh < 0 ? "▼" : "="} {Math.abs(chenh)} xe{pct !== null ? ` (${chenh > 0 ? "+" : ""}${pct}%)` : ""} so tháng trước
+    </span>
+  );
   const byLoc = scopedLocs.map((l) => ({ l, q: vehicles.reduce((s, v) => s + getQty(v.id, l.code), 0) }));
   const maxLoc = Math.max(1, ...byLoc.map((x) => x.q));
 
@@ -49,7 +67,7 @@ export default function Dashboard() {
         {!scope && regions.filter((r) => locations.some((l) => l.region === r)).map((r) => (
           <KPI key={r} label={"Tồn " + r} value={fmtNum(sum((v) => regionQty(v.id, r)))} tone="blue" />
         ))}
-        <KPI label="Bán trong tháng" value={fmtNum(scopedSales.reduce((s, o) => s + o.quantity, 0)) + " xe"} sub={fmtVND(revenue)} tone="green" />
+        <KPI label="Bán trong tháng" value={fmtNum(banThang) + " xe"} sub={<>{fmtVND(revenue)}{soSanh}</>} tone="green" />
         <KPI label="Sắp hết hàng" value={low.length + " mã"} tone="amber" />
         <KPI label="Hết hàng" value={out.length + " mã"} tone="red" />
       </div>

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { NAV, NAV_GROUPS, ROLES } from "@/lib/const";
+import GlobalSearch from "@/components/GlobalSearch";
 
 const base = (href) => href.split("?")[0];
 
@@ -30,12 +31,41 @@ export default function AppShell({ profile, children }) {
   const title = NAV.find((n) => pathname.startsWith(base(n.href)) && (!n.tab || n.tab === curTab))?.label
     || NAV.find((n) => pathname.startsWith(base(n.href)))?.label || "";
 
+  // Dem viec dang cho xu ly -> badge do tren menu
+  const [badges, setBadges] = useState({});
+  useEffect(() => {
+    let huy = false;
+    const dem = async () => {
+      const q = [
+        supabase.from("sales_orders").select("id", { count: "exact", head: true }).neq("invoice_status", "Đã xuất HĐ"),
+        supabase.from("sale_adjust_requests").select("id", { count: "exact", head: true }).eq("status", "Chờ duyệt"),
+        supabase.from("dv_tickets").select("id", { count: "exact", head: true }).not("status", "in", "(DA_GIAO,HUY)"),
+        supabase.from("deposits").select("id", { count: "exact", head: true }).eq("status", "DANG_GIU"),
+        supabase.from("v_task_list").select("id", { count: "exact", head: true })
+          .not("status", "in", "(completed,cancelled)"),
+        supabase.from("v_task_list").select("id", { count: "exact", head: true }).eq("status", "pending_review"),
+      ];
+      const [don, dc, dv, coc, task, taskDuyet] = await Promise.all(q.map((x) => x.then((r) => r.count || 0).catch(() => 0)));
+      if (!huy) setBadges({ "/don-ban": don, "/dieu-chinh": dc, "/dich-vu": dv, "/dat-coc": coc,
+        "/cong-viec": task, "/cong-viec/doi-nhom": taskDuyet });
+    };
+    dem();
+    const t = setInterval(dem, 60000);
+    return () => { huy = true; clearInterval(t); };
+  }, [pathname]);
+
   const signOut = async () => { await supabase.auth.signOut(); window.location.href = "/login"; };
 
   const ItemLink = ({ n, sub }) => (
     <Link href={n.href} onClick={() => setOpen(false)}
       className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[13.5px] font-semibold mb-0.5 ${sub ? "ml-3" : ""} ${isActive(n) ? "bg-brand text-white" : "hover:bg-navy-800"}`}>
-      <span className="w-5 text-center opacity-90">{n.icon}</span>{n.label}
+      <span className="w-5 text-center opacity-90">{n.icon}</span>
+      <span className="flex-1">{n.label}</span>
+      {badges[base(n.href)] > 0 && (
+        <span className={`min-w-[20px] h-5 px-1.5 rounded-full text-[10.5px] font-extrabold flex items-center justify-center ${isActive(n) ? "bg-white text-brand" : "bg-danger text-white"}`}>
+          {badges[base(n.href)] > 99 ? "99+" : badges[base(n.href)]}
+        </span>
+      )}
     </Link>
   );
 
@@ -60,6 +90,11 @@ export default function AppShell({ profile, children }) {
                   className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[12px] font-extrabold tracking-wide ${hasActive && !opened ? "text-white bg-navy-800" : "text-[#8FA0B5]"} hover:bg-navy-800 hover:text-white`}>
                   <span className="w-5 text-center opacity-90">{g.icon}</span>
                   <span className="flex-1 text-left">{g.label}</span>
+                  {!opened && items.reduce((a, n) => a + (badges[base(n.href)] || 0), 0) > 0 && (
+                    <span className="min-w-[20px] h-5 px-1.5 rounded-full text-[10.5px] font-extrabold flex items-center justify-center bg-danger text-white">
+                      {items.reduce((a, n) => a + (badges[base(n.href)] || 0), 0)}
+                    </span>
+                  )}
                   <span className="text-[10px]">{opened ? "▾" : "▸"}</span>
                 </button>
                 {opened && <div className="mt-0.5">{items.map((n) => <ItemLink key={n.href} n={n} sub />)}</div>}
@@ -80,8 +115,9 @@ export default function AppShell({ profile, children }) {
       <main className="flex-1 min-w-0">
         <header className="bg-white border-b border-[#E6EAEF] px-5 py-3 flex items-center gap-3 sticky top-0 z-20">
           <button className="md:hidden border border-[#D5DBE3] rounded-lg px-2.5 py-1.5" onClick={() => setOpen(true)}>☰</button>
-          <div className="text-[17px] font-extrabold">{title}</div>
-          <div className="ml-auto text-xs text-[#8A93A0]">{new Date().toLocaleDateString("vi-VN")}</div>
+          <div className="text-[17px] font-extrabold whitespace-nowrap hidden sm:block">{title}</div>
+          <GlobalSearch />
+          <div className="text-xs text-[#8A93A0] whitespace-nowrap hidden md:block">{new Date().toLocaleDateString("vi-VN")}</div>
         </header>
         <div className="p-5 max-w-[1180px] mx-auto pb-16">{children}</div>
       </main>

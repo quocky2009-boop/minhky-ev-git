@@ -15,3 +15,31 @@ body { @apply bg-[#F3F5F8] text-[#1B2733] font-sans; }
 .btn-danger { @apply btn bg-[#FDE8EA] text-[#B01E2C]; }
 .th { @apply text-left px-3 py-2.5 text-[11px] font-bold text-[#5A6572] border-b-2 border-[#E6EAEF] uppercase tracking-wide whitespace-nowrap; }
 .td { @apply px-3 py-2.5 text-[13.5px] border-b border-[#EEF1F4] align-top; }
+
+/* ===== MOBILE: bang rong -> the (card) khi man hinh < 768px =====
+   Cach dung: them class "tbl-card" vao <table>, va o moi <td> them
+   data-label="Ten cot" de hien nhan ben trai tren mobile. */
+@media (max-width: 767px) {
+  .tbl-card thead { display: none; }
+  .tbl-card, .tbl-card tbody, .tbl-card tr, .tbl-card td { display: block; width: 100%; }
+  .tbl-card tr {
+    @apply bg-white rounded-xl border border-[#E6EAEF] mb-2 p-1;
+  }
+  .tbl-card td {
+    @apply border-0 py-1.5 px-2.5 text-[13px];
+    display: flex; align-items: flex-start; gap: 8px;
+  }
+  .tbl-card td::before {
+    content: attr(data-label);
+    @apply text-[11px] font-bold text-[#8A93A0] uppercase shrink-0;
+    min-width: 88px;
+  }
+  .tbl-card td:empty { display: none; }
+  /* Bang trong popup/khoi hep van cuon ngang binh thuong neu khong gan class */
+  .tbl-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+}
+
+/* Tren mobile: giam padding trang cho rong hon */
+@media (max-width: 640px) {
+  .card { @apply p-3.5 rounded-xl; }
+}

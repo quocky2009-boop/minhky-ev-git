@@ -79,7 +79,7 @@ export default function Kho() {
           {canEdit && <button className="btn-primary !py-2 !text-xs" onClick={startNew}>+ Thêm kho / cửa hàng</button>}
         </div>
         <p className="text-xs text-[#5A6572] mb-2.5">Bấm tên kho để xem chi tiết từng chiếc xe (số khung, ngày nhập, số ngày tồn), import/export danh sách xe.</p>
-        <div className="overflow-x-auto"><table className="w-full border-collapse">
+        <div className="tbl-scroll"><table className="w-full border-collapse tbl-card">
           <thead><tr><th className="th">Tên</th><th className="th">Khu vực</th><th className="th">Loại điểm</th><th className="th">Địa chỉ</th><th className="th">Tổng tồn</th><th className="th">Trạng thái</th><th className="th"></th></tr></thead>
           <tbody>{pageSlice(locations, page, pageSize).map((l) => {
             const q = vehicles.reduce((s, v) => s + getQty(v.id, l.code), 0);

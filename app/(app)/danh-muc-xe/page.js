@@ -40,13 +40,15 @@ export default function DMXe() {
   useEffect(() => { if (!loading && tab === "sokhung" && units.length === 0) loadUnits(); }, [loading, tab]);
   const startEditUnit = (u) => {
     setEuFrame(u.frame_number);
-    setEu({ new_frame: u.frame_number, vehicle_id: u.vehicle_id, location_code: u.location_code, engine_number: u.engine_number || "", note: u.note || "" });
+    setEu({ new_frame: u.frame_number, vehicle_id: u.vehicle_id, location_code: u.location_code, engine_number: u.engine_number || "", note: u.note || "", cost_price: u.cost_price || 0 });
   };
   const saveUnit = async () => {
     const { error } = await supabase.rpc("fn_sua_unit", {
       p: { frame_number: euFrame, new_frame: eu.new_frame, vehicle_id: eu.vehicle_id, location_code: eu.location_code, engine_number: eu.engine_number, note: eu.note },
     });
     if (error) return notify(errMsg(error), "err");
+    const { error: e2 } = await supabase.rpc("fn_set_gia_von", { p: { frames: [eu.new_frame], cost_price: Number(eu.cost_price) || 0 } });
+    if (e2) notify("Đã lưu xe nhưng giá vốn lỗi: " + errMsg(e2), "err");
     notify("Đã cập nhật thông tin xe."); setEuFrame(null); loadUnits(); refresh();
   };
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
@@ -234,6 +236,7 @@ export default function DMXe() {
               color: (u) => vehicles.find((x) => x.id === u.vehicle_id)?.color || "",
               frame: (u) => u.frame_number,
               kho: (u) => locations.find((x) => x.code === u.location_code)?.name || u.location_code,
+              von: (u) => u.cost_price || 0,
               nhap: (u) => new Date(u.imported_at).getTime(),
               ton: (u) => Math.floor((nowMs - new Date(u.imported_at)) / 86400000),
               tt: (u) => u.status,
@@ -243,7 +246,7 @@ export default function DMXe() {
             return (
               <>
                 <div className="overflow-x-auto"><table className="w-full border-collapse">
-                  <thead><tr><th className="th w-10">STT</th><Th label="Hãng" k="brand" sort={uSort} /><Th label="Tên xe" k="name" sort={uSort} /><Th label="Màu" k="color" sort={uSort} /><Th label="Số khung" k="frame" sort={uSort} /><Th label="Kho" k="kho" sort={uSort} /><Th label="Ngày nhập" k="nhap" sort={uSort} /><Th label="Ngày tồn" k="ton" sort={uSort} /><Th label="Trạng thái" k="tt" sort={uSort} /><th className="th"></th></tr></thead>
+                  <thead><tr><th className="th w-10">STT</th><Th label="Hãng" k="brand" sort={uSort} /><Th label="Tên xe" k="name" sort={uSort} /><Th label="Màu" k="color" sort={uSort} /><Th label="Số khung" k="frame" sort={uSort} /><Th label="Kho" k="kho" sort={uSort} /><Th label="Giá vốn" k="von" sort={uSort} /><Th label="Ngày nhập" k="nhap" sort={uSort} /><Th label="Ngày tồn" k="ton" sort={uSort} /><Th label="Trạng thái" k="tt" sort={uSort} /><th className="th"></th></tr></thead>
                   <tbody>{pg.map((u, i) => {
                     const v = vehicles.find((x) => x.id === u.vehicle_id);
                     const l = locations.find((x) => x.code === u.location_code);
@@ -256,18 +259,20 @@ export default function DMXe() {
                         <td className="td text-xs">{v?.color || ""}</td>
                         <td className="td font-mono text-[12.5px]">{u.frame_number}{u.is_placeholder && <Badge tone="amber">tạm</Badge>}</td>
                         <td className="td text-xs">{l?.name || u.location_code}</td>
+                        <td className="td text-xs">{u.cost_price ? fmtVND(u.cost_price) : <span className="text-[#C6CDD6]">—</span>}</td>
                         <td className="td text-xs whitespace-nowrap">{fmtDate(u.imported_at)}</td>
                         <td className="td text-center"><span className={days >= 90 ? "text-danger font-bold" : days >= 60 ? "text-[#A25F00] font-bold" : ""}>{days}</span></td>
                         <td className="td">{u.status === "TON_KHO" ? <Badge tone="green">Tồn kho</Badge> : <Badge tone="blue">Đang chuyển</Badge>}</td>
                         <td className="td">{u.status !== "DA_BAN" && <button className={`!px-2.5 !py-1 !text-xs ${euFrame === u.frame_number ? "btn-primary" : "btn-ghost"}`} onClick={() => euFrame === u.frame_number ? setEuFrame(null) : startEditUnit(u)}>{euFrame === u.frame_number ? "Đóng" : "✎ Sửa"}</button>}</td>
                       </tr>,
                       euFrame === u.frame_number && (
-                        <tr key={u.frame_number + "e"}><td colSpan={10} className="td bg-[#FFFDF5]">
+                        <tr key={u.frame_number + "e"}><td colSpan={11} className="td bg-[#FFFDF5]">
                           <div className="grid gap-x-4 md:grid-cols-3 sm:grid-cols-2">
                             <Field label="Số khung"><input className="inp font-mono !text-[13px]" value={eu.new_frame} onChange={(e) => setEu((p) => ({ ...p, new_frame: e.target.value.toUpperCase() }))} /></Field>
                             <Field label="Mẫu xe (gõ tìm)"><VehicleSearch vehicles={vehicles} value={eu.vehicle_id} onChange={(v) => setEu((p) => ({ ...p, vehicle_id: v }))} /></Field>
                             <Field label="Kho hiện tại (gõ tìm)"><LocSearch locations={locations} value={eu.location_code} onChange={(v) => setEu((p) => ({ ...p, location_code: v }))} /></Field>
                             <Field label="Số máy (tùy chọn)"><input className="inp font-mono !text-[13px]" value={eu.engine_number} onChange={(e) => setEu((p) => ({ ...p, engine_number: e.target.value }))} /></Field>
+                            <Field label="💰 Giá vốn chiếc này (đ)"><input type="number" className="inp" value={eu.cost_price} onChange={(e) => setEu((p) => ({ ...p, cost_price: e.target.value }))} placeholder="Giá nhập thực tế" /></Field>
                             <Field label="Ghi chú"><input className="inp" value={eu.note} onChange={(e) => setEu((p) => ({ ...p, note: e.target.value }))} /></Field>
                           </div>
                           <div className="flex gap-2"><button className="btn-ok !text-xs" onClick={saveUnit}>💾 Lưu thông tin xe</button><button className="btn-ghost !text-xs" onClick={() => setEuFrame(null)}>Hủy</button></div>
@@ -276,7 +281,7 @@ export default function DMXe() {
                       ),
                     ];
                   })}
-                  {list2.length === 0 && <tr><td className="td" colSpan={10}>{kw ? `Không có xe nào khớp "${skq}".` : "Không có xe tồn nào."}</td></tr>}
+                  {list2.length === 0 && <tr><td className="td" colSpan={11}>{kw ? `Không có xe nào khớp "${skq}".` : "Không có xe tồn nào."}</td></tr>}
                   </tbody>
                 </table></div>
                 <div className="text-xs text-[#8A93A0] mt-2">Tổng: <b>{list2.length}</b> xe{kw ? " khớp tìm kiếm" : " đang tồn"}. Ngày tồn ≥60 vàng, ≥90 đỏ.</div>

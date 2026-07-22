@@ -143,7 +143,7 @@ export default function DonBan() {
 
         {busy && rows.length === 0 ? <div className="text-sm text-[#8A93A0] py-4">Đang tải đơn bán…</div> : (
           <>
-            <div className="overflow-x-auto"><table className="w-full border-collapse">
+            <div className="tbl-scroll"><table className="w-full border-collapse tbl-card">
               <thead><tr><th className="th w-10">STT</th><Th label="Mã đơn" k="code" sort={sort} /><Th label="Ngày" k="date" sort={sort} /><Th label="Xe · Số khung" k="xe" sort={sort} /><Th label="Kho" k="kho" sort={sort} /><Th label="Khách" k="kh" sort={sort} /><Th label="Tổng đơn" k="tien" sort={sort} /><Th label="Hóa đơn" k="hd" sort={sort} /><Th label="NV bán" k="nv" sort={sort} /><th className="th"></th></tr></thead>
               <tbody>{pageSlice(sorted, page, pageSize).map((o, i) => {
                 const v = vOf(o.vehicle_id);
@@ -151,17 +151,17 @@ export default function DonBan() {
                 const done = st === "Đã xuất HĐ";
                 return [
                   <tr key={o.id} className={invId === o.id ? "bg-[#FDF6E3]" : done ? "hover:bg-[#F8FAFC]" : "bg-[#FFFCF5] hover:bg-[#FDF6E3]"}>
-                    <td className="td text-center text-xs text-[#8A93A0]">{(pageClamp(page, sorted.length, pageSize) - 1) * pageSize + i + 1}</td>
-                    <td className="td font-bold">{o.code}</td>
-                    <td className="td text-xs whitespace-nowrap">{fmtDate(o.sale_date)}</td>
-                    <td className="td text-[13px]">{v ? `${v.name} ${v.color}` : o.vehicle_id}<div className="font-mono text-[10.5px] text-[#8A93A0]">{o.frame_number}</div></td>
-                    <td className="td text-xs">{locName(o.location_code)}</td>
-                    <td className="td text-[13px]">{o.customer_name}<div className="text-[10.5px] text-[#8A93A0]">{o.customer_phone}</div></td>
-                    <td className="td font-bold">{fmtVND(total(o))}</td>
-                    <td className="td">{done
+                    <td data-label="STT" className="td text-center text-xs text-[#8A93A0]">{(pageClamp(page, sorted.length, pageSize) - 1) * pageSize + i + 1}</td>
+                    <td data-label="Mã đơn" className="td font-bold">{o.code}</td>
+                    <td data-label="Ngày" className="td text-xs whitespace-nowrap">{fmtDate(o.sale_date)}</td>
+                    <td data-label="Xe" className="td text-[13px]">{v ? `${v.name} ${v.color}` : o.vehicle_id}<div className="font-mono text-[10.5px] text-[#8A93A0]">{o.frame_number}</div></td>
+                    <td data-label="Kho" className="td text-xs">{locName(o.location_code)}</td>
+                    <td data-label="Khách" className="td text-[13px]">{o.customer_name}<div className="text-[10.5px] text-[#8A93A0]">{o.customer_phone}</div></td>
+                    <td data-label="Tổng đơn" className="td font-bold">{fmtVND(total(o))}</td>
+                    <td data-label="Hóa đơn" className="td">{done
                       ? <><Badge tone="green">✓ Hoàn thành</Badge><div className="text-[10.5px] text-[#8A93A0] mt-0.5">HĐ {o.invoice_no} · {fmtDate(o.invoice_date)}<br/>{o.invoice_by_name}<br/>BH ✓{o.app_activated ? " · App ✓" : ""}</div></>
                       : <Badge tone="amber">Chờ xuất HĐ</Badge>}</td>
-                    <td className="td text-xs">{o.seller_name}</td>
+                    <td data-label="NV bán" className="td text-xs">{o.seller_name}</td>
                     <td className="td"><div className="flex gap-1.5">
                       {!done && canConfirm && <button className={`!px-2.5 !py-1 !text-xs ${invId === o.id ? "btn-primary" : "btn-ok"}`} onClick={() => { setInvId(invId === o.id ? null : o.id); setInvF({ no: "", date: iso(new Date()), bh: false, app: false }); }}>{invId === o.id ? "Đóng" : "✓ Xác nhận HĐ"}</button>}
                       <button className="btn-ghost !px-2 !py-1 !text-xs" title="Chi tiết đơn" onClick={() => openDetail(o)}>👁</button>
