@@ -32,10 +32,10 @@ function BanHangInner() {
   const [frames, setFrames] = useState([]);
   const empty = { vehicle_id: params.get("xe") || "", location_code: "", customer_name: "", customer_phone: "", customer_cccd: "", customer_address: "", customer_type: "Khách lẻ", customer_source: "Khách vãng lai", sale_price: "", paid_amount: "", payment_method: "Chuyển khoản", tra_gop_ct: "", tra_gop_tien: "", document_status: "Đang làm đăng ký", note: "", extra: {} };
   const [f, setF] = useState(empty);
-  const [show, setShow] = useState(!!params.get("xe"));
+  const [show, setShow] = useState(!!params.get("xe") || !!params.get("new"));
   const [busy, setBusy] = useState(false);
   const [detail, setDetail] = useState(null);
-  const [fotos, setFotos] = useState([]); // File[] cho don le
+  const [fotos, setFotos] = useState([]); // [{file, url}] cho don le
   const [items, setItems] = useState([]);   // dong ban kem
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
@@ -201,7 +201,7 @@ function BanHangInner() {
     const { data, error } = await supabase.rpc("fn_ban_hang", {
       p: { ...f, frames, extra, sale_price: f.sale_price ? Number(f.sale_price) : null,
         paid_amount: Number(f.paid_amount) || 0,
-        items: items.map((it) => ({ ...it, qty: Number(it.qty) || 1, unit_price: Number(it.unit_price) || 0 })) },
+        items: items.map((it) => ({ ...it, qty: Number(it.qty) || 1, unit_price: Number(it.unit_price) || 0, payment_method: it.payment_method || f.payment_method })) },
     });
     setBusy(false);
     if (error) return notify(errMsg(error), "err");
@@ -209,7 +209,7 @@ function BanHangInner() {
     if (fotos.length > 0) {
       try {
         notify(`Đang tải ${fotos.length} ảnh lên…`);
-        const list = await uploadAnhDon(supabase, data, fotos);
+        const list = await uploadAnhDon(supabase, data, fotos.map((x) => x.file));
         const { error: e2 } = await supabase.rpc("fn_gan_anh_don", { p_code: data, p_photos: list });
         if (e2) notify("Lưu đơn OK nhưng gắn ảnh lỗi: " + errMsg(e2), "err");
         else notify(`Đã đính kèm ${list.length} ảnh vào đơn ${data} + gửi Discord.`);
@@ -244,7 +244,18 @@ function BanHangInner() {
   const tongDon = tongXe + tongKem;
 
 
-  const addItem = (item_type, name, unit_price) => setItems((p) => [...p, { item_type, name, qty: 1, unit_price }]);
+  const thuTheoHT = (() => {
+    const m = {};
+    const htttXe = f.payment_method || "Chuyển khoản";
+    if (tongXe > 0) m[htttXe] = (m[htttXe] || 0) + tongXe;
+    items.forEach((it) => {
+      const amt = (Number(it.qty) || 1) * (Number(it.unit_price) || 0);
+      if (amt > 0) { const k = it.payment_method || htttXe; m[k] = (m[k] || 0) + amt; }
+    });
+    return Object.entries(m);
+  })();
+
+  const addItem = (item_type, name, unit_price) => setItems((p) => [...p, { item_type, name, qty: 1, unit_price, payment_method: f.payment_method }]);
   const setItem = (i, k, v) => setItems((p) => p.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
 
   const printOrder = (o) => _printOrder({ supabase, o, vehicles, locations, settings, notify });
@@ -385,6 +396,9 @@ function BanHangInner() {
                 <input className="inp !py-1.5 !text-xs flex-1 min-w-[150px]" value={it.name} onChange={(e) => setItem(i, "name", e.target.value)} />
                 <input type="number" min="1" className="inp !py-1.5 !text-xs !w-16" title="Số lượng" value={it.qty} onChange={(e) => setItem(i, "qty", e.target.value)} />
                 <input type="number" className="inp !py-1.5 !text-xs !w-28" title="Đơn giá" value={it.unit_price} onChange={(e) => setItem(i, "unit_price", e.target.value)} />
+                <select className="inp !py-1.5 !text-xs !w-auto" title="Hình thức thanh toán" value={it.payment_method || f.payment_method} onChange={(e) => setItem(i, "payment_method", e.target.value)}>
+                  {PAYMENT_METHODS.map((m) => <option key={m}>{m}</option>)}
+                </select>
                 <b className="text-[13px] tabular-nums w-24 text-right">{fmtVND((Number(it.qty) || 1) * (Number(it.unit_price) || 0))}</b>
                 <button className="text-[#C6CDD6] hover:text-danger" onClick={() => setItems((prev) => prev.filter((_, j) => j !== i))}>✕</button>
               </div>
@@ -392,8 +406,18 @@ function BanHangInner() {
           </div>
 
           <div className="bg-[#F8FAFC] rounded-xl p-3.5 mb-3 flex items-center gap-3 flex-wrap">
-            <div className="font-extrabold text-[13.5px]">Tổng đơn: <span className="text-brand">{fmtVND(tongDon)}</span>
+            <div className="font-extrabold text-[13.5px] w-full">Tổng đơn: <span className="text-brand">{fmtVND(tongDon)}</span>
               <span className="text-[11px] font-normal text-[#8A93A0]"> (xe {fmtVND(tongXe)}{tongKem ? ` + bán kèm ${fmtVND(tongKem)}` : ""})</span></div>
+            {thuTheoHT.length > 0 && (
+              <div className="w-full flex flex-wrap gap-1.5 -mt-1 mb-1">
+                {thuTheoHT.map(([m, v]) => (
+                  <span key={m} className="inline-flex items-center gap-1 bg-white border border-[#D5DBE3] rounded-lg px-2 py-1 text-[11px]">
+                    <b>{m}:</b> {fmtVND(v)}
+                  </span>
+                ))}
+                <span className="text-[10.5px] text-[#8A93A0] self-center">← tiền vào theo từng hình thức (đối chiếu dòng tiền)</span>
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <span className="text-xs text-[#5A6572]">Đã thanh toán:</span>
               <input type="number" min="0" className="inp !w-36 !py-1.5 !text-xs" value={f.paid_amount} onChange={(e) => set("paid_amount", e.target.value)} placeholder="0" />
@@ -403,7 +427,7 @@ function BanHangInner() {
               )}
             </div>
             <div className="ml-auto flex items-center gap-2">
-              <span className="text-xs text-[#5A6572]">Hình thức thanh toán:</span>
+              <span className="text-xs text-[#5A6572]">HTTT giá xe:</span>
               <select className="inp !w-auto !py-1.5 !text-xs" value={f.payment_method} onChange={(e) => set("payment_method", e.target.value)}>
                 {PAYMENT_METHODS.map((m) => <option key={m}>{m}</option>)}
               </select>
@@ -491,12 +515,20 @@ function BanHangInner() {
                 <label className="btn-ghost !text-xs cursor-pointer">
                   + Chọn / chụp ảnh
                   <input type="file" accept="image/*" multiple className="hidden"
-                    onChange={(e) => { setFotos((p) => [...p, ...Array.from(e.target.files || [])]); e.target.value = ""; }} />
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files || []);
+                      e.target.value = "";
+                      files.forEach((file) => {
+                        const rd = new FileReader();
+                        rd.onload = () => setFotos((p) => [...p, { file, url: rd.result }]);
+                        rd.readAsDataURL(file);
+                      });
+                    }} />
                 </label>
                 {fotos.map((fl, i) => (
                   <span key={i} className="inline-flex items-center gap-1.5 bg-[#F3F5F8] rounded-lg px-2 py-1 text-[11px]">
-                    <img src={URL.createObjectURL(fl)} alt="" className="w-8 h-8 object-cover rounded" />
-                    {fl.name.length > 14 ? fl.name.slice(0, 12) + "…" : fl.name}
+                    <img src={fl.url} alt="" className="w-9 h-9 object-cover rounded" />
+                    {fl.file.name.length > 14 ? fl.file.name.slice(0, 12) + "…" : fl.file.name}
                     <button className="text-danger font-bold" onClick={() => setFotos((p) => p.filter((_, j) => j !== i))}>✕</button>
                   </span>
                 ))}
@@ -595,7 +627,7 @@ function BanHangInner() {
                   <div className="col-span-2 pt-1 border-t border-dashed border-[#E6EAEF]">
                     <div className="text-[#8A93A0] mb-1">Bán kèm:</div>
                     {detail._items.map((it) => (
-                      <div key={it.id} className="flex justify-between"><span>{it.name} ×{it.qty}</span><b>{fmtVND(it.amount)}</b></div>
+                      <div key={it.id} className="flex justify-between"><span>{it.name} ×{it.qty} <span className="text-[10.5px] text-[#8A93A0]">({it.payment_method || "—"})</span></span><b>{fmtVND(it.amount)}</b></div>
                     ))}
                     <div className="flex justify-between mt-1 pt-1 border-t border-[#EEF1F4]"><b>Tổng đơn (xe + bán kèm)</b>
                       <b className="text-brand">{fmtVND(detail.sale_price * detail.quantity + detail._items.reduce((sm, x) => sm + x.amount, 0))}</b></div>

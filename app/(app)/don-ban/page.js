@@ -130,7 +130,7 @@ export default function DonBan() {
       <div className="card">
         <div className="flex gap-2 flex-wrap items-center mb-3">
           <div className="font-extrabold mr-auto">Danh sách đơn bán ({sorted.length})</div>
-          <Link href="/ban-hang" className="btn-primary !text-xs">+ Tạo đơn bán mới</Link>
+          <Link href="/ban-hang?new=1" className="btn-primary !text-xs">+ Tạo đơn bán mới</Link>
           <input type="date" className="inp !w-auto" value={from} onChange={(e) => setFrom(e.target.value)} />
           <input type="date" className="inp !w-auto" value={to} onChange={(e) => setTo(e.target.value)} />
           <div className="!w-52"><LocSearch locations={locations} value={fLoc} onChange={setFLoc} placeholder="Lọc kho…" /></div>
@@ -221,6 +221,16 @@ export default function DonBan() {
                   <div><span className="text-[#8A93A0]">Giá xe:</span> <b>{fmtVND(detail.sale_price)}</b></div>
                   <div><span className="text-[#8A93A0]">Tổng đơn:</span> <b className="text-brand">{fmtVND(tong)}</b></div>
                   <div><span className="text-[#8A93A0]">Đã thanh toán:</span> <b>{fmtVND(detail.paid_amount || 0)}</b></div>
+                  <div><span className="text-[#8A93A0]">HTTT giá xe:</span> <b>{detail.payment_method || "—"}</b></div>
+                  {detail._items && detail._items.length > 0 && (() => {
+                    const m = {}; const hx = detail.payment_method || "Chuyển khoản";
+                    m[hx] = (m[hx] || 0) + detail.sale_price * detail.quantity;
+                    detail._items.forEach((it) => { const k = it.payment_method || hx; m[k] = (m[k] || 0) + it.amount; });
+                    return <div className="col-span-2 flex flex-wrap gap-1.5 mt-1">
+                      <span className="text-[#8A93A0] text-xs self-center">Thu theo hình thức:</span>
+                      {Object.entries(m).map(([k, v]) => <span key={k} className="inline-flex items-center gap-1 bg-[#F3F5F8] rounded-lg px-2 py-0.5 text-[11px]"><b>{k}:</b> {fmtVND(v)}</span>)}
+                    </div>;
+                  })()}
                   <div><span className="text-[#8A93A0]">NV bán:</span> <b>{detail.seller_name}</b></div>
                   <div className="col-span-2"><span className="text-[#8A93A0]">Trạng thái:</span> {st === "Đã xuất HĐ"
                     ? <><Badge tone="green">✓ Hoàn thành</Badge> <span className="text-xs">HĐ <b>{detail.invoice_no}</b> · {fmtDate(detail.invoice_date)} · {detail.invoice_by_name} · BH ✓{detail.app_activated ? " · App ✓" : ""}</span></>
@@ -229,7 +239,7 @@ export default function DonBan() {
                   {detail._items === null ? <div className="col-span-2 text-xs text-[#8A93A0]">Đang tải bán kèm…</div> : detail._items.length > 0 && (
                     <div className="col-span-2">
                       <span className="text-[#8A93A0]">Bán kèm:</span>
-                      {detail._items.map((it, i) => <div key={i} className="text-xs ml-2">• {it.name} × {it.qty} = <b>{fmtVND(it.amount)}</b></div>)}
+                      {detail._items.map((it, i) => <div key={i} className="text-xs ml-2">• {it.name} × {it.qty} <span className="text-[10px] text-[#8A93A0]">({it.payment_method || "—"})</span> = <b>{fmtVND(it.amount)}</b></div>)}
                     </div>
                   )}
                   {(detail.photos || []).length > 0 && (
