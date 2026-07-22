@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Badge, Toast, KPI, Field, LocSearch, Pager, pageSlice } from "@/components/ui";
+import { Badge, Toast, KPI, Field, LocSearch, Pager, pageSlice, MoneyInput } from "@/components/ui";
 import { fmtVND, fmtDate, errMsg, downloadCSV } from "@/lib/format";
 
 const iso = (d) => d.toLocaleDateString("sv-SE");
@@ -185,7 +185,7 @@ export default function ThuChi() {
                     {accs.filter((a) => a.status === "Hoạt động").map((a) => <option key={a.id} value={a.id}>{a.name} ({fmtVND(a.so_du)})</option>)}
                   </select>
                 </Field>
-                <Field label="Số tiền" required><input type="number" className="inp" value={f.amount} onChange={(e) => setF((p) => ({ ...p, amount: e.target.value }))} /></Field>
+                <Field label="Số tiền" required><MoneyInput value={f.amount} onChange={(v) => setF((p) => ({ ...p, amount: v }))} /></Field>
                 <Field label="Danh mục">
                   <select className="inp" value={f.category} onChange={(e) => setF((p) => ({ ...p, category: e.target.value }))}>
                     <option value="">— Chọn —</option>

@@ -21,7 +21,7 @@ export default function TonTongHop() {
   const openCell = async (v, scope, code, label) => {
     setCell({ v, scope, code, label, units: null }); setCq(""); setCPage(1);
     let q = supabase.from("vehicle_units").select("*")
-      .eq("vehicle_id", v.id).in("status", ["TON_KHO", "DANG_CHUYEN"]).order("imported_at");
+      .eq("vehicle_id", v.id).in("status", ["TON_KHO", "DANG_CHUYEN", "GIU_CHO"]).order("imported_at");
     if (scope === "loc") q = q.eq("location_code", code);
     else if (scope === "region") {
       const codes = locations.filter((l) => l.region === code).map((l) => l.code);
@@ -128,7 +128,7 @@ export default function TonTongHop() {
                         <td className="td font-mono text-[12px] font-bold">{u.frame_number}{u.is_placeholder && <div><Badge tone="amber">SK tạm</Badge></div>}</td>
                         <td className="td whitespace-nowrap">{fmtDate(u.imported_at)}</td>
                         <td className="td"><b className={daysIn(u.imported_at) >= 90 ? "text-danger" : daysIn(u.imported_at) >= 60 ? "text-[#A25F00]" : ""}>{daysIn(u.imported_at)}</b></td>
-                        <td className="td">{u.status === "TON_KHO" ? <Badge tone="green">Tồn kho</Badge> : <Badge tone="purple">Đang chuyển</Badge>}</td>
+                        <td className="td">{u.status === "TON_KHO" ? <Badge tone="green">Tồn kho</Badge> : u.status === "GIU_CHO" ? <Badge tone="amber">🔒 Giữ chỗ</Badge> : <Badge tone="purple">Đang chuyển</Badge>}</td>
                       </tr>
                     ))}
                     {rows.length === 0 && <tr><td className="td" colSpan={showKho ? 6 : 5}>Không có số khung nào khớp "{cq}".</td></tr>}

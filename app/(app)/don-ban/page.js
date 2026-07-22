@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Badge, Toast, KPI, Pager, pageSlice, pageClamp, useSortable, Th, LocSearch } from "@/components/ui";
 import { fmtVND, fmtDate, fmtTime, errMsg, downloadCSV } from "@/lib/format";
@@ -20,6 +21,16 @@ export default function DonBan() {
   const [fLoc, setFLoc] = useState("");
   const [fInv, setFInv] = useState("");
   const [q, setQ] = useState("");
+  const _params = useSearchParams();
+  useEffect(() => { const v = _params.get("q"); if (v) setQ(v); }, [_params]);
+  // Tu mo chi tiet khi den tu o tim kiem toan cuc (khop dung 1 don)
+  const [_autoOpened, _setAutoOpened] = useState(false);
+  useEffect(() => {
+    const v = _params.get("q");
+    if (!v || _autoOpened || rows.length === 0) return;
+    const hit = rows.filter((o) => o.code.toLowerCase() === v.toLowerCase());
+    if (hit.length === 1) { _setAutoOpened(true); openDetail(hit[0]); }
+  }, [_params, rows]);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const sort = useSortable();

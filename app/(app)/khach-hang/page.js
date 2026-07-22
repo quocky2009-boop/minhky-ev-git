@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Field, Badge, Toast, KPI, Pager, pageSlice , useSortable, Th } from "@/components/ui";
 import { fmtVND, fmtDate, errMsg } from "@/lib/format";
@@ -12,6 +13,8 @@ export default function KhachHang() {
   const [list, setList] = useState([]);
   const [lastBuy, setLastBuy] = useState({}); // customer_id -> don gan nhat
   const [q, setQ] = useState("");
+  const _params = useSearchParams();
+  useEffect(() => { const v = _params.get("q"); if (v) setQ(v); }, [_params]);
   const [fStatus, setFStatus] = useState("");
   const [fType, setFType] = useState("");
   const [show, setShow] = useState(false);

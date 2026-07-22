@@ -80,6 +80,7 @@ export function LocPicker({ locations, value, onChange, exclude }) {
 
 // ===== V2: Combobox tim kiem xe (thay dropdown dai) =====
 import { useMemo, useRef, useEffect as useEff, useState as useSt } from "react";
+import Scanner from "@/components/Scanner";
 
 export function SearchPicker({ items, value, onChange, placeholder = "Gõ để tìm…", getLabel, getKey }) {
   const [q, setQ] = useSt("");
@@ -257,5 +258,86 @@ export function Th({ label, k, sort, className = "" }) {
     <th className={`th cursor-pointer select-none whitespace-nowrap ${active ? "text-brand" : ""} ${className}`} title="Bấm để sắp xếp" onClick={() => sort.toggle(k)}>
       {label} <span className={`text-[9px] ${active ? "" : "text-[#C6CDD6]"}`}>{active ? (sort.sortDir === "asc" ? "▲" : "▼") : "⇅"}</span>
     </th>
+  );
+}
+
+// ===== O NHAP TIEN: tu them dau cham phan cach khi go =====
+// Dung nhu <input>: value la SO (number/string so), onChange tra ve SO
+export function MoneyInput({ value, onChange, className = "", placeholder = "", ...rest }) {
+  const fmt = (v) => {
+    const n = String(v ?? "").replace(/\D/g, "");
+    return n ? Number(n).toLocaleString("vi-VN") : "";
+  };
+  const [txt, setTxt] = useSt(fmt(value));
+  useEff(() => {
+    const cur = String(txt).replace(/\D/g, "");
+    if (String(value ?? "") !== cur) setTxt(fmt(value));
+  }, [value]);
+  return (
+    <div className="relative">
+      <input
+        type="text" inputMode="numeric" placeholder={placeholder}
+        className={`inp !pr-8 ${className}`}
+        value={txt}
+        onChange={(e) => {
+          const raw = e.target.value.replace(/\D/g, "");
+          setTxt(raw ? Number(raw).toLocaleString("vi-VN") : "");
+          onChange?.(raw ? Number(raw) : "");
+        }}
+        {...rest}
+      />
+      <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] text-[#8A93A0] pointer-events-none">đ</span>
+    </div>
+  );
+}
+
+// ===== O TIM SO KHUNG: go tim + quet QR =====
+export function FrameSearch({ supabase, value, onPick, onlyStatus = null, placeholder = "Gõ số khung hoặc quét…" }) {
+  const [q, setQ] = useSt(value || "");
+  const [hits, setHits] = useSt([]);
+  const [open, setOpen] = useSt(false);
+  const [scan, setScan] = useSt(false);
+
+  useEff(() => { setQ(value || ""); }, [value]);
+
+  const tim = async (kw) => {
+    if (!kw || kw.length < 3) { setHits([]); return; }
+    let qy = supabase.from("vehicle_units").select("frame_number,vehicle_id,location_code,status")
+      .ilike("frame_number", `%${kw}%`).limit(8);
+    if (onlyStatus) qy = qy.in("status", onlyStatus);
+    const { data } = await qy;
+    setHits(data || []); setOpen(true);
+  };
+
+  return (
+    <div className="relative">
+      <div className="flex gap-1.5">
+        <input className="inp font-mono" placeholder={placeholder} value={q}
+          onChange={(e) => { const v = e.target.value.toUpperCase(); setQ(v); onPick?.(v, null); tim(v); }}
+          onFocus={() => q.length >= 3 && setOpen(true)} />
+        <button type="button" className="btn-ghost !px-3 whitespace-nowrap" onClick={() => setScan(true)}>📷 Quét</button>
+      </div>
+      {open && hits.length > 0 && (
+        <div className="absolute z-40 top-full mt-1 left-0 right-0 bg-white rounded-xl border border-[#E3E8EF] shadow-lg max-h-64 overflow-y-auto">
+          {hits.map((u) => (
+            <button key={u.frame_number} type="button" className="w-full text-left px-3 py-2 hover:bg-[#F3F5F8]"
+              onClick={() => { setQ(u.frame_number); onPick?.(u.frame_number, u); setOpen(false); }}>
+              <div className="font-mono text-[13px] font-bold">{u.frame_number}</div>
+              <div className="text-[11px] text-[#8A93A0]">{u.vehicle_id} · {u.location_code} · {
+                { TON_KHO: "Tồn kho", GIU_CHO: "Đang giữ chỗ", DA_BAN: "Đã bán", DANG_CHUYEN: "Đang chuyển" }[u.status] || u.status}</div>
+            </button>
+          ))}
+        </div>
+      )}
+      {scan && (
+        <Scanner
+          onAdd={(code) => {
+            const v = String(code).toUpperCase().trim();
+            setQ(v); onPick?.(v, null); tim(v); setScan(false);
+          }}
+          onClose={() => setScan(false)}
+        />
+      )}
+    </div>
   );
 }

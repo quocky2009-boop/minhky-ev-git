@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Badge, Toast, KPI, Field, CustomerSearch, LocSearch, Pager, pageSlice } from "@/components/ui";
+import { Badge, Toast, KPI, Field, CustomerSearch, LocSearch, Pager, pageSlice, MoneyInput, FrameSearch } from "@/components/ui";
+import Link from "next/link";
 import { fmtVND, fmtDate, errMsg } from "@/lib/format";
 
 const iso = (d) => d.toLocaleDateString("sv-SE");
@@ -102,9 +103,12 @@ export default function DatCoc() {
           <div className="font-extrabold mb-3">Nhận cọc giữ xe</div>
           <div className="grid gap-3 md:grid-cols-2">
             <Field label="Số khung xe cần giữ" required>
-              <input className="inp" value={f.frame_number} placeholder="Nhập/quét số khung"
-                onChange={(e) => { const v = e.target.value.toUpperCase(); setF((p) => ({ ...p, frame_number: v })); }}
-                onBlur={(e) => timXe(e.target.value)} />
+              <FrameSearch supabase={supabase} value={f.frame_number}
+                onlyStatus={["TON_KHO", "GIU_CHO"]}
+                onPick={(sk, u) => {
+                  setF((p) => ({ ...p, frame_number: sk }));
+                  if (u) setFrameInfo(u); else if (sk.length >= 6) timXe(sk); else setFrameInfo(null);
+                }} />
               {frameInfo && (frameInfo.notfound
                 ? <div className="text-[11px] text-danger mt-1">Không tìm thấy số khung này trong kho.</div>
                 : <div className="text-[11px] mt-1">
@@ -127,7 +131,7 @@ export default function DatCoc() {
                   onCreate={(name) => setNewC({ name: name || "", phone: "" })} />
               )}
             </Field>
-            <Field label="Số tiền cọc"><input type="number" className="inp" value={f.amount} onChange={(e) => setF((p) => ({ ...p, amount: e.target.value }))} placeholder="VD: 2000000" /></Field>
+            <Field label="Số tiền cọc"><MoneyInput value={f.amount} onChange={(v) => setF((p) => ({ ...p, amount: v }))} placeholder="VD: 2.000.000" /></Field>
             <Field label="Giữ xe đến ngày" required><input type="date" className="inp" value={f.hold_until} onChange={(e) => setF((p) => ({ ...p, hold_until: e.target.value }))} /></Field>
             <div className="md:col-span-2"><Field label="Ghi chú"><input className="inp" value={f.note} onChange={(e) => setF((p) => ({ ...p, note: e.target.value }))} /></Field></div>
           </div>
@@ -160,6 +164,10 @@ export default function DatCoc() {
                 {d.amount > 0 && <b className="text-[13px] whitespace-nowrap">{fmtVND(d.amount)}</b>}
                 {qh && <Badge tone="red">Quá hạn</Badge>}
                 <Badge tone={st.tone}>{st.label}</Badge>
+                {d.status === "DANG_GIU" && (
+                  <Link href={`/ban-hang?new=1&sk=${encodeURIComponent(d.frame_number)}&kh=${encodeURIComponent(d.customer_phone)}&coc=${d.amount}`}
+                    className="btn-ok !px-2.5 !py-1 !text-xs whitespace-nowrap">→ Tạo đơn bán</Link>
+                )}
                 {d.status === "DANG_GIU" && <button className="btn-ghost !px-2 !py-1 !text-xs !text-danger" onClick={() => huyCoc(d)}>Hủy giữ</button>}
               </div>
             );

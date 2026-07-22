@@ -1,7 +1,8 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Field, Toast, stockBadge, Badge, Pager, pageSlice, pageClamp, useSortable, Th, LocSearch, VehicleSearch } from "@/components/ui";
+import { Field, Toast, stockBadge, Badge, Pager, pageSlice, pageClamp, useSortable, Th, LocSearch, VehicleSearch, MoneyInput } from "@/components/ui";
 import { fmtVND, fmtDate, errMsg, parseCSV } from "@/lib/format";
 
 export default function DMXe() {
@@ -23,6 +24,12 @@ export default function DMXe() {
   const [units, setUnits] = useState([]);
   const [uLoading, setULoading] = useState(false);
   const [skq, setSkq] = useState("");
+  const [hiSk, setHiSk] = useState("");
+  const _params = useSearchParams();
+  useEffect(() => {
+    const sk = _params.get("sk");
+    if (sk) { setTab("sokhung"); setSkq(sk); setHiSk(sk.toUpperCase()); }
+  }, [_params]);
   const [uFBrand, setUFBrand] = useState("");
   const uSort = useSortable();
   const [uFLoc, setUFLoc] = useState("");
@@ -34,7 +41,7 @@ export default function DMXe() {
     setULoading(true);
     const { data } = await supabase.from("vehicle_units")
       .select("frame_number, vehicle_id, location_code, status, imported_at, is_placeholder, engine_number, note")
-      .in("status", ["TON_KHO", "DANG_CHUYEN"]).order("imported_at", { ascending: false }).limit(10000);
+      .in("status", ["TON_KHO", "DANG_CHUYEN", "GIU_CHO"]).order("imported_at", { ascending: false }).limit(10000);
     setUnits(data || []); setULoading(false);
   };
   useEffect(() => { if (!loading && tab === "sokhung" && units.length === 0) loadUnits(); }, [loading, tab]);
@@ -156,7 +163,7 @@ export default function DMXe() {
             <Field label="Tên xe" required><input className="inp" value={f.name} onChange={(e) => set("name", e.target.value)} placeholder="VD: Evo Grand" /></Field>
             <Field label="Màu xe" required><input className="inp" value={f.color} onChange={(e) => set("color", e.target.value)} placeholder="VD: Xanh Oliu" /></Field>
             <Field label="Mã hãng"><input className="inp" value={f.mfr_code} onChange={(e) => set("mfr_code", e.target.value)} /></Field>
-            <Field label="Giá niêm yết"><input type="number" className="inp" value={f.list_price} onChange={(e) => set("list_price", e.target.value)} /></Field>
+            <Field label="Giá niêm yết"><MoneyInput value={f.list_price} onChange={(v) => set("list_price", v)} /></Field>
             <Field label="Tồn tối thiểu"><input type="number" className="inp" value={f.min_stock} onChange={(e) => set("min_stock", e.target.value)} /></Field>
           </div>
           {editId && (
@@ -252,7 +259,7 @@ export default function DMXe() {
                     const l = locations.find((x) => x.code === u.location_code);
                     const days = Math.floor((today - new Date(u.imported_at)) / 86400000);
                     return [
-                      <tr key={u.frame_number} className={euFrame === u.frame_number ? "bg-[#FDF6E3]" : "hover:bg-[#F8FAFC]"}>
+                      <tr key={u.frame_number} className={euFrame === u.frame_number ? "bg-[#FDF6E3]" : hiSk && u.frame_number.toUpperCase() === hiSk ? "bg-[#E7F6EE] ring-2 ring-[#0E7A4A]" : "hover:bg-[#F8FAFC]"}>
                         <td className="td text-center text-xs text-[#8A93A0]">{(pageClamp(uPage, list2.length, uPageSize) - 1) * uPageSize + i + 1}</td>
                         <td className="td text-xs">{v?.brand || "?"}</td>
                         <td className="td font-semibold text-[13px]">{v?.name || u.vehicle_id}</td>
@@ -262,7 +269,7 @@ export default function DMXe() {
                         <td className="td text-xs">{u.cost_price ? fmtVND(u.cost_price) : <span className="text-[#C6CDD6]">—</span>}</td>
                         <td className="td text-xs whitespace-nowrap">{fmtDate(u.imported_at)}</td>
                         <td className="td text-center"><span className={days >= 90 ? "text-danger font-bold" : days >= 60 ? "text-[#A25F00] font-bold" : ""}>{days}</span></td>
-                        <td className="td">{u.status === "TON_KHO" ? <Badge tone="green">Tồn kho</Badge> : <Badge tone="blue">Đang chuyển</Badge>}</td>
+                        <td className="td">{u.status === "TON_KHO" ? <Badge tone="green">Tồn kho</Badge> : u.status === "GIU_CHO" ? <Badge tone="amber">🔒 Giữ chỗ</Badge> : <Badge tone="blue">Đang chuyển</Badge>}</td>
                         <td className="td">{u.status !== "DA_BAN" && <button className={`!px-2.5 !py-1 !text-xs ${euFrame === u.frame_number ? "btn-primary" : "btn-ghost"}`} onClick={() => euFrame === u.frame_number ? setEuFrame(null) : startEditUnit(u)}>{euFrame === u.frame_number ? "Đóng" : "✎ Sửa"}</button>}</td>
                       </tr>,
                       euFrame === u.frame_number && (
@@ -272,7 +279,7 @@ export default function DMXe() {
                             <Field label="Mẫu xe (gõ tìm)"><VehicleSearch vehicles={vehicles} value={eu.vehicle_id} onChange={(v) => setEu((p) => ({ ...p, vehicle_id: v }))} /></Field>
                             <Field label="Kho hiện tại (gõ tìm)"><LocSearch locations={locations} value={eu.location_code} onChange={(v) => setEu((p) => ({ ...p, location_code: v }))} /></Field>
                             <Field label="Số máy (tùy chọn)"><input className="inp font-mono !text-[13px]" value={eu.engine_number} onChange={(e) => setEu((p) => ({ ...p, engine_number: e.target.value }))} /></Field>
-                            <Field label="💰 Giá vốn chiếc này (đ)"><input type="number" className="inp" value={eu.cost_price} onChange={(e) => setEu((p) => ({ ...p, cost_price: e.target.value }))} placeholder="Giá nhập thực tế" /></Field>
+                            <Field label="💰 Giá vốn chiếc này (đ)"><MoneyInput value={eu.cost_price} onChange={(v) => setEu((p) => ({ ...p, cost_price: v }))} placeholder="Giá nhập thực tế" /></Field>
                             <Field label="Ghi chú"><input className="inp" value={eu.note} onChange={(e) => setEu((p) => ({ ...p, note: e.target.value }))} /></Field>
                           </div>
                           <div className="flex gap-2"><button className="btn-ok !text-xs" onClick={saveUnit}>💾 Lưu thông tin xe</button><button className="btn-ghost !text-xs" onClick={() => setEuFrame(null)}>Hủy</button></div>

@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Field, Badge, Toast } from "@/components/ui";
+import { Field, Badge, Toast, MoneyInput } from "@/components/ui";
 import { errMsg, fmtVND } from "@/lib/format";
 
 const TYPE_LABELS = { text: "Chữ", number: "Số", dropdown: "Danh sách chọn", checkbox: "Tick chọn", formula: "Công thức tự tính" };
@@ -296,7 +296,7 @@ export default function CaiDat() {
             <div><label className="lbl">Mã</label><input className="inp !w-28" value={svcF.code} onChange={(e) => setSvcF((p) => ({ ...p, code: e.target.value.toUpperCase() }))} placeholder="DVC-009" /></div>
             <div><label className="lbl">Tên dịch vụ</label><input className="inp !w-64" value={svcF.name} onChange={(e) => setSvcF((p) => ({ ...p, name: e.target.value }))} /></div>
             <div><label className="lbl">Nhóm</label><input className="inp !w-32" value={svcF.group_name} onChange={(e) => setSvcF((p) => ({ ...p, group_name: e.target.value }))} /></div>
-            <div><label className="lbl">Giá công</label><input type="number" className="inp !w-32" value={svcF.price} onChange={(e) => setSvcF((p) => ({ ...p, price: +e.target.value || 0 }))} /></div>
+            <div><label className="lbl">Giá công</label><div className="!w-36"><MoneyInput value={svcF.price} onChange={(v) => setSvcF((p) => ({ ...p, price: v || 0 }))} /></div></div>
             <button className="btn-ok !text-xs !py-2" onClick={luuSvc}>{svcF.id ? "Cập nhật" : "+ Thêm"}</button>
             {svcF.id && <button className="btn-ghost !text-xs !py-2" onClick={() => setSvcF({ id: null, code: "", name: "", group_name: "Chung", price: 0 })}>Hủy sửa</button>}
           </div>

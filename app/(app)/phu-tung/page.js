@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Badge, Toast, Field, KPI, LocSearch, Pager, pageSlice, useSortable, Th } from "@/components/ui";
+import { Badge, Toast, Field, KPI, LocSearch, Pager, pageSlice, useSortable, Th, MoneyInput } from "@/components/ui";
 import { fmtVND, fmtTime, errMsg, downloadCSV } from "@/lib/format";
 
 const TXN_LABEL = {
@@ -19,7 +19,7 @@ export default function KhoPhuTung() {
   const [stock, setStock] = useState([]);
   const [units, setUnits] = useState([]);
   const [txns, setTxns] = useState([]);
-  const [sups, setSups] = useState([]);
+  const sups = (settings?.suppliers || "VinFast\nTAILG").split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean);
   const [q, setQ] = useState("");
   const [fLoc, setFLoc] = useState("");
   const [page, setPage] = useState(1);
@@ -36,15 +36,14 @@ export default function KhoPhuTung() {
 
   const load = async () => {
     if (!profile) return;
-    const [{ data: p }, { data: s }, { data: u }, { data: t }, { data: sp }, { data: pm }] = await Promise.all([
+    const [{ data: p }, { data: s }, { data: u }, { data: t }, { data: pm }] = await Promise.all([
       supabase.from("parts").select("*").order("group_name").order("name"),
       supabase.from("parts_stock").select("*"),
       supabase.from("part_units").select("*").eq("status", "TON_KHO").limit(3000),
       supabase.from("pt_txns").select("*").order("created_at", { ascending: false }).limit(500),
-      supabase.from("suppliers").select("id,name").limit(200),
       supabase.from("role_perms").select("perm,allowed").eq("role", profile.role),
     ]);
-    setParts(p || []); setStock(s || []); setUnits(u || []); setTxns(t || []); setSups(sp || []);
+    setParts(p || []); setStock(s || []); setUnits(u || []); setTxns(t || []);
     const m = {}; (pm || []).forEach((x) => { m[x.perm] = x.allowed; }); setPerms(m);
   };
   useEffect(() => { if (!loading) load(); }, [loading, profile]);
@@ -76,8 +75,8 @@ export default function KhoPhuTung() {
     setBusy(true);
     const { data, error } = await supabase.rpc("fn_pt_nhap", { p: {
       part_id: nf.part_id, location_code: nf.location_code, qty: Number(nf.qty),
-      unit_cost: nf.unit_cost ? Number(nf.unit_cost) : null, supplier_id: nf.supplier_id || null,
-      note: nf.note, serials,
+      unit_cost: nf.unit_cost ? Number(nf.unit_cost) : null, supplier_id: null,
+      note: [nf.supplier_id ? "NCC: " + nf.supplier_id : "", nf.note].filter(Boolean).join(" · "), serials,
     } });
     setBusy(false);
     if (error) return notify(errMsg(error), "err");
@@ -126,8 +125,8 @@ export default function KhoPhuTung() {
             <Field label="Tên phụ tùng" required><input className="inp" value={pf.name} onChange={(e) => setPf((p) => ({ ...p, name: e.target.value }))} /></Field>
             <Field label="Nhóm"><select className="inp" value={pf.group_name} onChange={(e) => setPf((p) => ({ ...p, group_name: e.target.value }))}>{groups.map((g) => <option key={g}>{g}</option>)}</select></Field>
             <Field label="Đơn vị"><input className="inp" value={pf.unit} onChange={(e) => setPf((p) => ({ ...p, unit: e.target.value }))} /></Field>
-            <Field label="Giá nhập"><input type="number" className="inp" value={pf.cost_price} onChange={(e) => setPf((p) => ({ ...p, cost_price: +e.target.value || 0 }))} /></Field>
-            <Field label="Giá bán"><input type="number" className="inp" value={pf.sell_price} onChange={(e) => setPf((p) => ({ ...p, sell_price: +e.target.value || 0 }))} /></Field>
+            <Field label="Giá nhập"><MoneyInput value={pf.cost_price} onChange={(v) => setPf((p) => ({ ...p, cost_price: v || 0 }))} /></Field>
+            <Field label="Giá bán"><MoneyInput value={pf.sell_price} onChange={(v) => setPf((p) => ({ ...p, sell_price: v || 0 }))} /></Field>
             <Field label="Tồn tối thiểu (cảnh báo)"><input type="number" className="inp" value={pf.min_stock} onChange={(e) => setPf((p) => ({ ...p, min_stock: +e.target.value || 0 }))} /></Field>
             <div className="flex items-end">
               <label className="flex items-center gap-2 text-sm font-semibold cursor-pointer">
@@ -199,11 +198,11 @@ export default function KhoPhuTung() {
                 </Field>
                 <Field label="Nhập vào kho" required><LocSearch locations={locations} value={nf.location_code} onChange={(v) => setNf((p) => ({ ...p, location_code: v }))} placeholder="Chọn điểm…" /></Field>
                 <Field label="Số lượng" required><input type="number" min="1" className="inp" value={nf.qty} onChange={(e) => setNf((p) => ({ ...p, qty: e.target.value }))} /></Field>
-                <Field label="Giá nhập (bỏ trống = giá trong danh mục)"><input type="number" className="inp" value={nf.unit_cost} onChange={(e) => setNf((p) => ({ ...p, unit_cost: e.target.value }))} /></Field>
+                <Field label="Giá nhập (bỏ trống = giá trong danh mục)"><MoneyInput value={nf.unit_cost} onChange={(v) => setNf((p) => ({ ...p, unit_cost: v }))} /></Field>
                 <Field label="Nhà cung cấp">
                   <select className="inp" value={nf.supplier_id} onChange={(e) => setNf((p) => ({ ...p, supplier_id: e.target.value }))}>
                     <option value="">— Không chọn —</option>
-                    {sups.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    {sups.map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </Field>
                 <Field label="Ghi chú"><input className="inp" value={nf.note} onChange={(e) => setNf((p) => ({ ...p, note: e.target.value }))} /></Field>

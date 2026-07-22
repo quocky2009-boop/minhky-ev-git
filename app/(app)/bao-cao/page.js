@@ -80,7 +80,7 @@ export default function BaoCao() {
     } else if (type === "tonsk") {
       let q = supabase.from("vehicle_units")
         .select("frame_number, vehicle_id, location_code, status, imported_at, import_doc, is_placeholder, note")
-        .in("status", ["TON_KHO", "DANG_CHUYEN"]).order("imported_at", { ascending: false }).limit(10000);
+        .in("status", ["TON_KHO", "DANG_CHUYEN", "GIU_CHO"]).order("imported_at", { ascending: false }).limit(10000);
       if (fLoc) q = q.eq("location_code", fLoc);
       const { data } = await q;
       setRows((data || []).filter((u) => !fBrand || vOf(u.vehicle_id)?.brand === fBrand));
@@ -155,7 +155,7 @@ export default function BaoCao() {
   const exportTonChiTiet = async () => {
     let q = supabase.from("vehicle_units")
       .select("frame_number, vehicle_id, location_code, status, imported_at, import_doc, is_placeholder, note")
-      .in("status", ["TON_KHO", "DANG_CHUYEN"])
+      .in("status", ["TON_KHO", "DANG_CHUYEN", "GIU_CHO"])
       .order("location_code").order("vehicle_id").limit(10000);
     if (fLoc) q = q.eq("location_code", fLoc);
     const { data } = await q;

@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Badge, Toast, Field, KPI, CustomerSearch, LocSearch, Pager, pageSlice } from "@/components/ui";
+import { Badge, Toast, Field, KPI, CustomerSearch, LocSearch, Pager, pageSlice, MoneyInput, FrameSearch } from "@/components/ui";
 import { fmtVND, fmtDate, fmtTime, errMsg } from "@/lib/format";
 import { uploadAnhDon } from "@/lib/img";
 
@@ -47,9 +48,17 @@ export default function DichVu() {
   const [rows, setRows] = useState([]);
   const [custs, setCusts] = useState([]);
   const [services, setServices] = useState([]);
-  const [parts, setParts] = useState([]);
   const [fSt, setFSt] = useState("");
   const [q, setQ] = useState("");
+  const _params = useSearchParams();
+  useEffect(() => { const v = _params.get("q"); if (v) setQ(v); }, [_params]);
+  const [_autoOpened, _setAutoOpened] = useState(false);
+  useEffect(() => {
+    const v = _params.get("q");
+    if (!v || _autoOpened || rows.length === 0) return;
+    const hit = rows.filter((t) => t.code.toLowerCase() === v.toLowerCase());
+    if (hit.length === 1) { _setAutoOpened(true); openDetail(hit[0]); }
+  }, [_params, rows]);
   const [page, setPage] = useState(1);
   const [busy, setBusy] = useState(false);
   // tiep nhan
@@ -63,23 +72,24 @@ export default function DichVu() {
   const [pays, setPays] = useState([]);
   const [tong, setTong] = useState(null);
   const [discount, setDiscount] = useState(0);
+  const [dType, setDType] = useState("amount");
+  const [dPercent, setDPercent] = useState(0);
   const [payF, setPayF] = useState({ method: "Chuyển khoản", amount: "" });
-  const [payFotos, setPayFotos] = useState([]);
-  const [serialPick, setSerialPick] = useState({});
-  const [serialAvail, setSerialAvail] = useState({});
+  const [xeInfo, setXeInfo] = useState(null);
+  const [nLines, setNLines] = useState([]);      // hang muc ngay khi tiep nhan
+  const [nDisc, setNDisc] = useState({ type: "amount", amount: 0, percent: 0 });
 
   const can = (p) => profile?.role === "CEO" || !!perms[p];
 
   const load = async () => {
     if (!profile) return;
-    const [{ data: t }, { data: pm }, { data: c }, { data: sv }, { data: pt }] = await Promise.all([
+    const [{ data: t }, { data: pm }, { data: c }, { data: sv }] = await Promise.all([
       supabase.from("dv_tickets").select("*").order("created_at", { ascending: false }).limit(1000),
       supabase.from("role_perms").select("perm,allowed").eq("role", profile.role),
       supabase.from("customers").select("id,code,name,phone,status").order("created_at", { ascending: false }).limit(2000),
       supabase.from("dv_services").select("*").eq("status", "Hoạt động").order("group_name"),
-      supabase.from("parts").select("*").eq("status", "Hoạt động").order("name"),
     ]);
-    setRows(t || []); setCusts(c || []); setServices(sv || []); setParts(pt || []);
+    setRows(t || []); setCusts(c || []); setServices(sv || []);
     const m = {}; (pm || []).forEach((x) => { m[x.perm] = x.allowed; }); setPerms(m);
   };
   useEffect(() => { if (!loading) load(); }, [loading, profile]);
@@ -92,14 +102,7 @@ export default function DichVu() {
       supabase.from("v_dv_ticket_tong").select("*").eq("ticket_id", t.id).single(),
     ]);
     setLines(l || []); setPays(p || []); setTong(v || null);
-    // serial kha dung cho cac dong pin
-    const serialParts = (l || []).filter((x) => x.line_type === "PHU_TUNG" && parts.find((pp) => pp.id === x.part_id)?.track_serial);
-    const av = {};
-    for (const x of serialParts) {
-      const { data: u } = await supabase.from("part_units").select("serial").eq("part_id", x.part_id).eq("location_code", t.location_code).eq("status", "TON_KHO").limit(50);
-      av[x.id] = (u || []).map((z) => z.serial);
-    }
-    setSerialAvail(av);
+    setDiscount(t.discount || 0); setDType(t.discount_type || "amount"); setDPercent(t.discount_percent || 0);
   };
   const reloadDetail = async () => { const { data: t } = await supabase.from("dv_tickets").select("*").eq("id", detail.id).single(); if (t) { await openDetail(t); load(); } };
 
@@ -119,17 +122,43 @@ export default function DichVu() {
   const taoPhieu = async () => {
     if (!f.location_code) return notify("Chọn điểm dịch vụ.", "err");
     if (!f.customer_name || !f.customer_phone) return notify("Chọn hoặc tạo khách hàng.", "err");
-    if (fotos.length < 4) return notify(`Bắt buộc tối thiểu 4 ảnh xe (đang có ${fotos.length}).`, "err");
     setBusy(true);
     let photos = [];
-    try { notify(`Đang tải ${fotos.length} ảnh…`); photos = await uploadAnhDon(supabase, "tn/" + Date.now(), fotos.map((x) => x.file), "dich-vu"); }
+    try { if (fotos.length) { notify(`Đang tải ${fotos.length} ảnh…`); photos = await uploadAnhDon(supabase, "tn/" + Date.now(), fotos.map((x) => x.file), "dich-vu"); } }
     catch (e) { setBusy(false); return notify("Tải ảnh lỗi: " + (e.message || e), "err"); }
     const { data, error } = await supabase.rpc("fn_dv_tao_phieu", { p: { ...f, odo_km: f.odo_km || null, battery_pct: f.battery_pct || null, photos } });
+    if (error) { setBusy(false); return notify(errMsg(error), "err"); }
+
+    // Luu luon hang muc bao gia neu da nhap
+    const ok = nLines.filter((l) => l.name?.trim());
+    if (ok.length > 0) {
+      const { data: t2 } = await supabase.from("dv_tickets").select("id").eq("code", data).single();
+      if (t2) {
+        const { error: e2 } = await supabase.rpc("fn_dv_luu_bao_gia", { p: {
+          id: t2.id, lines: ok,
+          discount_type: nDisc.type, discount: nDisc.type === "amount" ? nDisc.amount : 0,
+          discount_percent: nDisc.type === "percent" ? nDisc.percent : 0,
+        } });
+        if (e2) notify("Đã tạo phiếu nhưng lưu báo giá lỗi: " + errMsg(e2), "err");
+      }
+    }
     setBusy(false);
-    if (error) return notify(errMsg(error), "err");
-    notify(`Đã tạo phiếu ${data}.`);
-    setShow(false); setFotos([]); setF({ location_code: "", customer_id: "", customer_name: "", customer_phone: "", frame_number: "", vehicle_desc: "", odo_km: "", battery_pct: "", assets_note: "", request_note: "" });
+    notify(`Đã tạo phiếu ${data}${ok.length ? ` kèm ${ok.length} hạng mục` : ""}.`);
+    setShow(false); setFotos([]); setNLines([]); setNDisc({ type: "amount", amount: 0, percent: 0 }); setXeInfo(null);
+    setF({ location_code: "", customer_id: "", customer_name: "", customer_phone: "", frame_number: "", vehicle_desc: "", odo_km: "", battery_pct: "", assets_note: "", request_note: "" });
     load();
+  };
+
+  // Tra xe da ban theo so khung
+  const traXe = async (sk) => {
+    if (!sk || sk.length < 4) { setXeInfo(null); return; }
+    const { data } = await supabase.rpc("fn_tra_xe_da_ban", { p_frame: sk });
+    const hit = (data || [])[0];
+    if (hit) {
+      setXeInfo(hit);
+      setF((p) => ({ ...p, frame_number: hit.frame_number,
+        vehicle_desc: p.vehicle_desc || `${hit.hang} ${hit.ten_xe} ${hit.mau}`.trim() }));
+    } else setXeInfo(null);
   };
 
   // ===== ACTIONS =====
@@ -142,12 +171,18 @@ export default function DichVu() {
     reloadDetail();
   };
 
-  const saveBaoGia = async () => {
-    await rpc("fn_dv_luu_bao_gia", { p: { id: detail.id, discount, lines: lines.filter((l) => !l.exported).map((l) => ({ ...l })) } }, "Đã lưu báo giá — chờ khách duyệt.");
+  const saveBaoGia = async (dtype, dval) => {
+    await rpc("fn_dv_luu_bao_gia", { p: {
+      id: detail.id, lines: lines.map((l) => ({ ...l })),
+      discount_type: dtype ?? detail.discount_type ?? "amount",
+      discount: dtype === "percent" ? 0 : (dval ?? discount),
+      discount_percent: dtype === "percent" ? (dval ?? 0) : 0,
+    } }, "Đã lưu báo giá.");
   };
-  const khachDuyet = () => rpc("fn_dv_khach_duyet", { p_id: detail.id, p_evidence: [] }, "Khách đã duyệt — chuyển sang thi công.");
-  const nghiemThu = () => { const n = prompt("Ghi chú nghiệm thu (không bắt buộc):") || ""; rpc("fn_dv_nghiem_thu", { p_id: detail.id, p_note: n }, "Đã nghiệm thu — chờ thanh toán."); };
-  const giaoXe = () => { if (confirm("Xác nhận giao xe cho khách?")) rpc("fn_dv_giao_xe", { p_id: detail.id }, "Đã giao xe — phiếu hoàn tất."); };
+  const hoanTat = () => {
+    if (!confirm("Xác nhận nghiệm thu và giao xe cho khách?")) return;
+    rpc("fn_dv_hoan_tat", { p_id: detail.id, p_note: "" }, "Đã hoàn tất — nghiệm thu & giao xe.");
+  };
   const duyetNo = () => {
     const a = prompt("Số tiền công nợ được duyệt (đ):"); if (a === null) return;
     const n = prompt("Lý do / điều kiện công nợ (bắt buộc):"); if (n === null) return;
@@ -156,26 +191,13 @@ export default function DichVu() {
   const huyPhieu = () => { const n = prompt("Lý do hủy phiếu (bắt buộc):"); if (n === null) return; rpc("fn_dv_huy_phieu", { p_id: detail.id, p_ly_do: n }, "Đã hủy phiếu, vật tư đã hoàn kho."); };
   const chanDoan = () => { const n = prompt("Chẩn đoán / tình trạng xe:", detail.diagnose_note || ""); if (n === null) return; rpc("fn_dv_chan_doan", { p: { id: detail.id, diagnose_note: n } }, "Đã lưu chẩn đoán."); };
 
-  const xuatVatTu = async (l) => {
-    const pt = parts.find((p) => p.id === l.part_id);
-    let serials = [];
-    if (pt?.track_serial) {
-      serials = serialPick[l.id] || [];
-      if (serials.length !== l.qty) return notify(`Chọn đúng ${l.qty} serial cho ${l.name}.`, "err");
-    }
-    rpc("fn_dv_xuat_vat_tu", { p_line_id: l.id, p_serials: serials }, `Đã xuất ${l.name} — tồn đã trừ.`);
-  };
-
   const thuTien = async () => {
     if (!(Number(payF.amount) > 0)) return notify("Nhập số tiền.", "err");
     setBusy(true);
-    let evidence = [];
-    try { if (payFotos.length) evidence = await uploadAnhDon(supabase, "thu/" + detail.code, payFotos.map((x) => x.file), "dich-vu"); }
-    catch (e) { setBusy(false); return notify("Tải ảnh lỗi: " + (e.message || e), "err"); }
-    const { data, error } = await supabase.rpc("fn_dv_thu_tien", { p: { ticket_id: detail.id, method: payF.method, amount: Number(payF.amount), evidence } });
+    const { data, error } = await supabase.rpc("fn_dv_thu_tien", { p: { ticket_id: detail.id, method: payF.method, amount: Number(payF.amount), evidence: [] } });
     setBusy(false);
     if (error) return notify(errMsg(error), "err");
-    notify(`Đã lập phiếu thu ${data}.`); setPayF({ method: "Chuyển khoản", amount: "" }); setPayFotos([]); reloadDetail();
+    notify(`Đã lập phiếu thu ${data}.`); setPayF({ method: "Chuyển khoản", amount: "" }); reloadDetail();
   };
 
   // ===== CHI TIET =====
@@ -217,7 +239,6 @@ export default function DichVu() {
           </div>
           <div className="flex flex-col gap-2">
             {lines.map((l, i) => {
-              const pt = parts.find((p) => p.id === l.part_id);
               return (
                 <div key={l.id || "n" + i} className={`p-2.5 rounded-xl border ${l.exported ? "border-[#BBE3CC] bg-[#F4FBF7]" : "border-[#E3E8EF]"}`}>
                   <div className="flex gap-1.5 flex-wrap items-center">
@@ -255,22 +276,12 @@ export default function DichVu() {
                         )}
                         <input className="inp !py-1.5 !text-xs flex-1 min-w-[120px]" placeholder="Tên hạng mục" value={l.name} onChange={(e) => setLines((p) => p.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} />
                         <input type="number" className="inp !py-1.5 !text-xs !w-16" title="SL" value={l.qty} onChange={(e) => setLines((p) => p.map((x, j) => j === i ? { ...x, qty: +e.target.value || 1 } : x))} />
-                        <input type="number" className="inp !py-1.5 !text-xs !w-28" title="Đơn giá" value={l.unit_price} onChange={(e) => setLines((p) => p.map((x, j) => j === i ? { ...x, unit_price: +e.target.value || 0 } : x))} />
+                        <div className="!w-32"><MoneyInput className="!py-1.5 !text-xs" value={l.unit_price} onChange={(v) => setLines((p) => p.map((x, j) => j === i ? { ...x, unit_price: v || 0 } : x))} /></div>
                         <b className="text-[13px] w-24 text-right">{fmtVND((l.qty || 1) * (l.unit_price || 0))}</b>
                         <button className="text-danger font-bold" onClick={() => setLines((p) => p.filter((_, j) => j !== i))}>✕</button>
                       </>
                     )}
                   </div>
-                  {l.exported === false && l.approved && l.line_type === "PHU_TUNG" && can("pt_xuat") && ["DANG_LAM", "NGHIEM_THU"].includes(detail.status) && (
-                    <div className="mt-2 flex gap-1.5 flex-wrap items-center">
-                      {pt?.track_serial && (serialAvail[l.id] || []).map((sn) => {
-                        const on = (serialPick[l.id] || []).includes(sn);
-                        return <button key={sn} className={`!px-2 !py-1 !text-[11px] rounded-lg border ${on ? "bg-brand text-white border-brand" : "bg-white border-[#D5DBE3]"}`}
-                          onClick={() => setSerialPick((p) => ({ ...p, [l.id]: on ? (p[l.id] || []).filter((x) => x !== sn) : [...(p[l.id] || []), sn] }))}>{sn}</button>;
-                      })}
-                      <button className="btn-ok !px-2.5 !py-1 !text-xs" disabled={busy} onClick={() => xuatVatTu(l)}>⇧ Xuất kho{pt?.track_serial ? ` (${(serialPick[l.id] || []).length}/${l.qty} serial)` : ""}</button>
-                    </div>
-                  )}
                 </div>
               );
             })}
@@ -278,10 +289,14 @@ export default function DichVu() {
           </div>
           {editable && can("dv_bao_gia") && (
             <div className="flex gap-2 items-center mt-3 flex-wrap">
-              <span className="text-xs text-[#5A6572]">Giảm giá:</span>
-              <input type="number" className="inp !py-1.5 !text-xs !w-28" value={discount} onChange={(e) => setDiscount(+e.target.value || 0)} />
-              <button className="btn-primary !text-xs" disabled={busy} onClick={saveBaoGia}>💾 Lưu báo giá</button>
-              {detail.status === "CHO_DUYET_GIA" && <button className="btn-ok !text-xs" disabled={busy} onClick={khachDuyet}>✓ Khách đã đồng ý báo giá</button>}
+              <span className="text-xs text-[#5A6572]">Giảm giá cả đơn:</span>
+              <select className="inp !w-auto !py-1.5 !text-xs" value={dType} onChange={(e) => setDType(e.target.value)}>
+                <option value="amount">Số tiền</option><option value="percent">Phần trăm</option>
+              </select>
+              {dType === "amount"
+                ? <div className="!w-36"><MoneyInput className="!py-1.5 !text-xs" value={discount} onChange={(v) => setDiscount(v || 0)} /></div>
+                : <input type="number" className="inp !py-1.5 !text-xs !w-20" placeholder="%" value={dPercent} onChange={(e) => setDPercent(+e.target.value || 0)} />}
+              <button className="btn-primary !text-xs" disabled={busy} onClick={() => saveBaoGia(dType, dType === "percent" ? dPercent : discount)}>💾 Lưu báo giá</button>
             </div>
           )}
         </div>
@@ -310,17 +325,15 @@ export default function DichVu() {
                 <select className="inp !py-2 !w-auto" value={payF.method} onChange={(e) => setPayF((p) => ({ ...p, method: e.target.value }))}>
                   <option>Chuyển khoản</option><option>Tiền mặt</option>
                 </select></div>
-              <div><label className="lbl">Số tiền</label><input type="number" className="inp !py-2 !w-36" value={payF.amount} onChange={(e) => setPayF((p) => ({ ...p, amount: e.target.value }))} /></div>
-              <div className="min-w-[160px]"><PhotoPick fotos={payFotos} setFotos={setPayFotos} label={payF.method === "Tiền mặt" ? "Ảnh phiếu thu (bắt buộc)" : "Ảnh giao dịch"} /></div>
+              <div><label className="lbl">Số tiền</label><div className="!w-40"><MoneyInput className="!py-2" value={payF.amount} onChange={(v) => setPayF((p) => ({ ...p, amount: v }))} /></div></div>
               <button className="btn-ok !py-2 !text-xs" disabled={busy} onClick={thuTien}>💵 Lập phiếu thu</button>
             </div>
           )}
           <div className="flex gap-2 mt-3 flex-wrap">
-            {detail.status === "DANG_LAM" && can("dv_nghiem_thu") && <button className="btn-primary !text-xs" disabled={busy} onClick={nghiemThu}>✔ Nghiệm thu</button>}
             {editable && can("dv_eod") && <button className="btn-ghost !text-xs" disabled={busy} onClick={duyetNo}>Duyệt công nợ</button>}
-            {detail.status === "CHO_THANH_TOAN" && can("dv_giao_xe") && (
-              <button className="btn-ok !text-xs" disabled={busy || conLai > 0} title={conLai > 0 ? "Thu đủ hoặc duyệt công nợ trước" : ""} onClick={giaoXe}>
-                🛵 Giao xe{conLai > 0 ? ` (còn thiếu ${fmtVND(conLai)})` : ""}
+            {editable && can("dv_giao_xe") && (
+              <button className="btn-ok" disabled={busy || conLai > 0} title={conLai > 0 ? "Thu đủ hoặc duyệt công nợ trước" : ""} onClick={hoanTat}>
+                ✅ Nghiệm thu & Giao xe{conLai > 0 ? ` (còn thiếu ${fmtVND(conLai)})` : ""}
               </button>
             )}
           </div>
@@ -374,16 +387,80 @@ export default function DichVu() {
                 )}
               </Field>
             </div>
-            <Field label="Số khung (xe Minh Kỳ bán, nếu có)"><input className="inp" value={f.frame_number} onChange={(e) => setF((p) => ({ ...p, frame_number: e.target.value.toUpperCase() }))} /></Field>
-            <Field label="Mô tả xe (xe ngoài)"><input className="inp" placeholder="VD: VinFast Evo200 đỏ" value={f.vehicle_desc} onChange={(e) => setF((p) => ({ ...p, vehicle_desc: e.target.value }))} /></Field>
+            <Field label="Số khung (xe Minh Kỳ bán — gõ tìm hoặc quét)">
+              <FrameSearch supabase={supabase} value={f.frame_number}
+                onPick={(sk, u) => { setF((p) => ({ ...p, frame_number: sk })); traXe(sk); }} />
+              {xeInfo && (
+                <div className="text-[11px] mt-1 p-2 rounded-lg bg-[#E7F6EE] text-[#0E7A4A]">
+                  ✓ <b>{xeInfo.hang} {xeInfo.ten_xe} {xeInfo.mau}</b>
+                  {xeInfo.sale_date && ` · Minh Kỳ bán ${new Date(xeInfo.sale_date).toLocaleDateString("vi-VN")}`}
+                  {xeInfo.customer_name && ` · KH ${xeInfo.customer_name}`}
+                </div>
+              )}
+            </Field>
+            <Field label="Mô tả xe (tự điền nếu là xe Minh Kỳ bán, hoặc gõ tay)">
+              <input className="inp" placeholder="VD: VinFast Evo200 đỏ" value={f.vehicle_desc} onChange={(e) => setF((p) => ({ ...p, vehicle_desc: e.target.value }))} />
+            </Field>
             <Field label="ODO (km)"><input type="number" className="inp" value={f.odo_km} onChange={(e) => setF((p) => ({ ...p, odo_km: e.target.value }))} /></Field>
             <Field label="Mức pin (%)"><input type="number" className="inp" value={f.battery_pct} onChange={(e) => setF((p) => ({ ...p, battery_pct: e.target.value }))} /></Field>
             <Field label="Tài sản / phụ kiện kèm theo"><input className="inp" placeholder="VD: 2 mũ bảo hiểm, sạc" value={f.assets_note} onChange={(e) => setF((p) => ({ ...p, assets_note: e.target.value }))} /></Field>
             <Field label="Yêu cầu của khách"><input className="inp" value={f.request_note} onChange={(e) => setF((p) => ({ ...p, request_note: e.target.value }))} /></Field>
-            <div className="md:col-span-2"><PhotoPick fotos={fotos} setFotos={setFotos} label={`Ảnh hiện trạng xe — tối thiểu 4 ảnh trước/sau/2 bên (đang có ${fotos.length})`} /></div>
+            <div className="md:col-span-2"><PhotoPick fotos={fotos} setFotos={setFotos} label={`Ảnh hiện trạng xe (không bắt buộc)${fotos.length ? ` — ${fotos.length} ảnh` : ""}`} /></div>
           </div>
+          <div className="mt-4 pt-3 border-t border-[#EEF1F4]">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="font-bold text-sm mr-auto">Báo giá / hạng mục (có thể nhập luôn)</div>
+              <button className="btn-ghost !text-xs" onClick={() => setNLines((p) => [...p, { line_type: "CONG", name: "", qty: 1, unit_price: 0, discount_percent: 0 }])}>+ Thêm dòng</button>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              {nLines.map((l, i) => (
+                <div key={i} className="flex gap-1.5 flex-wrap items-center p-2 rounded-lg border border-[#E3E8EF]">
+                  <select className="inp !w-auto !py-1.5 !text-xs" value={l.line_type} onChange={(e) => setNLines((p) => p.map((x, j) => j === i ? { ...x, line_type: e.target.value } : x))}>
+                    {Object.entries(LINE_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                  </select>
+                  {l.line_type === "CONG" && (
+                    <select className="inp !w-auto !py-1.5 !text-xs" value={l.service_id || ""} onChange={(e) => {
+                      const sv = services.find((x) => x.id == e.target.value);
+                      setNLines((p) => p.map((x, j) => j === i ? { ...x, service_id: sv?.id || null, name: sv?.name || x.name, unit_price: sv?.price ?? x.unit_price } : x));
+                    }}>
+                      <option value="">— Bảng giá —</option>
+                      {services.map((sv) => <option key={sv.id} value={sv.id}>{sv.name}</option>)}
+                    </select>
+                  )}
+                  <input className="inp !py-1.5 !text-xs flex-1 min-w-[130px]" placeholder="Tên hạng mục / phụ tùng" value={l.name}
+                    onChange={(e) => setNLines((p) => p.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} />
+                  <input type="number" className="inp !py-1.5 !text-xs !w-14" title="SL" value={l.qty}
+                    onChange={(e) => setNLines((p) => p.map((x, j) => j === i ? { ...x, qty: +e.target.value || 1 } : x))} />
+                  <div className="!w-32"><MoneyInput className="!py-1.5 !text-xs" value={l.unit_price}
+                    onChange={(v) => setNLines((p) => p.map((x, j) => j === i ? { ...x, unit_price: v || 0 } : x))} /></div>
+                  <input type="number" className="inp !py-1.5 !text-xs !w-16" title="Giảm %" placeholder="%" value={l.discount_percent || ""}
+                    onChange={(e) => setNLines((p) => p.map((x, j) => j === i ? { ...x, discount_percent: +e.target.value || 0 } : x))} />
+                  <b className="text-[13px] w-24 text-right">{fmtVND(Math.round((l.qty || 1) * (l.unit_price || 0) * (1 - (l.discount_percent || 0) / 100)))}</b>
+                  <button className="text-danger font-bold" onClick={() => setNLines((p) => p.filter((_, j) => j !== i))}>✕</button>
+                </div>
+              ))}
+              {nLines.length === 0 && <div className="text-[13px] text-[#8A93A0]">Chưa có hạng mục — có thể thêm sau khi tạo phiếu.</div>}
+            </div>
+            {nLines.length > 0 && (
+              <div className="flex gap-2 items-center mt-2 flex-wrap">
+                <span className="text-xs text-[#5A6572]">Giảm giá cả đơn:</span>
+                <select className="inp !w-auto !py-1.5 !text-xs" value={nDisc.type} onChange={(e) => setNDisc((p) => ({ ...p, type: e.target.value }))}>
+                  <option value="amount">Số tiền</option><option value="percent">Phần trăm</option>
+                </select>
+                {nDisc.type === "amount"
+                  ? <div className="!w-36"><MoneyInput className="!py-1.5 !text-xs" value={nDisc.amount} onChange={(v) => setNDisc((p) => ({ ...p, amount: v || 0 }))} /></div>
+                  : <input type="number" className="inp !py-1.5 !text-xs !w-20" placeholder="%" value={nDisc.percent} onChange={(e) => setNDisc((p) => ({ ...p, percent: +e.target.value || 0 }))} />}
+                <span className="text-[13px] font-bold ml-auto">
+                  Tổng: {fmtVND(Math.max(0, (nDisc.type === "percent"
+                    ? Math.round(nLines.reduce((a, l) => a + Math.round((l.qty || 1) * (l.unit_price || 0) * (1 - (l.discount_percent || 0) / 100)), 0) * (1 - (nDisc.percent || 0) / 100))
+                    : nLines.reduce((a, l) => a + Math.round((l.qty || 1) * (l.unit_price || 0) * (1 - (l.discount_percent || 0) / 100)), 0) - (nDisc.amount || 0))))}
+                </span>
+              </div>
+            )}
+          </div>
+
           <div className="flex gap-2 mt-4">
-            <button className="btn-ok" disabled={busy || fotos.length < 4} onClick={taoPhieu}>{busy ? "Đang lưu…" : `Tạo phiếu tiếp nhận${fotos.length < 4 ? ` (thiếu ${4 - fotos.length} ảnh)` : ""}`}</button>
+            <button className="btn-ok" disabled={busy} onClick={taoPhieu}>{busy ? "Đang lưu…" : "Tạo phiếu tiếp nhận"}</button>
             <button className="btn-ghost" onClick={() => setShow(false)}>Hủy</button>
           </div>
         </div>

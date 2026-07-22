@@ -22,7 +22,7 @@ export default function KiemKe() {
   const loadUnits = async () => {
     if (!loc) { setUnits([]); return; }
     const { data } = await supabase.from("vehicle_units").select("*")
-      .eq("location_code", loc).in("status", ["TON_KHO", "DANG_CHUYEN"]).order("vehicle_id");
+      .eq("location_code", loc).in("status", ["TON_KHO", "DANG_CHUYEN", "GIU_CHO"]).order("vehicle_id");
     setUnits(data || []);
   };
   useEffect(() => { setActual({}); setScan(""); loadUnits(); }, [loc]);
@@ -33,7 +33,7 @@ export default function KiemKe() {
   // ===== PHUONG PHAP 1: THEO SO KHUNG =====
   const scanned = [...new Set(scan.split(/[\n,;\s]+/).map((x) => x.trim().toUpperCase()).filter(Boolean))];
   const sysFrames = units.map((u) => u.frame_number.toUpperCase());
-  const missing = units.filter((u) => u.status === "TON_KHO" && !scanned.includes(u.frame_number.toUpperCase()));
+  const missing = units.filter((u) => ["TON_KHO","GIU_CHO"].includes(u.status) && !scanned.includes(u.frame_number.toUpperCase()));
   const inTransit = units.filter((u) => u.status === "DANG_CHUYEN");
   const extra = scanned.filter((s) => !sysFrames.includes(s));
   const matched = scanned.filter((s) => sysFrames.includes(s)).length;
@@ -97,7 +97,7 @@ export default function KiemKe() {
       let remove = [], add = [];
       if (act < r.sys) {
         // Thieu xe: tu chon xe de bot — uu tien so khung TAM, sau do xe nhap lau nhat
-        const candidates = r.units.filter((u) => u.status === "TON_KHO")
+        const candidates = r.units.filter((u) => ["TON_KHO","GIU_CHO"].includes(u.status))
           .sort((a, b) => (b.is_placeholder - a.is_placeholder) || (new Date(a.imported_at) - new Date(b.imported_at)));
         remove = candidates.slice(0, r.sys - act).map((u) => u.frame_number);
         if (remove.length < r.sys - act) { failed++; continue; } // xe dang chuyen chiem cho, khong du de bot

@@ -19,7 +19,7 @@ export default function KhoChiTiet() {
 
   const load = async () => {
     const { data } = await supabase.from("vehicle_units").select("*")
-      .eq("location_code", decodeURIComponent(code)).in("status", ["TON_KHO", "DANG_CHUYEN"]);
+      .eq("location_code", decodeURIComponent(code)).in("status", ["TON_KHO", "DANG_CHUYEN", "GIU_CHO"]);
     setUnits(data || []);
   };
   useEffect(() => { load(); }, [code]);
@@ -85,7 +85,7 @@ export default function KhoChiTiet() {
         <span className="text-xs text-[#8A93A0]">{loc?.address}</span>
       </div>
       <div className="flex gap-3 flex-wrap">
-        <KPI label="Xe đang tồn" value={units.filter((u) => u.status === "TON_KHO").length} tone="dark" />
+        <KPI label="Xe đang tồn" value={units.filter((u) => ["TON_KHO","GIU_CHO"].includes(u.status)).length} tone="dark" />
         <KPI label="Đang chuyển đi" value={units.filter((u) => u.status === "DANG_CHUYEN").length} tone="blue" />
         <KPI label="Tồn ≥ 60 ngày" value={old60} tone={old60 ? "amber" : "dark"} />
         <KPI label="Số khung tạm cần cập nhật" value={placeholders} tone={placeholders ? "red" : "dark"} />
@@ -114,7 +114,7 @@ export default function KhoChiTiet() {
                 <td className="td">{v?.color || ""}</td>
                 <td className="td">{fmtDate(u.imported_at)}</td>
                 <td className="td"><b className={d >= 90 ? "text-danger" : d >= 60 ? "text-[#A25F00]" : ""}>{d} ngày</b></td>
-                <td className="td">{u.status === "TON_KHO" ? <Badge tone="green">Tồn kho</Badge> : <Badge tone="blue">Đang chuyển</Badge>}</td>
+                <td className="td">{u.status === "TON_KHO" ? <Badge tone="green">Tồn kho</Badge> : u.status === "GIU_CHO" ? <Badge tone="amber">🔒 Giữ chỗ</Badge> : <Badge tone="blue">Đang chuyển</Badge>}</td>
                 {canEdit && <td className="td"><button className="btn-ghost !px-2.5 !py-1 !text-xs" onClick={() => editFrame(u)}>Sửa SK</button></td>}
               </tr>
             );

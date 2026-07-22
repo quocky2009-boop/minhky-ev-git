@@ -2,7 +2,7 @@
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Field, Badge, Toast, VehicleSearch, LocSearch, FramePicker, Pager, pageSlice , useSortable, Th, CustomerSearch } from "@/components/ui";
+import { Field, Badge, Toast, VehicleSearch, LocSearch, FramePicker, Pager, pageSlice , useSortable, Th, CustomerSearch, MoneyInput } from "@/components/ui";
 import { printOrder as _printOrder } from "@/lib/print";
 import { uploadAnhDon } from "@/lib/img";
 import Scanner from "@/components/Scanner";
@@ -33,6 +33,26 @@ function BanHangInner() {
   const empty = { vehicle_id: params.get("xe") || "", location_code: "", customer_name: "", customer_phone: "", customer_cccd: "", customer_address: "", customer_type: "Khách lẻ", customer_source: "Khách vãng lai", sale_price: "", paid_amount: "", payment_method: "Chuyển khoản", tra_gop_ct: "", tra_gop_tien: "", document_status: "Đang làm đăng ký", note: "", extra: {} };
   const [f, setF] = useState(empty);
   const [show, setShow] = useState(!!params.get("xe") || !!params.get("new"));
+
+  // Den tu phieu dat coc: tu dien so khung + khach + tien coc da nhan
+  const [_cocDone, _setCocDone] = useState(false);
+  useEffect(() => {
+    const sk = params.get("sk"), kh = params.get("kh"), coc = params.get("coc");
+    if (!sk || _cocDone || custs.length === 0) return;
+    _setCocDone(true);
+    (async () => {
+      const { data: u } = await supabase.from("vehicle_units").select("*").eq("frame_number", sk).maybeSingle();
+      if (!u) { notify("Không tìm thấy số khung " + sk, "err"); return; }
+      setF((p) => ({ ...p, vehicle_id: u.vehicle_id, location_code: u.location_code,
+        paid_amount: coc ? Number(coc) : p.paid_amount,
+        note: coc ? `Đã nhận cọc ${Number(coc).toLocaleString("vi-VN")}đ` : p.note }));
+      setFrames([sk]);
+      const c = custs.find((x) => (x.phone || "").replace(/\D/g, "") === String(kh || "").replace(/\D/g, ""));
+      if (c) { setCustId(c.id); setF((p) => ({ ...p, customer_name: c.name, customer_phone: c.phone,
+        customer_cccd: c.cccd || "", customer_address: c.address || "" })); }
+      notify(`Đã nạp xe ${sk} từ phiếu cọc — kiểm tra rồi lưu đơn.`);
+    })();
+  }, [params, custs]);
   const [busy, setBusy] = useState(false);
   const [detail, setDetail] = useState(null);
   const [fotos, setFotos] = useState([]); // [{file, url}] cho don le
@@ -347,7 +367,7 @@ function BanHangInner() {
             <Field label="Loại khách"><select className="inp" value={f.customer_type} onChange={(e) => set("customer_type", e.target.value)}>{CUSTOMER_TYPES.map((c) => <option key={c}>{c}</option>)}</select></Field>
             <Field label="Nguồn khách"><select className="inp" value={f.customer_source} onChange={(e) => set("customer_source", e.target.value)}>{CUSTOMER_SOURCES.map((c) => <option key={c}>{c}</option>)}</select></Field>
             <Field label={`Giá bán thực tế / xe ${vehicle ? `(niêm yết ${fmtVND(vehicle.list_price)})` : ""}`}>
-              <input type="number" className="inp" value={f.sale_price} onChange={(e) => set("sale_price", e.target.value)} placeholder={vehicle ? String(vehicle.list_price) : ""} />
+              <MoneyInput value={f.sale_price} onChange={(v) => set("sale_price", v)} placeholder={vehicle ? Number(vehicle.list_price).toLocaleString("vi-VN") : ""} />
             </Field>
 
             <Field label="Trạng thái hồ sơ"><select className="inp" value={f.document_status} onChange={(e) => set("document_status", e.target.value)}>{DOC_STATUSES.map((c) => <option key={c}>{c}</option>)}</select></Field>
@@ -395,7 +415,7 @@ function BanHangInner() {
                   {it.item_type === "PHU_KIEN" ? "PK" : it.item_type === "DANG_KY" ? "ĐK" : "BH"}</Badge>
                 <input className="inp !py-1.5 !text-xs flex-1 min-w-[150px]" value={it.name} onChange={(e) => setItem(i, "name", e.target.value)} />
                 <input type="number" min="1" className="inp !py-1.5 !text-xs !w-16" title="Số lượng" value={it.qty} onChange={(e) => setItem(i, "qty", e.target.value)} />
-                <input type="number" className="inp !py-1.5 !text-xs !w-28" title="Đơn giá" value={it.unit_price} onChange={(e) => setItem(i, "unit_price", e.target.value)} />
+                <div className="!w-32"><MoneyInput className="!py-1.5 !text-xs" value={it.unit_price} onChange={(v) => setItem(i, "unit_price", v)} /></div>
                 <select className="inp !py-1.5 !text-xs !w-auto" title="Hình thức thanh toán" value={it.payment_method || f.payment_method} onChange={(e) => setItem(i, "payment_method", e.target.value)}>
                   {PAYMENT_METHODS.map((m) => <option key={m}>{m}</option>)}
                 </select>
@@ -420,7 +440,7 @@ function BanHangInner() {
             )}
             <div className="flex items-center gap-2">
               <span className="text-xs text-[#5A6572]">Đã thanh toán:</span>
-              <input type="number" min="0" className="inp !w-36 !py-1.5 !text-xs" value={f.paid_amount} onChange={(e) => set("paid_amount", e.target.value)} placeholder="0" />
+              <div className="!w-40"><MoneyInput className="!py-1.5 !text-xs" value={f.paid_amount} onChange={(v) => set("paid_amount", v)} placeholder="0" /></div>
               <button className="btn-ghost !px-2 !py-1.5 !text-[10.5px]" onClick={() => set("paid_amount", tongDon)}>Đủ 100%</button>
               {f.paid_amount !== "" && Number(f.paid_amount) < tongDon && (
                 <span className="text-xs font-bold text-[#A25F00]">Còn lại: {fmtVND(tongDon - (Number(f.paid_amount) || 0))}</span>
@@ -479,8 +499,8 @@ function BanHangInner() {
                       <td className="td text-[13px] font-semibold">{v ? `${v.name} ${v.color}` : r.vehicle_id}</td>
                       <td className="td text-xs">{locations.find((l) => l.code === r.location_code)?.name || r.location_code}</td>
                       <td className="td font-mono text-[12px]">{r.frame}</td>
-                      <td className="td"><input type="number" min="0" className="inp !py-1.5 !text-xs !w-32" value={r.price} onChange={(e) => setWRows((p) => p.map((x, j) => j === i ? { ...x, price: e.target.value } : x))} /></td>
-                      <td className="td"><input type="number" min="0" className="inp !py-1.5 !text-xs !w-32" value={r.paid} onChange={(e) => setWRows((p) => p.map((x, j) => j === i ? { ...x, paid: e.target.value } : x))} /></td>
+                      <td className="td"><div className="!w-36"><MoneyInput className="!py-1.5 !text-xs" value={r.price} onChange={(v) => setWRows((p) => p.map((x, j) => j === i ? { ...x, price: v } : x))} /></div></td>
+                      <td className="td"><div className="!w-36"><MoneyInput className="!py-1.5 !text-xs" value={r.paid} onChange={(v) => setWRows((p) => p.map((x, j) => j === i ? { ...x, paid: v } : x))} /></div></td>
                       <td className="td"><button className="text-[#C6CDD6] hover:text-danger" onClick={() => setWRows((p) => p.filter((_, j) => j !== i))}>✕</button></td>
                     </tr>; })}
                     <tr className="bg-[#F3F5F8] font-extrabold"><td className="td" colSpan={4}>TỔNG {wRows.length} xe</td><td className="td">{fmtVND(wTong)}</td><td className="td" colSpan={2}></td></tr>
@@ -668,7 +688,7 @@ function BanHangInner() {
                     <div className="font-bold text-xs mb-1.5">Yêu cầu điều chỉnh giá bán (sai sót nhập liệu)</div>
                     <div className="flex gap-1.5 flex-wrap items-end">
                       <div><label className="lbl">Giá bán đúng (đ/xe)</label>
-                        <input type="number" min="0" className="inp !py-2 !w-40" value={adjF.new_price} onChange={(e) => setAdjF((p) => ({ ...p, new_price: e.target.value }))} placeholder={String(detail.sale_price)} /></div>
+                        <div className="!w-44"><MoneyInput className="!py-2" value={adjF.new_price} onChange={(v) => setAdjF((p) => ({ ...p, new_price: v }))} placeholder={Number(detail.sale_price).toLocaleString("vi-VN")} /></div></div>
                       <div className="flex-1 min-w-[180px]"><label className="lbl">Lý do (bắt buộc)</label>
                         <input className="inp !py-2" value={adjF.reason} onChange={(e) => setAdjF((p) => ({ ...p, reason: e.target.value }))} placeholder="VD: Gõ nhầm 19.9tr thành 15tr…" /></div>
                       <button className="btn-primary !py-2 !text-xs" onClick={sendAdj}>Gửi yêu cầu</button>
