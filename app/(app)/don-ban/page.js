@@ -5,6 +5,7 @@ import { useCatalog, useToast } from "@/lib/useData";
 import { Badge, Toast, KPI, Pager, pageSlice, pageClamp, useSortable, Th, LocSearch } from "@/components/ui";
 import { fmtVND, fmtDate, fmtTime, errMsg, downloadCSV } from "@/lib/format";
 import { printOrder } from "@/lib/print";
+import { InfoRows, MoneyRows } from "@/components/detail";
 import Link from "next/link";
 
 const iso = (d) => d.toLocaleDateString("sv-SE");
@@ -222,48 +223,65 @@ export default function DonBan() {
                   {profile.role === "CEO" && <button className="btn-ghost !px-3 !py-1.5 !text-xs !text-danger" disabled={busy} onClick={() => deleteOrder(detail)}>🗑 Xóa đơn</button>}
                   <button className="btn-ghost !px-3 !py-1.5 !text-xs" onClick={() => setDetail(null)}>✕</button>
                 </div>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[13px]">
-                  <div><span className="text-[#8A93A0]">Ngày bán:</span> <b>{fmtDate(detail.sale_date)}</b></div>
-                  <div><span className="text-[#8A93A0]">Kho xuất:</span> <b>{locName(detail.location_code)}</b></div>
-                  <div className="col-span-2"><span className="text-[#8A93A0]">Xe:</span> <b>{v ? v.brand + " · " + v.name + " · " + v.color : detail.vehicle_id}</b> × {detail.quantity}</div>
-                  {detail.frame_number && <div className="col-span-2"><span className="text-[#8A93A0]">Số khung:</span> <span className="font-mono font-bold">{detail.frame_number}</span></div>}
-                  <div><span className="text-[#8A93A0]">Khách hàng:</span> <b>{detail.customer_name}</b></div>
-                  <div><span className="text-[#8A93A0]">SĐT:</span> <b>{detail.customer_phone}</b></div>
-                  <div><span className="text-[#8A93A0]">Giá xe:</span> <b>{fmtVND(detail.sale_price)}</b></div>
-                  <div><span className="text-[#8A93A0]">Tổng đơn:</span> <b className="text-brand">{fmtVND(tong)}</b></div>
-                  <div><span className="text-[#8A93A0]">Đã thanh toán:</span> <b>{fmtVND(detail.paid_amount || 0)}</b></div>
-                  <div><span className="text-[#8A93A0]">HTTT giá xe:</span> <b>{detail.payment_method || "—"}</b></div>
-                  {detail._items && detail._items.length > 0 && (() => {
+                {(() => {
+                  const conLai = Math.max(0, tong - (detail.paid_amount || 0));
+                  const httt = (() => {
+                    if (!detail._items || detail._items.length === 0) return null;
                     const m = {}; const hx = detail.payment_method || "Chuyển khoản";
                     m[hx] = (m[hx] || 0) + detail.sale_price * detail.quantity;
                     detail._items.forEach((it) => { const k = it.payment_method || hx; m[k] = (m[k] || 0) + it.amount; });
-                    return <div className="col-span-2 flex flex-wrap gap-1.5 mt-1">
-                      <span className="text-[#8A93A0] text-xs self-center">Thu theo hình thức:</span>
-                      {Object.entries(m).map(([k, v]) => <span key={k} className="inline-flex items-center gap-1 bg-[#F3F5F8] rounded-lg px-2 py-0.5 text-[11px]"><b>{k}:</b> {fmtVND(v)}</span>)}
-                    </div>;
-                  })()}
-                  <div><span className="text-[#8A93A0]">NV bán:</span> <b>{detail.seller_name}</b></div>
-                  <div className="col-span-2"><span className="text-[#8A93A0]">Trạng thái:</span> {st === "Đã xuất HĐ"
-                    ? <><Badge tone="green">✓ Hoàn thành</Badge> <span className="text-xs">HĐ <b>{detail.invoice_no}</b> · {fmtDate(detail.invoice_date)} · {detail.invoice_by_name} · BH ✓{detail.app_activated ? " · App ✓" : ""}</span></>
-                    : <Badge tone="amber">Chờ xuất HĐ</Badge>}</div>
-                  {detail.note && <div className="col-span-2"><span className="text-[#8A93A0]">Ghi chú:</span> {detail.note}</div>}
-                  {detail._items === null ? <div className="col-span-2 text-xs text-[#8A93A0]">Đang tải bán kèm…</div> : detail._items.length > 0 && (
-                    <div className="col-span-2">
-                      <span className="text-[#8A93A0]">Bán kèm:</span>
-                      {detail._items.map((it, i) => <div key={i} className="text-xs ml-2">• {it.name} × {it.qty} <span className="text-[10px] text-[#8A93A0]">({it.payment_method || "—"})</span> = <b>{fmtVND(it.amount)}</b></div>)}
+                    return Object.entries(m);
+                  })();
+                  return (
+                    <div className="flex flex-col gap-3">
+                      <InfoRows rows={[
+                        ["Ngày bán", fmtDate(detail.sale_date)],
+                        ["Kho xuất", locName(detail.location_code)],
+                        ["Xe", <span key="x">{v ? `${v.brand} · ${v.name} · ${v.color}` : detail.vehicle_id} × {detail.quantity}
+                          {detail.frame_number && <span className="block text-[11px] text-[#8A93A0] font-mono">SK {detail.frame_number}</span>}</span>],
+                        ["Khách hàng", <span key="k">{detail.customer_name}<span className="block text-[11px] text-[#8A93A0]">{detail.customer_phone}</span></span>],
+                        ["NV bán", detail.seller_name],
+                        ["Trạng thái", st === "Đã xuất HĐ"
+                          ? <span key="s"><Badge tone="green">✓ Hoàn thành</Badge>
+                              <span className="block text-[11px] text-[#8A93A0] font-normal mt-0.5">HĐ {detail.invoice_no} · {fmtDate(detail.invoice_date)} · {detail.invoice_by_name} · BH ✓{detail.app_activated ? " · App ✓" : ""}</span></span>
+                          : <Badge key="s" tone="amber">Chờ xuất HĐ</Badge>],
+                        ["Ghi chú", detail.note],
+                      ]} />
+
+                      <MoneyRows
+                        lines={[
+                          ["Giá xe" + (detail.quantity > 1 ? ` × ${detail.quantity}` : ""), fmtVND(detail.sale_price * detail.quantity)],
+                          ...(detail._items && detail._items.length > 0
+                            ? detail._items.map((it) => [`${it.name} × ${it.qty}`, fmtVND(it.amount), "font-semibold text-[#5A6572]"])
+                            : []),
+                          ["Tổng đơn", fmtVND(tong), "font-bold text-brand"],
+                          ["Đã thanh toán", fmtVND(detail.paid_amount || 0), "font-bold text-[#0E7A4A]"],
+                        ]}
+                        total={{ label: conLai > 0 ? "Còn phải thu" : "Đã thanh toán đủ", value: fmtVND(conLai), done: conLai === 0 }}
+                      />
+
+                      {httt && httt.length > 1 && (
+                        <div className="flex flex-wrap gap-1.5 items-center">
+                          <span className="text-[#8A93A0] text-xs">Thu theo hình thức:</span>
+                          {httt.map(([k, val]) => <span key={k} className="inline-flex items-center gap-1 bg-[#F3F5F8] rounded-lg px-2 py-0.5 text-[11px]"><b>{k}:</b> {fmtVND(val)}</span>)}
+                        </div>
+                      )}
+
+                      {detail._items === null && <div className="text-xs text-[#8A93A0]">Đang tải bán kèm…</div>}
+
+                      {(detail.photos || []).length > 0 && (
+                        <div>
+                          <div className="text-[12px] text-[#5A6572] mb-1.5">Ảnh đính kèm ({detail.photos.length})</div>
+                          <div className="flex gap-2 flex-wrap">
+                            {detail.photos.map((ph, i) => (
+                              <a key={i} href={ph.url} target="_blank" rel="noreferrer"><img src={ph.url} alt="" className="w-20 h-20 object-cover rounded-lg border border-[#E3E8EF]" /></a>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )}
-                  {(detail.photos || []).length > 0 && (
-                    <div className="col-span-2">
-                      <span className="text-[#8A93A0]">Ảnh đính kèm ({detail.photos.length}):</span>
-                      <div className="flex gap-2 flex-wrap mt-1">
-                        {detail.photos.map((ph, i) => (
-                          <a key={i} href={ph.url} target="_blank" rel="noreferrer"><img src={ph.url} alt="" className="w-20 h-20 object-cover rounded-lg border border-[#E3E8EF]" /></a>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
+                  );
+                })()}
               </div>
             </div>
           );

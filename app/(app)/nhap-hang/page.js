@@ -2,7 +2,8 @@
 import { useEffect, useState, useRef } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Field, Toast, Badge, VehicleSearch, LocSearch, Pager, pageSlice } from "@/components/ui";
-import { fmtTime, fmtDate, errMsg, parseCSV, downloadCSV } from "@/lib/format";
+import { InfoRows, MoneyRows } from "@/components/detail";
+import { fmtTime, fmtDate, errMsg, parseCSV, downloadCSV, fmtVND } from "@/lib/format";
 import Scanner from "@/components/Scanner";
 
 export default function NhapHang() {
@@ -140,9 +141,27 @@ export default function NhapHang() {
               <button className="btn-ghost !px-3 !py-1.5 !text-xs" onClick={exportDetail}>⬇ Xuất CSV phiếu</button>
               <button className="btn-ghost !px-3 !py-1.5 !text-xs" onClick={() => setDetail(null)}>✕</button>
             </div>
-            <div className="text-xs text-[#5A6572] mb-3">
-              {fmtTime(detail.txn.created_at)} · Người tạo: <b>{detail.txn.created_by_name}</b> · Kho: <b>{locName(detail.txn.to_location)}</b> · {detail.units.length} xe
-              {detail.txn.note && <div>Ghi chú: {detail.txn.note}</div>}
+            <div className="flex flex-col gap-3 mb-3">
+              <InfoRows rows={[
+                ["Thời gian nhập", fmtTime(detail.txn.created_at)],
+                ["Người tạo phiếu", detail.txn.created_by_name],
+                ["Kho nhập", locName(detail.txn.to_location)],
+                ["Ghi chú", detail.txn.note],
+              ]} />
+              {(() => {
+                const tongVon = detail.units.reduce((a, u) => a + (u.cost_price || 0), 0);
+                const coVon = detail.units.filter((u) => u.cost_price > 0).length;
+                return (
+                  <MoneyRows
+                    lines={[
+                      ["Số lượng xe", detail.units.length + " chiếc", "font-bold"],
+                      ...(coVon > 0 ? [["Đã khai giá vốn", `${coVon}/${detail.units.length} chiếc`,
+                        coVon === detail.units.length ? "font-bold text-[#0E7A4A]" : "font-bold text-[#A25F00]"]] : []),
+                    ]}
+                    total={{ label: "Tổng giá vốn lô hàng", value: fmtVND(tongVon), done: coVon === detail.units.length && tongVon > 0 }}
+                  />
+                );
+              })()}
             </div>
             <table className="w-full border-collapse">
               <thead><tr><th className="th">Số khung</th><th className="th">Xe</th><th className="th">Trạng thái hiện tại</th></tr></thead>

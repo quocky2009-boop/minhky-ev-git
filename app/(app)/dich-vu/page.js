@@ -16,6 +16,12 @@ const ST = {
   DA_GIAO: { label: "Đã giao", tone: "green" },
   HUY: { label: "Đã hủy", tone: "red" },
 };
+const LOG_LABEL = {
+  tiep_nhan: "Tiếp nhận xe", chan_doan: "Cập nhật chẩn đoán", bao_gia: "Lập / sửa báo giá",
+  khach_duyet: "Khách duyệt báo giá", xuat_vat_tu: "Xuất vật tư", nghiem_thu: "Nghiệm thu",
+  thu_tien: "Thu tiền", duyet_cong_no: "Duyệt công nợ", giao_xe: "Giao xe",
+  hoan_tat: "Nghiệm thu & giao xe", huy_phieu: "Hủy phiếu",
+};
 const LINE_TYPES = { CONG: "Tiền công", PHU_TUNG: "Phụ tùng", THUE_NGOAI: "Thuê ngoài", HANG_KHACH: "Hàng khách mang" };
 const iso = (d) => d.toLocaleDateString("sv-SE");
 
@@ -71,6 +77,7 @@ export default function DichVu() {
   const [lines, setLines] = useState([]);
   const [pays, setPays] = useState([]);
   const [tong, setTong] = useState(null);
+  const [logs, setLogs] = useState([]);
   const [discount, setDiscount] = useState(0);
   const [dType, setDType] = useState("amount");
   const [dPercent, setDPercent] = useState(0);
@@ -96,11 +103,14 @@ export default function DichVu() {
 
   const openDetail = async (t) => {
     setDetail(t); setDiscount(t.discount || 0); setPayF({ method: "Chuyển khoản", amount: "" }); setPayFotos([]); setSerialPick({});
-    const [{ data: l }, { data: p }, { data: v }] = await Promise.all([
+    const [{ data: l }, { data: p }, { data: v }, { data: lg }] = await Promise.all([
       supabase.from("dv_ticket_lines").select("*").eq("ticket_id", t.id).order("id"),
       supabase.from("dv_payments").select("*").eq("ticket_id", t.id).order("id"),
       supabase.from("v_dv_ticket_tong").select("*").eq("ticket_id", t.id).single(),
+      supabase.from("dv_audit_logs").select("*").eq("entity_type", "ticket").eq("entity_id", t.code)
+        .order("acted_at", { ascending: false }).limit(30),
     ]);
+    setLogs(lg || []);
     setLines(l || []); setPays(p || []); setTong(v || null);
     setDiscount(t.discount || 0); setDType(t.discount_type || "amount"); setDPercent(t.discount_percent || 0);
   };
@@ -215,18 +225,30 @@ export default function DichVu() {
           {editable && can("dv_huy_phieu") && <button className="btn-ghost !px-2.5 !py-1 !text-xs !text-danger" onClick={huyPhieu}>Hủy phiếu</button>}
         </div>
 
-        <div className="card text-[13px] grid grid-cols-2 gap-x-4 gap-y-1.5">
-          <div><span className="text-[#8A93A0]">Khách:</span> <b>{detail.customer_name}</b> · {detail.customer_phone}</div>
-          <div><span className="text-[#8A93A0]">Điểm:</span> <b>{locations.find((l) => l.code === detail.location_code)?.name || detail.location_code}</b></div>
-          <div className="col-span-2"><span className="text-[#8A93A0]">Xe:</span> <b>{detail.vehicle_desc || ("SK " + detail.frame_number)}</b>{detail.odo_km ? ` · ODO ${detail.odo_km}km` : ""}{detail.battery_pct != null ? ` · Pin ${detail.battery_pct}%` : ""}</div>
-          {detail.request_note && <div className="col-span-2"><span className="text-[#8A93A0]">Yêu cầu:</span> {detail.request_note}</div>}
-          {detail.assets_note && <div className="col-span-2"><span className="text-[#8A93A0]">Tài sản kèm:</span> {detail.assets_note}</div>}
-          <div className="col-span-2"><span className="text-[#8A93A0]">Chẩn đoán:</span> {detail.diagnose_note || <i className="text-[#8A93A0]">chưa có</i>}
-            {editable && can("dv_chan_doan") && <button className="btn-ghost !px-2 !py-0.5 !text-xs ml-2" onClick={chanDoan}>✎</button>}
-            {detail.ktv_name && <span className="text-[11px] text-[#8A93A0]"> · KTV: {detail.ktv_name}</span>}
-          </div>
+        <div className="card !p-0 overflow-hidden">
+          {[
+            ["Khách hàng", <span key="k"><b>{detail.customer_name}</b> · {detail.customer_phone}</span>],
+            ["Điểm dịch vụ", <b key="d">{locations.find((l) => l.code === detail.location_code)?.name || detail.location_code}</b>],
+            ["Xe", <span key="x"><b>{detail.vehicle_desc || "—"}</b>{detail.frame_number ? <span className="text-[11px] text-[#8A93A0] block font-mono">SK {detail.frame_number}</span> : null}</span>],
+            ...(detail.odo_km || detail.battery_pct != null
+              ? [["ODO / Pin", <span key="o">{detail.odo_km ? `${detail.odo_km} km` : "—"}{detail.battery_pct != null ? ` · ${detail.battery_pct}%` : ""}</span>]] : []),
+            ...(detail.request_note ? [["Yêu cầu của khách", detail.request_note]] : []),
+            ...(detail.assets_note ? [["Tài sản kèm theo", detail.assets_note]] : []),
+            ["Chẩn đoán", <span key="c">
+              {detail.diagnose_note || <i className="text-[#8A93A0] font-normal">chưa có</i>}
+              {editable && can("dv_chan_doan") && <button className="btn-ghost !px-2 !py-0.5 !text-xs ml-2" onClick={chanDoan}>✎</button>}
+            </span>],
+            ...(detail.ktv_name ? [["Kỹ thuật viên", detail.ktv_name]] : []),
+          ].map(([k, v], i) => (
+            <div key={i} className="flex items-start justify-between gap-3 px-3.5 py-2.5 border-b border-dashed border-[#E3E8EF] text-[13.5px]">
+              <span className="text-[#5A6572] shrink-0">{k}</span>
+              <span className="text-right font-semibold min-w-0 break-words">{v}</span>
+            </div>
+          ))}
           {(detail.photos || []).length > 0 && (
-            <div className="col-span-2 flex gap-1.5 flex-wrap">{detail.photos.map((ph, i) => <a key={i} href={ph.url} target="_blank" rel="noreferrer"><img src={ph.url} alt="" className="w-14 h-14 object-cover rounded-lg border border-[#E3E8EF]" /></a>)}</div>
+            <div className="flex gap-1.5 flex-wrap p-3">
+              {detail.photos.map((ph, i) => <a key={i} href={ph.url} target="_blank" rel="noreferrer"><img src={ph.url} alt="" className="w-14 h-14 object-cover rounded-lg border border-[#E3E8EF]" /></a>)}
+            </div>
           )}
         </div>
 
@@ -304,11 +326,20 @@ export default function DichVu() {
         <div className="card">
           <div className="font-extrabold mb-2">Thanh toán</div>
           {tong && (
-            <div className="flex gap-3 flex-wrap mb-2">
-              <KPI label="Tổng phiếu" value={fmtVND(tong.tong)} tone="dark" />
-              <KPI label="Đã thu" value={fmtVND(tong.da_thu)} tone="green" />
-              <KPI label="Công nợ duyệt" value={fmtVND(tong.debt_approved)} tone="blue" />
-              <KPI label="Còn lại" value={fmtVND(conLai)} tone={conLai > 0 ? "amber" : "green"} />
+            <div className="mb-3 rounded-xl border border-[#E3E8EF] overflow-hidden">
+              {[
+                ["Báo giá", fmtVND(tong.tong), "text-brand font-bold"],
+                ["Đã thu", fmtVND(tong.da_thu), "text-[#0E7A4A] font-bold"],
+                ...(tong.debt_approved > 0 ? [["Công nợ được duyệt", fmtVND(tong.debt_approved), "text-[#1D4FB8] font-bold"]] : []),
+              ].map(([k, v, cls], i) => (
+                <div key={i} className="flex items-center justify-between px-3 py-2 border-b border-dashed border-[#E3E8EF] text-[13.5px]">
+                  <span className="text-[#5A6572]">{k}</span><span className={cls}>{v}</span>
+                </div>
+              ))}
+              <div className={`flex items-center justify-between px-3 py-2.5 ${conLai > 0 ? "bg-[#FFF6E5]" : "bg-[#E7F6EE]"}`}>
+                <span className="font-bold text-[13.5px]">Còn thu khi trả xe</span>
+                <span className={`text-[17px] font-extrabold ${conLai > 0 ? "text-[#A25F00]" : "text-[#0E7A4A]"}`}>{fmtVND(conLai)}</span>
+              </div>
             </div>
           )}
           {pays.map((p) => (
@@ -337,6 +368,22 @@ export default function DichVu() {
               </button>
             )}
           </div>
+        </div>
+
+        <div className="card">
+          <div className="font-extrabold mb-2">Nhật ký phiếu ({logs.length})</div>
+          {logs.length === 0 ? <div className="text-sm text-[#8A93A0]">Chưa có thao tác nào.</div> : (
+            <div className="max-h-56 overflow-y-auto pr-1">
+              {logs.map((lg) => (
+                <div key={lg.id} className="flex items-start gap-2 py-1.5 border-b border-dashed border-[#EEF1F4] text-[12.5px]">
+                  <span className="text-[#8A93A0] whitespace-nowrap">{fmtTime(lg.acted_at)}</span>
+                  <span className="text-[#8A93A0]">·</span>
+                  <span className="text-[#5A6572] truncate">{lg.acted_by_name}</span>
+                  <span className="ml-auto font-semibold text-right whitespace-nowrap">{LOG_LABEL[lg.action] || lg.action}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     );

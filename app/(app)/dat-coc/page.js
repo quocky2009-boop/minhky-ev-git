@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Badge, Toast, KPI, Field, CustomerSearch, LocSearch, Pager, pageSlice, MoneyInput, FrameSearch } from "@/components/ui";
 import Link from "next/link";
+import { InfoRows, MoneyRows } from "@/components/detail";
 import { fmtVND, fmtDate, errMsg } from "@/lib/format";
 
 const iso = (d) => d.toLocaleDateString("sv-SE");
@@ -16,6 +17,7 @@ export default function DatCoc() {
   const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
   const [fSt, setFSt] = useState("DANG_GIU");
+  const [detail, setDetail] = useState(null);
   const [page, setPage] = useState(1);
   const [f, setF] = useState({ frame_number: "", customer_id: "", customer_name: "", customer_phone: "", amount: "", hold_until: iso(new Date(Date.now() + 3 * 86400000)), note: "" });
   const [newC, setNewC] = useState(null);
@@ -164,6 +166,7 @@ export default function DatCoc() {
                 {d.amount > 0 && <b className="text-[13px] whitespace-nowrap">{fmtVND(d.amount)}</b>}
                 {qh && <Badge tone="red">Quá hạn</Badge>}
                 <Badge tone={st.tone}>{st.label}</Badge>
+                <button className="btn-ghost !px-2 !py-1 !text-xs" onClick={() => setDetail(d)}>👁</button>
                 {d.status === "DANG_GIU" && (
                   <Link href={`/ban-hang?new=1&sk=${encodeURIComponent(d.frame_number)}&kh=${encodeURIComponent(d.customer_phone)}&coc=${d.amount}`}
                     className="btn-ok !px-2.5 !py-1 !text-xs whitespace-nowrap">→ Tạo đơn bán</Link>
@@ -176,6 +179,51 @@ export default function DatCoc() {
         </div>
         <Pager total={filtered.length} page={page} setPage={setPage} pageSize={15} setPageSize={() => {}} />
       </div>
+
+      {detail && (() => {
+        const st = ST[detail.status] || { label: detail.status, tone: "dark" };
+        const qh = detail.status === "DANG_GIU" && new Date(detail.hold_until) < new Date(iso(new Date()));
+        return (
+          <div className="fixed inset-0 z-[95] bg-black/50 flex items-center justify-center p-3" onClick={() => setDetail(null)}>
+            <div className="bg-white rounded-2xl w-[520px] max-w-full max-h-[88vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center gap-2 p-3.5 border-b border-[#EEF1F4]">
+                <span className="text-lg">🔒</span>
+                <div className="font-extrabold text-base text-brand mr-auto">{detail.code}</div>
+                <Badge tone={st.tone}>{st.label}</Badge>
+                <button className="btn-ghost !px-2.5 !py-1 !text-xs" onClick={() => setDetail(null)}>✕</button>
+              </div>
+
+              <div className="p-3.5 flex flex-col gap-3">
+                <InfoRows rows={[
+                  ["Khách hàng", <span key="k">{detail.customer_name}<span className="block text-[11px] text-[#8A93A0]">{detail.customer_phone}</span></span>],
+                  ["Xe giữ", <span key="x">{vName(detail.vehicle_id)}<span className="block text-[11px] text-[#8A93A0] font-mono">SK {detail.frame_number}</span></span>],
+                  ["Điểm", locName(detail.location_code)],
+                  ["Giữ đến ngày", <span key="h" className={qh ? "text-danger" : ""}>{fmtDate(detail.hold_until)}{qh && " · QUÁ HẠN"}</span>],
+                  ["Người nhận cọc", detail.created_by_name],
+                  ["Ghi chú", detail.note],
+                  ["Lý do hủy", detail.cancel_reason],
+                ]} />
+
+                <MoneyRows
+                  lines={[["Tiền cọc đã nhận", fmtVND(detail.amount), "font-bold text-[#0E7A4A]"]]}
+                  total={{ label: detail.status === "DA_BAN" ? "Đã chuyển thành đơn bán" : "Sẽ trừ vào tiền xe khi bán",
+                           value: fmtVND(detail.amount), done: detail.status === "DA_BAN" }}
+                />
+
+                <div className="flex gap-2 flex-wrap">
+                  {detail.status === "DANG_GIU" && (
+                    <>
+                      <Link href={`/ban-hang?new=1&sk=${encodeURIComponent(detail.frame_number)}&kh=${encodeURIComponent(detail.customer_phone)}&coc=${detail.amount}`}
+                        className="btn-ok !text-xs">→ Tạo đơn bán</Link>
+                      <button className="btn-ghost !text-xs !text-danger" onClick={() => { huyCoc(detail); setDetail(null); }}>Hủy giữ xe</button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

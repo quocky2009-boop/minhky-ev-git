@@ -5,6 +5,13 @@ import { Badge, Toast, KPI, Field, Pager, pageSlice } from "@/components/ui";
 import { errMsg } from "@/lib/format";
 import { uploadAnhDon } from "@/lib/img";
 import { TASK_STATUS, PRIORITY, hanLabel, sortTasks, fmtHan, toLocalInput } from "@/lib/task";
+import { InfoRows, AuditLog } from "@/components/detail";
+
+const TASK_LOG = {
+  create: "Tạo việc", start: "Bắt đầu thực hiện", check: "Tích checklist", uncheck: "Bỏ tích checklist",
+  submit: "Gửi kết quả", resubmit: "Gửi lại kết quả", submit_auto_complete: "Gửi & tự hoàn thành",
+  approve: "Xác nhận hoàn thành", revise: "Yêu cầu bổ sung", cancel: "Hủy việc", update: "Cập nhật việc",
+};
 
 export default function VievCuaToi() {
   const { supabase, profile, loading } = useCatalog();
@@ -18,6 +25,7 @@ export default function VievCuaToi() {
   const [cl, setCl] = useState([]);
   const [results, setResults] = useState([]);
   const [cmts, setCmts] = useState([]);
+  const [logs, setLogs] = useState([]);
   const [collabs, setCollabs] = useState([]);
   // gui ket qua
   const [rf, setRf] = useState({ result_text: "", result_link: "" });
@@ -39,13 +47,14 @@ export default function VievCuaToi() {
 
   const openTask = async (t) => {
     setD(t); setRf({ result_text: "", result_link: "" }); setFiles([]); setCmt("");
-    const [{ data: c }, { data: r }, { data: m }, { data: co }] = await Promise.all([
+    const [{ data: c }, { data: r }, { data: m }, { data: co }, { data: lg }] = await Promise.all([
       supabase.from("task_checklist_items").select("*").eq("task_id", t.id).order("sort_order"),
       supabase.from("task_results").select("*").eq("task_id", t.id).order("version_number", { ascending: false }),
       supabase.from("task_comments").select("*").eq("task_id", t.id).is("deleted_at", null).order("created_at"),
       supabase.from("task_collaborators").select("*").eq("task_id", t.id),
+      supabase.from("task_audit_logs").select("*").eq("task_id", t.id).order("acted_at", { ascending: false }).limit(30),
     ]);
-    setCl(c || []); setResults(r || []); setCmts(m || []); setCollabs(co || []);
+    setCl(c || []); setResults(r || []); setCmts(m || []); setCollabs(co || []); setLogs(lg || []);
   };
   const reload = async () => {
     const { data } = await supabase.from("v_task_list").select("*").eq("id", d.id).single();
@@ -234,6 +243,8 @@ export default function VievCuaToi() {
             </div>
           </div>
         )}
+
+        <AuditLog logs={logs} labels={TASK_LOG} title="Nhật ký việc" />
 
         <div className="card">
           <div className="font-extrabold mb-2">Trao đổi ({cmts.length})</div>
