@@ -400,7 +400,7 @@ export default function DichVu() {
   const dangMo = rows.filter((t) => !["DA_GIAO", "HUY"].includes(t.status)).length;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className={`flex flex-col gap-4 ${show ? "pb-24" : ""}`}>
       <Toast toast={toast} />
       <div className="flex items-center gap-2 flex-wrap">
         <div className="font-extrabold text-lg mr-auto">Phiếu dịch vụ ({rows.length})</div>
@@ -415,6 +415,7 @@ export default function DichVu() {
       </div>
 
       {show && (
+        <div className="flex flex-col gap-4">
         <div className="card !p-4 border-2 border-brand">
           <div className="font-extrabold mb-3">Tiếp nhận xe vào dịch vụ</div>
           <div className="grid gap-3 md:grid-cols-2">
@@ -454,9 +455,13 @@ export default function DichVu() {
             <Field label="Yêu cầu của khách"><input className="inp" value={f.request_note} onChange={(e) => setF((p) => ({ ...p, request_note: e.target.value }))} /></Field>
             <div className="md:col-span-2"><PhotoPick fotos={fotos} setFotos={setFotos} label={`Ảnh hiện trạng xe (không bắt buộc)${fotos.length ? ` — ${fotos.length} ảnh` : ""}`} /></div>
           </div>
-          <div className="mt-4 pt-3 border-t border-[#EEF1F4]">
+        </div>
+
+        <div className="card !p-4">
+          <div>
             <div className="flex items-center gap-2 mb-2">
-              <div className="font-bold text-sm mr-auto">Báo giá / hạng mục (có thể nhập luôn)</div>
+              <div className="font-extrabold mr-auto">Báo giá / hạng mục</div>
+              <span className="text-[11px] text-[#8A93A0]">{nLines.length} dòng</span>
               <button className="btn-ghost !text-xs" onClick={() => setNLines((p) => [...p, { line_type: "CONG", name: "", qty: 1, unit_price: 0, discount_percent: 0 }])}>+ Thêm dòng</button>
             </div>
             <div className="flex flex-col gap-1.5">
@@ -506,10 +511,47 @@ export default function DichVu() {
             )}
           </div>
 
-          <div className="flex gap-2 mt-4">
-            <button className="btn-ok" disabled={busy} onClick={taoPhieu}>{busy ? "Đang lưu…" : "Tạo phiếu tiếp nhận"}</button>
-            <button className="btn-ghost" onClick={() => setShow(false)}>Hủy</button>
+        </div>
+
+        <div className="card !p-4">
+          <div className="font-extrabold mb-2.5">Tổng kết phiếu</div>
+          {(() => {
+            const tamTinh = nLines.reduce((a, l) => a + Math.round((l.qty || 1) * (l.unit_price || 0) * (1 - (l.discount_percent || 0) / 100)), 0);
+            const ck = nDisc.type === "percent" ? Math.round(tamTinh * (nDisc.percent || 0) / 100) : Math.min(nDisc.amount || 0, tamTinh);
+            const tong = Math.max(0, tamTinh - ck);
+            return (
+              <div className="rounded-xl border border-[#E3E8EF] overflow-hidden">
+                <div className="flex items-center justify-between px-3 py-2 border-b border-dashed border-[#E3E8EF] text-[13.5px]">
+                  <span className="text-[#5A6572]">Số hạng mục</span><span className="font-bold">{nLines.filter((l) => l.name?.trim()).length}</span>
+                </div>
+                <div className="flex items-center justify-between px-3 py-2 border-b border-dashed border-[#E3E8EF] text-[13.5px]">
+                  <span className="text-[#5A6572]">Tạm tính</span><span className="font-bold">{fmtVND(tamTinh)}</span>
+                </div>
+                {ck > 0 && (
+                  <div className="flex items-center justify-between px-3 py-2 border-b border-dashed border-[#E3E8EF] text-[13.5px]">
+                    <span className="text-[#5A6572]">Giảm giá</span><span className="font-bold text-danger">−{fmtVND(ck)}</span>
+                  </div>
+                )}
+                <div className="flex items-center justify-between px-3 py-2.5 bg-[#EAF2FF]">
+                  <span className="font-bold text-[13.5px]">Khách phải trả</span>
+                  <span className="text-[18px] font-extrabold text-brand">{fmtVND(tong)}</span>
+                </div>
+              </div>
+            );
+          })()}
+          <p className="text-[11px] text-[#8A93A0] mt-2">Thu tiền và hoàn tất (nghiệm thu + giao xe) thực hiện ở màn chi tiết phiếu sau khi tiếp nhận.</p>
+        </div>
+
+        <div className="fixed bottom-0 left-0 right-0 lg:left-[248px] bg-white border-t border-[#E6EAEF] px-4 py-3 flex items-center gap-3 z-30">
+          <div className="text-[13px] hidden sm:block">
+            <span className="text-[#8A93A0]">Khách:</span> <b>{f.customer_name || "—"}</b>
+            {nLines.filter((l) => l.name?.trim()).length > 0 && <span className="text-[#5A6572] ml-2">· {nLines.filter((l) => l.name?.trim()).length} hạng mục</span>}
           </div>
+          <div className="ml-auto flex gap-2">
+            <button className="btn-ghost" onClick={() => setShow(false)}>Hủy</button>
+            <button className="btn-ok !px-6" disabled={busy} onClick={taoPhieu}>{busy ? "Đang lưu…" : "Tạo phiếu tiếp nhận"}</button>
+          </div>
+        </div>
         </div>
       )}
 

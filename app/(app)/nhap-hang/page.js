@@ -1,207 +1,290 @@
 "use client";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Field, Toast, Badge, VehicleSearch, LocSearch, Pager, pageSlice } from "@/components/ui";
-import { InfoRows, MoneyRows } from "@/components/detail";
-import { fmtTime, fmtDate, errMsg, parseCSV, downloadCSV, fmtVND } from "@/lib/format";
+import { Field, Badge, Toast, LocSearch, VehicleSearch, MoneyInput } from "@/components/ui";
+import { fmtVND, fmtTime, errMsg, downloadCSV } from "@/lib/format";
 import Scanner from "@/components/Scanner";
+import Link from "next/link";
+
+const iso = (d) => d.toLocaleDateString("sv-SE");
+const emptyLine = { vehicle_id: "", frames: [], cost_price: 0, note: "" };
 
 export default function NhapHang() {
-  const { supabase, vehicles, locations, loading, refresh, settings } = useCatalog();
+  const { supabase, vehicles, locations, settings, profile, loading, refresh } = useCatalog();
   const { toast, notify } = useToast();
+
   const [txns, setTxns] = useState([]);
-  const empty = { vehicle_id: "", loc: "", frames: "", supplier: "", doc: "", note: "" };
-  const [f, setF] = useState(empty);
   const [busy, setBusy] = useState(false);
-  const [showScanner, setShowScanner] = useState(false);
-  const [detail, setDetail] = useState(null);       // {doc, txn, units}
-  const [importLoc, setImportLoc] = useState("");
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
-  const fileRef = useRef(null);
-  const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
+  const [ketQua, setKetQua] = useState(null);
+  const [detail, setDetail] = useState(null);
 
-  // Xem chi tiet phieu nhap: cac so khung thuoc phieu
-  const openDetail = async (t) => {
-    const { data } = await supabase.from("vehicle_units").select("*").eq("import_doc", t.doc_code).order("vehicle_id");
-    setDetail({ doc: t.doc_code, txn: t, units: data || [] });
+  // Thông tin phiếu
+  const [meta, setMeta] = useState({ location_code: "", supplier: "", doc: "", note: "", ngay: iso(new Date()) });
+  // Dòng hàng
+  const [lines, setLines] = useState([{ ...emptyLine }]);
+  // Quét
+  const [scanIdx, setScanIdx] = useState(null);
+
+  const load = async () => {
+    const { data } = await supabase.from("inventory_txns").select("*")
+      .eq("txn_type", "Nhập hàng").order("created_at", { ascending: false }).limit(200);
+    setTxns(data || []);
   };
+  useEffect(() => { if (!loading) load(); }, [loading]);
 
-  const exportDetail = () => {
-    if (!detail) return;
-    downloadCSV(`phieu_nhap_${detail.doc}.csv`, [
-      ["PHIẾU NHẬP HÀNG:", detail.doc],
-      ["Thời gian:", fmtTime(detail.txn.created_at)],
-      ["Người tạo:", detail.txn.created_by_name],
-      ["Ghi chú:", detail.txn.note || ""],
-      [],
-      ["STT", "Số khung", "Mã xe", "Tên xe", "Màu", "Số máy", "Trạng thái hiện tại", "Đang ở kho"],
-      ...detail.units.map((u, i) => {
-        const v = vehicles.find((x) => x.id === u.vehicle_id);
-        return [i + 1, u.frame_number, u.vehicle_id, v?.name || "", v?.color || "", u.engine_number || "",
-          u.status === "TON_KHO" ? "Tồn kho" : u.status === "DA_BAN" ? "Đã bán" : u.status === "DANG_CHUYEN" ? "Đang chuyển" : u.status,
-          locName(u.location_code)];
-      }),
-    ]);
-    notify(`Đã xuất chi tiết phiếu ${detail.doc}.`);
-  };
+  if (loading || !profile) return <div className="card">Đang tải dữ liệu…</div>;
+  const canNhap = ["CEO", "ADMIN"].includes(profile.role);
 
-  // Import CSV nhap hang loat: vehicle_id + frame_number (+ engine_number, note)
-  const importCSV = async (file) => {
-    if (!importLoc) return notify("Chọn kho nhập trước khi import.", "err");
-    const rows = parseCSV(await file.text());
-    if (rows.length < 2) return notify("File trống hoặc sai định dạng.", "err");
-    const header = rows[0].map((h) => h.trim().toLowerCase());
-    const idx = (k) => header.indexOf(k);
-    if (idx("vehicle_id") < 0 || idx("frame_number") < 0)
-      return notify("File cần tối thiểu 2 cột: vehicle_id (mã nội bộ, xem ở Danh mục xe), frame_number. Thêm được: engine_number, note.", "err");
-    const items = rows.slice(1).map((r) => ({
-      vehicle_id: r[idx("vehicle_id")]?.trim(),
-      frame_number: r[idx("frame_number")]?.trim(),
-      engine_number: idx("engine_number") >= 0 ? r[idx("engine_number")]?.trim() : "",
-      note: idx("note") >= 0 ? r[idx("note")]?.trim() : "",
+  const vName = (id) => { const v = vehicles.find((x) => x.id === id); return v ? `${v.brand} ${v.name} ${v.color}` : id; };
+  const locName = (c) => locations.find((l) => l.code === c)?.name || c;
+  const sups = (settings?.suppliers || "VinFast\nTAILG").split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean);
+
+  const setLine = (i, k, v) => setLines((p) => p.map((x, j) => j === i ? { ...x, [k]: v } : x));
+
+  const themSK = (i, raw) => {
+    const list = String(raw || "").split(/[\s,;\n]+/).map((x) => x.trim().toUpperCase()).filter(Boolean);
+    if (list.length === 0) return;
+    setLines((p) => p.map((x, j) => {
+      if (j !== i) return x;
+      const moi = list.filter((sk) => !x.frames.includes(sk));
+      const trung = list.filter((sk) => x.frames.includes(sk));
+      if (trung.length) notify(`Bỏ qua ${trung.length} số khung đã có trong dòng.`, "err");
+      return { ...x, frames: [...x.frames, ...moi] };
     }));
-    const { data, error } = await supabase.rpc("fn_import_units", { p_loc: importLoc, p_rows: items });
+  };
+
+  const tongXe = lines.reduce((s, l) => s + l.frames.length, 0);
+  const tongVon = lines.reduce((s, l) => s + l.frames.length * (Number(l.cost_price) || 0), 0);
+  const soMa = lines.filter((l) => l.vehicle_id && l.frames.length > 0).length;
+
+  const luuPhieu = async () => {
+    if (!meta.location_code) return notify("Chọn kho nhập.", "err");
+    const ok = lines.filter((l) => l.vehicle_id && l.frames.length > 0);
+    if (ok.length === 0) return notify("Chưa có dòng hàng hợp lệ (cần chọn mã xe và nhập số khung).", "err");
+    setBusy(true);
+    const { data, error } = await supabase.rpc("fn_nhap_hang_v2", { p: {
+      location_code: meta.location_code, supplier: meta.supplier, doc: meta.doc, note: meta.note,
+      lines: ok.map((l) => ({ vehicle_id: l.vehicle_id, frames: l.frames, cost_price: Number(l.cost_price) || 0, note: l.note })),
+    } });
+    setBusy(false);
     if (error) return notify(errMsg(error), "err");
-    const sk = data?.skipped || [];
-    notify(`Đã nhập ${data?.inserted || 0} xe vào ${locName(importLoc)} (phiếu ${data?.doc}).` +
-      (sk.length ? ` Bỏ qua ${sk.length} dòng: ${sk.slice(0, 3).map((x) => `${x.frame} (${x.ly_do})`).join("; ")}${sk.length > 3 ? "…" : ""}` : ""),
-      sk.length ? "err" : "ok");
+    setKetQua(data);
+    notify(`Đã nhập ${data.so_xe} xe vào kho.`);
     refresh(); load();
   };
 
-  const load = async () => {
-    const { data } = await supabase.from("inventory_txns").select("*").eq("txn_type", "Nhập hàng").order("created_at", { ascending: false }).limit(1000);
-    setTxns(data || []);
-  };
-  useEffect(() => { load(); }, []);
-
-  const frameList = f.frames.split(/[\n,;]+/).map((x) => x.trim().toUpperCase()).filter(Boolean);
-  const dup = frameList.filter((x, i) => frameList.indexOf(x) !== i);
-
-  const submit = async () => {
-    setBusy(true);
-    const { data, error } = await supabase.rpc("fn_nhap_hang", { p_vehicle: f.vehicle_id, p_loc: f.loc, p_frames: frameList, p_supplier: f.supplier, p_doc: f.doc, p_note: f.note });
-    setBusy(false);
-    if (error) return notify(errMsg(error), "err");
-    notify(`Đã nhập ${frameList.length} xe (phiếu ${data}). Tồn đã cộng tự động.`);
-    setF(empty); refresh(); load();
+  const lamMoi = () => {
+    setKetQua(null); setLines([{ ...emptyLine }]);
+    setMeta((p) => ({ ...p, supplier: "", doc: "", note: "" }));
   };
 
-  if (loading) return <div className="card">Đang tải dữ liệu…</div>;
-  const locName = (c) => locations.find((l) => l.code === c)?.name || c || "—";
+  const openDetail = async (t) => {
+    const { data: u } = await supabase.from("vehicle_units").select("*").eq("import_doc", t.doc_code).limit(200);
+    setDetail({ doc: t.doc_code, txn: t, units: u || [] });
+  };
+
+  // ===== ĐÃ LƯU =====
+  if (ketQua) {
+    return (
+      <div className="flex flex-col gap-4">
+        <Toast toast={toast} />
+        <div className="card text-center py-8">
+          <div className="text-5xl mb-2">📦</div>
+          <div className="font-extrabold text-xl mb-1">Đã nhập {ketQua.so_xe} xe vào kho</div>
+          <div className="text-[13px] text-[#5A6572]">Phiếu <b>{ketQua.doc}</b> · {ketQua.so_ma} mã xe · kho {locName(meta.location_code)}</div>
+          {ketQua.tong_von > 0 && <div className="text-[13px] text-[#5A6572] mt-0.5">Tổng giá vốn: <b>{fmtVND(ketQua.tong_von)}</b></div>}
+          <div className="flex gap-2 justify-center flex-wrap mt-4">
+            <button className="btn-ok" onClick={lamMoi}>+ Nhập phiếu khác</button>
+            <Link href="/danh-muc-xe?tab=sokhung" className="btn-ghost">Xem xe theo số khung</Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 pb-24">
       <Toast toast={toast} />
-      {showScanner && <Scanner onClose={() => setShowScanner(false)}
-        onAdd={(list) => set("frames", [...new Set([...f.frames.split(/[\n,;]+/).map(x=>x.trim()).filter(Boolean), ...list])].join("\n"))} />}
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="font-extrabold text-lg mr-auto">Nhập hàng</div>
+        {!canNhap && <Badge tone="amber">Chỉ Admin/BGĐ được nhập hàng</Badge>}
+      </div>
+
+      {canNhap && (
+        <>
+          {/* HÀNG 1: NCC | THÔNG TIN PHIẾU */}
+          <div className="grid gap-4 lg:grid-cols-3">
+            <div className="card lg:col-span-2">
+              <div className="font-extrabold mb-2.5">Thông tin nhà cung cấp</div>
+              <div className="grid gap-2.5 md:grid-cols-2">
+                <Field label="Nhà cung cấp">
+                  <select className="inp" value={meta.supplier} onChange={(e) => setMeta((p) => ({ ...p, supplier: e.target.value }))}>
+                    <option value="">— Chọn NCC —</option>
+                    {sups.map((x) => <option key={x}>{x}</option>)}
+                  </select>
+                </Field>
+                <Field label="Số chứng từ NCC (nếu có)">
+                  <input className="inp" value={meta.doc} onChange={(e) => setMeta((p) => ({ ...p, doc: e.target.value.toUpperCase() }))} placeholder="Bỏ trống = tự sinh mã PN-…" />
+                </Field>
+                <div className="md:col-span-2">
+                  <Field label="Ghi chú phiếu nhập">
+                    <input className="inp" value={meta.note} onChange={(e) => setMeta((p) => ({ ...p, note: e.target.value }))} placeholder="VD: lô hàng tháng 7, xe giao đợt 2" />
+                  </Field>
+                </div>
+              </div>
+            </div>
+
+            <div className="card">
+              <div className="font-extrabold mb-2.5">Thông tin bổ sung</div>
+              <div className="flex flex-col gap-2.5">
+                <Field label="Nhập vào kho" required>
+                  <LocSearch locations={locations} value={meta.location_code} onChange={(v) => setMeta((p) => ({ ...p, location_code: v }))} placeholder="Chọn kho / cửa hàng" />
+                </Field>
+                <Field label="Người nhập"><input className="inp bg-[#F8FAFC]" value={profile.name} disabled /></Field>
+                <Field label="Ngày nhập"><input type="date" className="inp" value={meta.ngay} onChange={(e) => setMeta((p) => ({ ...p, ngay: e.target.value }))} /></Field>
+              </div>
+            </div>
+          </div>
+
+          {/* HÀNG 2: BẢNG HÀNG HÓA */}
+          <div className="card">
+            <div className="flex items-center gap-2 mb-2.5 flex-wrap">
+              <div className="font-extrabold mr-auto">Thông tin hàng hóa</div>
+              <span className="text-[11px] text-[#8A93A0]">{soMa} mã · {tongXe} xe</span>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              {lines.map((l, i) => (
+                <div key={i} className="rounded-xl border border-[#E3E8EF] p-3">
+                  <div className="grid gap-2.5 md:grid-cols-4 mb-2.5">
+                    <div className="md:col-span-2">
+                      <label className="lbl">Mã xe {i + 1}</label>
+                      <VehicleSearch vehicles={vehicles} value={l.vehicle_id} onChange={(id) => setLine(i, "vehicle_id", id || "")} />
+                    </div>
+                    <div>
+                      <label className="lbl">💰 Giá vốn / xe</label>
+                      <MoneyInput value={l.cost_price} onChange={(v) => setLine(i, "cost_price", v)} placeholder="Giá nhập thực tế" />
+                    </div>
+                    <div className="flex items-end gap-2">
+                      <div className="flex-1">
+                        <label className="lbl">Số lượng</label>
+                        <div className="inp bg-[#F8FAFC] flex items-center font-bold">{l.frames.length} xe</div>
+                      </div>
+                      {lines.length > 1 && (
+                        <button className="btn-ghost !px-2.5 !py-2 !text-danger" onClick={() => setLines((p) => p.filter((_, j) => j !== i))}>✕</button>
+                      )}
+                    </div>
+                  </div>
+
+                  <label className="lbl">Số khung (dán nhiều dòng, cách nhau bằng dấu phẩy hoặc xuống dòng)</label>
+                  <div className="flex gap-1.5 mb-2">
+                    <input className="inp font-mono !text-[13px]" placeholder="Nhập/dán số khung rồi Enter…"
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); themSK(i, e.target.value); e.target.value = ""; } }}
+                      onBlur={(e) => { if (e.target.value.trim()) { themSK(i, e.target.value); e.target.value = ""; } }} />
+                    <button className="btn-ghost !px-3 whitespace-nowrap" onClick={() => setScanIdx(i)}>📷 Quét</button>
+                  </div>
+
+                  {l.frames.length > 0 && (
+                    <div className="flex gap-1.5 flex-wrap">
+                      {l.frames.map((sk, k) => (
+                        <span key={sk} className="inline-flex items-center gap-1.5 bg-[#F3F5F8] rounded-lg px-2 py-1 text-[11.5px] font-mono">
+                          {sk}
+                          <button className="text-danger font-bold" onClick={() => setLine(i, "frames", l.frames.filter((_, j) => j !== k))}>✕</button>
+                        </span>
+                      ))}
+                      <button className="text-[11px] text-danger underline" onClick={() => setLine(i, "frames", [])}>Xóa hết</button>
+                    </div>
+                  )}
+
+                  {l.vehicle_id && l.frames.length > 0 && (Number(l.cost_price) || 0) > 0 && (
+                    <div className="text-[12px] text-[#5A6572] mt-2 text-right">
+                      {l.frames.length} × {fmtVND(l.cost_price)} = <b className="text-brand">{fmtVND(l.frames.length * Number(l.cost_price))}</b>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <button className="btn-ghost !text-xs mt-2.5" onClick={() => setLines((p) => [...p, { ...emptyLine }])}>⊕ Thêm mã xe khác</button>
+          </div>
+
+          {/* HÀNG 3: TỔNG KẾT */}
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="card">
+              <div className="font-extrabold mb-2.5">Kiểm tra trước khi lưu</div>
+              <div className="flex flex-col gap-1.5 text-[13px]">
+                {lines.filter((l) => l.vehicle_id && l.frames.length > 0).map((l, i) => (
+                  <div key={i} className="flex justify-between gap-2 py-1 border-b border-dashed border-[#EEF1F4]">
+                    <span className="min-w-0"><b>{vName(l.vehicle_id)}</b><span className="block text-[11px] text-[#8A93A0]">{l.frames.length} số khung</span></span>
+                    <span className="text-right whitespace-nowrap">{fmtVND(l.frames.length * (Number(l.cost_price) || 0))}</span>
+                  </div>
+                ))}
+                {soMa === 0 && <div className="text-[#8A93A0]">Chưa có dòng hàng nào hợp lệ.</div>}
+              </div>
+            </div>
+
+            <div className="card">
+              <div className="font-extrabold mb-2.5">Tổng kết phiếu</div>
+              <div className="rounded-xl border border-[#E3E8EF] overflow-hidden">
+                <div className="flex items-center justify-between px-3 py-2 border-b border-dashed border-[#E3E8EF] text-[13.5px]">
+                  <span className="text-[#5A6572]">Số mã xe</span><span className="font-bold">{soMa}</span>
+                </div>
+                <div className="flex items-center justify-between px-3 py-2 border-b border-dashed border-[#E3E8EF] text-[13.5px]">
+                  <span className="text-[#5A6572]">Tổng số xe</span><span className="font-bold">{tongXe} chiếc</span>
+                </div>
+                <div className="flex items-center justify-between px-3 py-2 border-b border-dashed border-[#E3E8EF] text-[13.5px]">
+                  <span className="text-[#5A6572]">Kho nhập</span><span className="font-bold">{meta.location_code ? locName(meta.location_code) : "—"}</span>
+                </div>
+                <div className={`flex items-center justify-between px-3 py-2.5 ${tongVon > 0 ? "bg-[#EAF2FF]" : "bg-[#FFF6E5]"}`}>
+                  <span className="font-bold text-[13.5px]">Tổng giá vốn lô hàng</span>
+                  <span className={`text-[18px] font-extrabold ${tongVon > 0 ? "text-brand" : "text-[#A25F00]"}`}>{fmtVND(tongVon)}</span>
+                </div>
+              </div>
+              {tongVon === 0 && tongXe > 0 && (
+                <div className="text-[11.5px] text-[#A25F00] mt-2">⚠ Chưa khai giá vốn — báo cáo lãi gộp sẽ thiếu số liệu.</div>
+              )}
+            </div>
+          </div>
+
+          {/* THANH DÍNH ĐÁY */}
+          <div className="fixed bottom-0 left-0 right-0 lg:left-[248px] bg-white border-t border-[#E6EAEF] px-4 py-3 flex items-center gap-3 z-30">
+            <div className="text-[13px] hidden sm:block">
+              <span className="text-[#8A93A0]">Tổng:</span> <b className="text-brand text-[15px]">{tongXe} xe</b>
+              {tongVon > 0 && <span className="text-[#5A6572] ml-2">· {fmtVND(tongVon)}</span>}
+            </div>
+            <div className="ml-auto flex gap-2">
+              <button className="btn-ghost" onClick={lamMoi}>Xóa hết</button>
+              <button className="btn-ok !px-6" disabled={busy || tongXe === 0} onClick={luuPhieu}>
+                {busy ? "Đang lưu…" : `Nhập kho${tongXe > 0 ? ` (${tongXe} xe)` : ""}`}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* LỊCH SỬ NHẬP */}
       <div className="card">
-        <div className="font-extrabold text-base">Phiếu nhập hàng — theo số khung</div>
-        <p className="text-xs text-[#5A6572] mb-4">Mỗi xe 1 số khung, mỗi dòng 1 số. Có thể copy nguyên cột số khung từ file Excel của hãng rồi dán vào — số lượng tự đếm.</p>
-        <div className="grid gap-x-4 md:grid-cols-2">
-          <div>
-            <Field label="Xe (gõ để tìm trong danh mục)" required><VehicleSearch vehicles={vehicles} value={f.vehicle_id} onChange={(v) => set("vehicle_id", v)} /></Field>
-            <Field label="Kho / cửa hàng nhập" required><LocSearch locations={locations} value={f.loc} onChange={(v) => set("loc", v)} /></Field>
-            <Field label="Nhà cung cấp" hint='Thêm/bớt nhà cung cấp trong menu Cài đặt.'>
-              <select className="inp" value={f.supplier} onChange={(e) => set("supplier", e.target.value)}>
-                <option value="">— Chọn nhà cung cấp —</option>
-                {(settings.suppliers || "VinFast\nTAILG").split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean).map((x) => <option key={x}>{x}</option>)}
-              </select>
-            </Field>
-            <Field label="Số phiếu nhập"><input className="inp" value={f.doc} onChange={(e) => set("doc", e.target.value)} placeholder="Để trống sẽ tự sinh mã" /></Field>
-            <Field label="Ghi chú"><input className="inp" value={f.note} onChange={(e) => set("note", e.target.value)} /></Field>
-          </div>
-          <div>
-            <Field label={`Danh sách số khung — đã nhận diện ${frameList.length} xe`} required
-              hint={dup.length ? `⚠ Có số khung lặp: ${[...new Set(dup)].join(", ")}` : "Mỗi dòng 1 số khung (hoặc cách nhau bằng dấu phẩy)."}>
-              <textarea className="inp !h-[180px] font-mono text-[13px]" value={f.frames} onChange={(e) => set("frames", e.target.value)}
-                placeholder={"RLGB1234567890001\nRLGB1234567890002\nRLGB1234567890003"} />
-            </Field>
-            <button className="btn-primary w-full !py-3" onClick={() => setShowScanner(true)}>📷 Quét camera / chụp OCR</button>
-          </div>
-        </div>
-        <button className="btn-ok" disabled={busy || frameList.length === 0 || dup.length > 0} onClick={submit}>
-          {busy ? "Đang lưu…" : `Lưu phiếu & cộng ${frameList.length} xe vào tồn`}
-        </button>
-        <div className="mt-4 pt-3 border-t border-dashed border-[#E6EAEF] flex gap-2 items-center flex-wrap">
-          <span className="text-xs font-bold">Nhập hàng loạt từ file:</span>
-          <div className="!w-56"><LocSearch locations={locations} value={importLoc} onChange={setImportLoc} placeholder="Gõ để tìm kho nhập…" /></div>
-          <button className="btn-ghost !py-1.5 !text-xs" onClick={() => fileRef.current?.click()}>⬆ Import CSV</button>
-          <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={(e) => { if (e.target.files[0]) importCSV(e.target.files[0]); e.target.value = ""; }} />
-          <span className="text-[11px] text-[#8A93A0]">Cột bắt buộc: vehicle_id (mã nội bộ), frame_number. Thêm được: engine_number, note. Excel: Save As → CSV UTF-8.</span>
+        <div className="font-extrabold mb-2.5">Lịch sử nhập hàng ({txns.length})</div>
+        <div className="flex flex-col gap-1.5">
+          {txns.slice(0, 30).map((t) => (
+            <div key={t.id} className="flex items-center gap-2 p-2.5 rounded-xl border border-[#E3E8EF] text-[13px]">
+              <div className="mr-auto min-w-0">
+                <div className="font-semibold">{t.doc_code} · {vName(t.vehicle_id)}</div>
+                <div className="text-[11px] text-[#8A93A0] truncate">{fmtTime(t.created_at)} · {locName(t.to_location)} · {t.created_by_name}{t.note ? " · " + t.note : ""}</div>
+              </div>
+              <b className="text-[#0E7A4A] whitespace-nowrap">+{t.quantity}</b>
+            </div>
+          ))}
+          {txns.length === 0 && <div className="text-sm text-[#8A93A0]">Chưa có phiếu nhập nào.</div>}
         </div>
       </div>
 
-      {detail && (
-        <div className="fixed inset-0 z-[90] bg-black/50 flex items-center justify-center p-3" onClick={() => setDetail(null)}>
-          <div className="bg-white rounded-2xl w-[620px] max-w-full max-h-[88vh] overflow-y-auto p-4" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center gap-2 mb-1">
-              <div className="font-extrabold text-base mr-auto">Phiếu nhập {detail.doc}</div>
-              <button className="btn-ghost !px-3 !py-1.5 !text-xs" onClick={exportDetail}>⬇ Xuất CSV phiếu</button>
-              <button className="btn-ghost !px-3 !py-1.5 !text-xs" onClick={() => setDetail(null)}>✕</button>
-            </div>
-            <div className="flex flex-col gap-3 mb-3">
-              <InfoRows rows={[
-                ["Thời gian nhập", fmtTime(detail.txn.created_at)],
-                ["Người tạo phiếu", detail.txn.created_by_name],
-                ["Kho nhập", locName(detail.txn.to_location)],
-                ["Ghi chú", detail.txn.note],
-              ]} />
-              {(() => {
-                const tongVon = detail.units.reduce((a, u) => a + (u.cost_price || 0), 0);
-                const coVon = detail.units.filter((u) => u.cost_price > 0).length;
-                return (
-                  <MoneyRows
-                    lines={[
-                      ["Số lượng xe", detail.units.length + " chiếc", "font-bold"],
-                      ...(coVon > 0 ? [["Đã khai giá vốn", `${coVon}/${detail.units.length} chiếc`,
-                        coVon === detail.units.length ? "font-bold text-[#0E7A4A]" : "font-bold text-[#A25F00]"]] : []),
-                    ]}
-                    total={{ label: "Tổng giá vốn lô hàng", value: fmtVND(tongVon), done: coVon === detail.units.length && tongVon > 0 }}
-                  />
-                );
-              })()}
-            </div>
-            <table className="w-full border-collapse">
-              <thead><tr><th className="th">Số khung</th><th className="th">Xe</th><th className="th">Trạng thái hiện tại</th></tr></thead>
-              <tbody>{detail.units.map((u) => {
-                const v = vehicles.find((x) => x.id === u.vehicle_id);
-                return (
-                  <tr key={u.frame_number}>
-                    <td className="td font-mono text-[12px] font-bold">{u.frame_number}</td>
-                    <td className="td">{v ? `${v.name} ${v.color}` : u.vehicle_id}</td>
-                    <td className="td">{u.status === "TON_KHO" ? <Badge tone="green">Tồn · {locName(u.location_code)}</Badge>
-                      : u.status === "DA_BAN" ? <Badge tone="blue">Đã bán {u.sale_code && `· ${u.sale_code}`}</Badge>
-                      : u.status === "DANG_CHUYEN" ? <Badge tone="purple">Đang chuyển</Badge>
-                      : <Badge tone="gray">{u.status}</Badge>}</td>
-                  </tr>
-                );
-              })}
-              {detail.units.length === 0 && <tr><td className="td" colSpan={3}>Phiếu này không có dữ liệu số khung chi tiết (có thể là phiếu từ bản cũ).</td></tr>}
-              </tbody>
-            </table>
-          </div>
-        </div>
+      {scanIdx !== null && (
+        <Scanner
+          onAdd={(code) => { themSK(scanIdx, code); }}
+          onClose={() => setScanIdx(null)}
+        />
       )}
-      <div className="card">
-        <div className="font-extrabold mb-2.5">Lịch sử nhập gần đây</div>
-        <div className="overflow-x-auto"><table className="w-full border-collapse">
-          <thead><tr><th className="th">Thời gian</th><th className="th">Phiếu</th><th className="th">Xe</th><th className="th">Kho nhập</th><th className="th">SL</th><th className="th">Tồn sau</th><th className="th">Người nhập</th><th className="th"></th></tr></thead>
-          <tbody>{pageSlice(txns, page, pageSize).map((t) => {
-            const v = vehicles.find((x) => x.id === t.vehicle_id);
-            return <tr key={t.id}>
-              <td className="td">{fmtTime(t.created_at)}</td><td className="td font-bold">{t.doc_code}</td>
-              <td className="td">{v ? `${v.name} ${v.color}` : t.vehicle_id}</td>
-              <td className="td">{locName(t.to_location)}</td>
-              <td className="td font-bold text-[#0E7A4A]">+{t.qty}</td>
-              <td className="td">{t.stock_after}</td><td className="td">{t.created_by_name}</td>
-              <td className="td"><button className="btn-ghost !px-2.5 !py-1 !text-xs" onClick={() => openDetail(t)}>Chi tiết</button></td>
-            </tr>;
-          })}</tbody>
-        </table></div>
-        <Pager total={txns.length} page={page} setPage={setPage} pageSize={pageSize} setPageSize={setPageSize} />
-      </div>
     </div>
   );
 }
