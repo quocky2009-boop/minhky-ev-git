@@ -95,7 +95,7 @@ export default function GiaoViec() {
   const toggle = (arr, setArr, id) => setArr(arr.includes(id) ? arr.filter((x) => x !== id) : [...arr, id]);
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 pb-24">
       <Toast toast={toast} />
       <div className="flex items-center gap-2 flex-wrap">
         <div className="font-extrabold text-lg mr-auto">Giao việc</div>
@@ -110,16 +110,8 @@ export default function GiaoViec() {
         </div>
       )}
 
-      <div className="card">
-        <Field label="Dùng mẫu có sẵn (không bắt buộc)">
-          <select className="inp" value={tplId} onChange={(e) => dungMau(e.target.value)}>
-            <option value="">— Tạo mới từ đầu —</option>
-            {tpls.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
-        </Field>
-      </div>
-
-      <div className="card">
+      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="card lg:col-span-2">
         <div className="font-extrabold mb-3">Nội dung công việc</div>
         <div className="grid gap-3 md:grid-cols-2">
           <div className="md:col-span-2"><Field label="Tên công việc" required><input className="inp" value={f.title} onChange={(e) => setF((p) => ({ ...p, title: e.target.value }))} /></Field></div>
@@ -140,6 +132,19 @@ export default function GiaoViec() {
             </div>
           </Field>
           <Field label="Hạn hoàn thành" required><input type="datetime-local" className="inp" value={f.due_at} onChange={(e) => setF((p) => ({ ...p, due_at: e.target.value }))} /></Field>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="font-extrabold mb-3">Thông tin bổ sung</div>
+        <div className="flex flex-col gap-3">
+          <Field label="Dùng mẫu có sẵn">
+            <select className="inp" value={tplId} onChange={(e) => dungMau(e.target.value)}>
+              <option value="">— Tạo mới từ đầu —</option>
+              {tpls.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </Field>
+          <Field label="Người giao"><input className="inp bg-[#F8FAFC]" value={profile.name} disabled /></Field>
           <Field label="Người xác nhận kết quả">
             <select className="inp" value={f.reviewer_id} onChange={(e) => setF((p) => ({ ...p, reviewer_id: e.target.value }))}>
               <option value="">— Mặc định: người có quyền duyệt —</option>
@@ -147,6 +152,7 @@ export default function GiaoViec() {
             </select>
           </Field>
         </div>
+      </div>
       </div>
 
       <div className="card">

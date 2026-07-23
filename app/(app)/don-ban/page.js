@@ -130,9 +130,18 @@ export default function DonBan() {
     const paid = Number(payEdit.paid) || 0;
     if (paid < 0) return notify("Số tiền không hợp lệ.", "err");
     setBusy(true);
+    const themTien = paid - (detail.paid_amount || 0);
+    const ghiChu = [payEdit.method, payEdit.note].filter(Boolean).join(" · ");
     const { error } = await supabase.rpc("fn_cap_nhat_da_tra", {
-      p_id: detail.id, p_paid: paid, p_note: payEdit.note || "",
+      p_id: detail.id, p_paid: paid, p_note: ghiChu,
     });
+    if (!error && themTien > 0) {
+      // Ghi phieu thu theo dung phuong thuc da chon
+      await supabase.from("sale_payments").insert({
+        sale_code: detail.code, method: payEdit.method, amount: themTien,
+        note: payEdit.note || "", created_by_name: profile.name,
+      });
+    }
     setBusy(false);
     if (error) return notify(errMsg(error), "err");
     notify("Đã cập nhật thanh toán — phần thu thêm tự vào sổ quỹ.");
@@ -222,7 +231,7 @@ export default function DonBan() {
                       <button className="btn-ghost !px-2 !py-1 !text-xs" title="Chi tiết đơn" onClick={() => openDetail(o)}>👁</button>
                       {canSuaTT && total(o) - (o.paid_amount || 0) > 0 && (
                         <button className="btn-ok !px-2 !py-1 !text-xs" title={`Còn thiếu ${fmtVND(total(o) - (o.paid_amount || 0))} — bấm để thu`}
-                          onClick={async () => { await openDetail(o); setPayEdit({ paid: o.paid_amount || 0, note: "" }); }}>💵</button>
+                          onClick={async () => { await openDetail(o); setPayEdit({ paid: o.paid_amount || 0, note: "", method: "Tiền mặt" }); }}>💵</button>
                       )}
                       <button className="btn-ghost !px-2 !py-1 !text-xs" title="In phiếu xuất" onClick={() => printOrder({ supabase, o, vehicles, locations, settings, notify })}>🖨</button>
                       {done && canCancel && <button className="btn-ghost !px-2 !py-1 !text-xs hover:text-danger" title="Hủy xác nhận" onClick={() => cancelInv(o)}>↺</button>}
@@ -266,7 +275,7 @@ export default function DonBan() {
               <div className="bg-white rounded-2xl w-[600px] max-w-full max-h-[88vh] overflow-y-auto p-4" onClick={(e) => e.stopPropagation()}>
                 <div className="flex items-center gap-1.5 mb-3 flex-wrap">
                   <div className="font-extrabold text-base mr-auto">Chi tiết đơn {detail.code}</div>
-                  {canSuaTT && <button className="btn-ok !px-3 !py-1.5 !text-xs" onClick={() => setPayEdit({ paid: detail.paid_amount || 0, note: "" })}>💵 Thu tiền</button>}
+                  {canSuaTT && <button className="btn-ok !px-3 !py-1.5 !text-xs" onClick={() => setPayEdit({ paid: detail.paid_amount || 0, note: "", method: "Tiền mặt" })}>💵 Thu tiền</button>}
                   <button className="btn-primary !px-3 !py-1.5 !text-xs" onClick={() => printOrder({ supabase, o: detail, vehicles, locations, settings, notify })}>🖨 In phiếu</button>
                   {profile.role === "CEO" && <button className="btn-ghost !px-3 !py-1.5 !text-xs !text-danger" disabled={busy} onClick={() => deleteOrder(detail)}>🗑 Xóa đơn</button>}
                   <button className="btn-ghost !px-3 !py-1.5 !text-xs" onClick={() => setDetail(null)}>✕</button>
@@ -372,13 +381,23 @@ export default function DonBan() {
                             ))}
                           </div>
                           <div>
+                            <label className="lbl">Hình thức thanh toán</label>
+                            <div className="flex gap-1.5 flex-wrap">
+                              {(settings?.payment_methods || "Tiền mặt\nChuyển khoản\nTrả góp")
+                                .split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean).map((m) => (
+                                <button key={m} className={`btn !px-3 !py-1.5 !text-xs ${payEdit.method === m ? "bg-brand text-white" : "bg-[#EEF1F4]"}`}
+                                  onClick={() => setPayEdit((p) => ({ ...p, method: m }))}>{m}</button>
+                              ))}
+                            </div>
+                          </div>
+                          <div>
                             <label className="lbl">Tổng số tiền khách đã trả (sau khi thu thêm)</label>
                             <MoneyInput value={payEdit.paid} onChange={(v) => setPayEdit((p) => ({ ...p, paid: v }))} />
                             {Number(payEdit.paid) !== (detail.paid_amount || 0) && (
                               <div className={`text-[11.5px] mt-1 font-bold ${Number(payEdit.paid) > (detail.paid_amount || 0) ? "text-[#0E7A4A]" : "text-danger"}`}>
                                 {Number(payEdit.paid) > (detail.paid_amount || 0) ? "Thu thêm " : "Giảm "}
                                 {fmtVND(Math.abs(Number(payEdit.paid) - (detail.paid_amount || 0)))}
-                                {Number(payEdit.paid) > (detail.paid_amount || 0) && " — sẽ tự ghi phiếu thu vào sổ quỹ"}
+                                {Number(payEdit.paid) > (detail.paid_amount || 0) && ` — ghi phiếu thu ${payEdit.method} vào sổ quỹ`}
                               </div>
                             )}
                           </div>

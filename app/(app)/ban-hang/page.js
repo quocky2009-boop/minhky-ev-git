@@ -7,7 +7,7 @@ import { printOrder as _printOrder } from "@/lib/print";
 import { uploadAnhDon } from "@/lib/img";
 import Link from "next/link";
 import { fmtVND, errMsg } from "@/lib/format";
-import { CUSTOMER_TYPES, CUSTOMER_SOURCES, PAYMENT_METHODS, DOC_STATUSES } from "@/lib/const";
+import { CUSTOMER_TYPES, CUSTOMER_SOURCES } from "@/lib/const";
 
 const iso = (d) => d.toLocaleDateString("sv-SE");
 const ITEM_TYPES = { PHU_KIEN: "Phụ kiện", DANG_KY: "Đăng ký xe", BAO_HIEM: "Bảo hiểm" };
@@ -88,6 +88,8 @@ function TaoDonInner() {
   if (loading || !profile) return <div className="card">Đang tải dữ liệu…</div>;
 
   const cfields = (customFields || []).filter((c) => c.entity === "sales_order");
+  const PTTT = (settings?.payment_methods || "Tiền mặt\nChuyển khoản\nTrả góp")
+    .split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean);
 
   const vName = (id) => { const v = vehicles.find((x) => x.id === id); return v ? `${v.name} · ${v.color}` : id; };
 
@@ -130,7 +132,13 @@ function TaoDonInner() {
   const setKem = (i, k, v) => setKemRows((p) => p.map((x, j) => j === i ? { ...x, [k]: v } : x));
 
   // Phụ kiện gợi ý từ Cài đặt
-  const goiY = (settings?.accessories || "").split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean);
+  const parseDM = (raw) => (raw || "").split(/\n+/).map((x) => x.trim()).filter(Boolean)
+    .map((line) => { const [ten, gia] = line.split("|").map((y) => y.trim()); return { ten, gia: Number(gia) || 0 }; });
+  const DM = {
+    PHU_KIEN: parseDM(settings?.phu_kien),
+    BAO_HIEM: parseDM(settings?.bao_hiem),
+    DANG_KY: [{ ten: "Dịch vụ đăng ký xe", gia: Number(settings?.gia_dang_ky) || 350000 }],
+  };
 
   // ===== TÍNH TIỀN =====
   const tongXe = xeRows.reduce((s, r) => s + lineTotal(1, r.unit_price, r.discount_type, r.discount_value).con, 0);
@@ -147,6 +155,7 @@ function TaoDonInner() {
   const luuDon = async () => {
     if (xeRows.length === 0) return notify("Chưa chọn xe nào.", "err");
     if (!kh.customer_name || !kh.customer_phone) return notify("Chọn hoặc nhập khách hàng.", "err");
+    if (!meta.location_code) return notify("Chọn điểm bán để hạch toán doanh số.", "err");
     const tgThieu = pays.find((p) => p.method === "Trả góp" && Number(p.amount) > 0 && !p.tra_gop_ct);
     if (tgThieu) return notify("Chọn đơn vị trả góp.", "err");
     const cfThieu = cfields.find((c) => c.required && c.field_type !== "formula" && !extra[c.field_key]);
@@ -275,13 +284,12 @@ function TaoDonInner() {
         <div className="card">
           <div className="font-extrabold mb-2.5">Thông tin bổ sung</div>
           <div className="flex flex-col gap-2.5">
-            <Field label="Điểm bán (ghi nhận)">
-              <LocSearch locations={locations} value={meta.location_code} onChange={(v) => setMeta((p) => ({ ...p, location_code: v }))} placeholder="Không bắt buộc" />
-              <div className="text-[10.5px] text-[#8A93A0] mt-1">Mỗi xe tự trừ tồn ở kho của chính nó — gom xe từ nhiều kho được.</div>
+            <Field label="Điểm bán (ghi nhận doanh số)" required>
+              <LocSearch locations={locations} value={meta.location_code} onChange={(v) => setMeta((p) => ({ ...p, location_code: v }))} placeholder="Bắt buộc chọn" />
+              <div className="text-[10.5px] text-[#8A93A0] mt-1">Dùng để hạch toán doanh số theo điểm/khu vực. Xe vẫn trừ tồn ở kho của chính nó.</div>
             </Field>
             <Field label="Bán bởi"><input className="inp bg-[#F8FAFC]" value={profile.name} disabled /></Field>
             <Field label="Ngày bán"><input type="date" className="inp" value={meta.sale_date} onChange={(e) => setMeta((p) => ({ ...p, sale_date: e.target.value }))} /></Field>
-            <Field label="Hồ sơ đăng ký"><select className="inp" value={meta.document_status} onChange={(e) => setMeta((p) => ({ ...p, document_status: e.target.value }))}>{DOC_STATUSES.map((x) => <option key={x}>{x}</option>)}</select></Field>
 
             {cfields.map((c) => {
               if (c.field_type === "formula") {
@@ -355,10 +363,22 @@ function TaoDonInner() {
                 <td data-label="STT" className="td text-center text-xs text-[#8A93A0]">{xeRows.length + i + 1}</td>
                 <td data-label="Tên hàng" className="td">
                   <div className="flex gap-1.5">
-                    <select className="inp !py-1 !text-xs !w-auto" value={r.item_type} onChange={(e) => setKem(i, "item_type", e.target.value)}>
+                    <select className="inp !py-1 !text-xs !w-auto" value={r.item_type} onChange={(e) => {
+                      const t = e.target.value;
+                      setKem(i, "item_type", t);
+                      if (t === "DANG_KY" && !r.name) {
+                        setKem(i, "name", DM.DANG_KY[0].ten); setKem(i, "unit_price", DM.DANG_KY[0].gia);
+                      }
+                    }}>
                       {Object.entries(ITEM_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                     </select>
-                    <input className="inp !py-1 !text-xs" list="goiy-phukien" placeholder="Tên phụ kiện / dịch vụ" value={r.name} onChange={(e) => setKem(i, "name", e.target.value)} />
+                    <input className="inp !py-1 !text-xs" list={`dm-${r.item_type}`} placeholder="Gõ tìm hoặc nhập tên…" value={r.name}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setKem(i, "name", v);
+                        const hit = (DM[r.item_type] || []).find((x) => x.ten === v);
+                        if (hit && hit.gia > 0) setKem(i, "unit_price", hit.gia);
+                      }} />
                   </div>
                 </td>
                 <td data-label="SL" className="td"><input type="number" min="1" className="inp !py-1 !text-xs !w-14" value={r.qty} onChange={(e) => setKem(i, "qty", +e.target.value || 1)} /></td>
@@ -372,7 +392,11 @@ function TaoDonInner() {
             )}
           </tbody>
         </table></div>
-        <datalist id="goiy-phukien">{goiY.map((g) => <option key={g} value={g} />)}</datalist>
+        {Object.entries(DM).map(([k, list]) => (
+          <datalist key={k} id={`dm-${k}`}>
+            {list.map((x) => <option key={x.ten} value={x.ten}>{x.gia > 0 ? fmtVND(x.gia) : ""}</option>)}
+          </datalist>
+        ))}
 
         <button className="btn-ghost !text-xs mt-2.5" onClick={() => setKemRows((p) => [...p, { item_type: "PHU_KIEN", name: "", qty: 1, unit_price: 0, discount_type: "amount", discount_value: 0 }])}>
           ⊕ Thêm phụ kiện / dịch vụ đăng ký
@@ -437,7 +461,7 @@ function TaoDonInner() {
             {pays.map((p, i) => (
               <div key={i} className="flex gap-1.5 items-center">
                 <select className="inp !py-1.5 !text-xs !w-auto" value={p.method} onChange={(e) => setPays((x) => x.map((y, j) => j === i ? { ...y, method: e.target.value } : y))}>
-                  {PAYMENT_METHODS.map((m) => <option key={m}>{m}</option>)}
+                  {PTTT.map((m) => <option key={m}>{m}</option>)}
                 </select>
                 <div className="flex-1"><MoneyInput className="!py-1.5 !text-xs" value={p.amount} onChange={(v) => setPays((x) => x.map((y, j) => j === i ? { ...y, amount: v } : y))} /></div>
                 <button className="text-danger font-bold px-1" onClick={() => setPays((x) => x.filter((_, j) => j !== i))}>✕</button>
