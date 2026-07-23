@@ -116,16 +116,13 @@ function TaoDonInner() {
     const { data: u } = await supabase.from("vehicle_units").select("*").eq("frame_number", s).maybeSingle();
     if (!u) return notify(`Không tìm thấy số khung ${s}.`, "err");
     if (!["TON_KHO", "GIU_CHO"].includes(u.status)) return notify(`Xe ${s} đang ở trạng thái ${u.status}, không bán được.`, "err");
-    if (meta.location_code && u.location_code !== meta.location_code) {
-      return notify(`Xe ${s} thuộc kho khác (${u.location_code}). Chọn cùng kho hoặc bỏ lọc kho.`, "err");
-    }
+
     const v = vehicles.find((x) => x.id === u.vehicle_id);
     setXeRows((p) => [...p, {
       frame_number: s, vehicle_id: u.vehicle_id, ten: v ? `${v.brand} ${v.name} ${v.color}` : u.vehicle_id,
       location_code: u.location_code, giu_cho: u.status === "GIU_CHO",
       unit_price: v?.list_price || 0, discount_type: "amount", discount_value: 0,
     }]);
-    if (!meta.location_code) setMeta((p) => ({ ...p, location_code: u.location_code }));
     notify(`Đã thêm ${v ? v.name : u.vehicle_id} · ${s}`);
   };
 
@@ -278,7 +275,10 @@ function TaoDonInner() {
         <div className="card">
           <div className="font-extrabold mb-2.5">Thông tin bổ sung</div>
           <div className="flex flex-col gap-2.5">
-            <Field label="Bán tại"><LocSearch locations={locations} value={meta.location_code} onChange={(v) => setMeta((p) => ({ ...p, location_code: v }))} placeholder="Chọn kho / cửa hàng" /></Field>
+            <Field label="Điểm bán (ghi nhận)">
+              <LocSearch locations={locations} value={meta.location_code} onChange={(v) => setMeta((p) => ({ ...p, location_code: v }))} placeholder="Không bắt buộc" />
+              <div className="text-[10.5px] text-[#8A93A0] mt-1">Mỗi xe tự trừ tồn ở kho của chính nó — gom xe từ nhiều kho được.</div>
+            </Field>
             <Field label="Bán bởi"><input className="inp bg-[#F8FAFC]" value={profile.name} disabled /></Field>
             <Field label="Ngày bán"><input type="date" className="inp" value={meta.sale_date} onChange={(e) => setMeta((p) => ({ ...p, sale_date: e.target.value }))} /></Field>
             <Field label="Hồ sơ đăng ký"><select className="inp" value={meta.document_status} onChange={(e) => setMeta((p) => ({ ...p, document_status: e.target.value }))}>{DOC_STATUSES.map((x) => <option key={x}>{x}</option>)}</select></Field>
@@ -317,6 +317,9 @@ function TaoDonInner() {
         <div className="flex items-center gap-2 mb-2.5 flex-wrap">
           <div className="font-extrabold mr-auto">Thông tin hàng hóa</div>
           <span className="text-[11px] text-[#8A93A0]">{xeRows.length} xe · {kemRows.length} mục kèm</span>
+          {new Set(xeRows.map((r) => r.location_code)).size > 1 && (
+            <Badge tone="blue">Gom từ {new Set(xeRows.map((r) => r.location_code)).size} kho</Badge>
+          )}
         </div>
 
         <div className="mb-3">

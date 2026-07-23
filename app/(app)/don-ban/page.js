@@ -38,7 +38,8 @@ export default function DonBan() {
   const [invId, setInvId] = useState(null);
   const [invF, setInvF] = useState({ no: "", date: iso(new Date()), bh: false, app: false });
   const [detail, setDetail] = useState(null);
-  const [payEdit, setPayEdit] = useState(null);   // { paid, note } khi dang sua thanh toan
+  const [payEdit, setPayEdit] = useState(null);
+  const [klEdit, setKlEdit] = useState(null);   // khach le cuoi (don ban buon)
 
   const load = async () => {
     setBusy(true);
@@ -106,6 +107,25 @@ export default function DonBan() {
 
   const canSuaTT = ["CEO", "MANAGER", "ADMIN"].includes(profile?.role);
 
+  const canKhachLe = (o) => o.customer_type === "Khách buôn";
+  const thieuKhachLe = (o) => canKhachLe(o) && isVF(o) && !o.end_customer_id;
+
+  const luuKhachLe = async () => {
+    const f = klEdit;
+    if (!f.name?.trim() || !f.phone?.trim() || !f.address?.trim() || !f.email?.trim()) {
+      return notify("Cần đủ 4 thông tin: họ tên, SĐT, địa chỉ VNeID, email.", "err");
+    }
+    setBusy(true);
+    const { error } = await supabase.rpc("fn_luu_khach_le_cuoi", { p: { id: detail.id, ...f } });
+    setBusy(false);
+    if (error) return notify(errMsg(error), "err");
+    notify("Đã lưu khách lẻ cuối — hồ sơ đã vào danh mục khách hàng.");
+    setKlEdit(null);
+    const { data } = await supabase.from("sales_orders").select("*").eq("id", detail.id).single();
+    if (data) setDetail((d) => ({ ...d, ...data }));
+    load();
+  };
+
   const luuThanhToan = async () => {
     const paid = Number(payEdit.paid) || 0;
     if (paid < 0) return notify("Số tiền không hợp lệ.", "err");
@@ -153,6 +173,9 @@ export default function DonBan() {
       <Toast toast={toast} />
       <div className="flex gap-3 flex-wrap">
         <KPI label="Chờ hoàn thiện (HĐ/BH/App)" value={nCho} tone={nCho ? "amber" : "dark"} />
+        {rows.filter((o) => thieuKhachLe(o)).length > 0 && (
+          <KPI label="Chờ thông tin khách lẻ" value={rows.filter((o) => thieuKhachLe(o)).length} tone="red" />
+        )}
         <KPI label="Đã hoàn thành" value={nXong} tone="green" />
         <KPI label="Tổng đơn" value={rows.length} tone="dark" />
         <KPI label="Doanh số" value={fmtVND(doanhSo)} tone="blue" />
@@ -191,7 +214,8 @@ export default function DonBan() {
                     <td data-label="Tổng đơn" className="td font-bold">{fmtVND(total(o))}</td>
                     <td data-label="Hóa đơn" className="td">{done
                       ? <><Badge tone="green">✓ Hoàn thành</Badge><div className="text-[10.5px] text-[#8A93A0] mt-0.5">HĐ {o.invoice_no} · {fmtDate(o.invoice_date)}<br/>{o.invoice_by_name}<br/>BH ✓{o.app_activated ? " · App ✓" : ""}</div></>
-                      : <Badge tone="amber">Chờ xuất HĐ</Badge>}</td>
+                      : <Badge tone="amber">Chờ xuất HĐ</Badge>}
+                      {thieuKhachLe(o) && <div className="mt-0.5"><Badge tone="red">⚠ Thiếu khách lẻ</Badge></div>}</td>
                     <td data-label="NV bán" className="td text-xs">{o.seller_name}</td>
                     <td className="td"><div className="flex gap-1.5">
                       {!done && canConfirm && <button className={`!px-2.5 !py-1 !text-xs ${invId === o.id ? "btn-primary" : "btn-ok"}`} onClick={() => { setInvId(invId === o.id ? null : o.id); setInvF({ no: "", date: iso(new Date()), bh: false, app: false }); }}>{invId === o.id ? "Đóng" : "✓ Xác nhận HĐ"}</button>}
@@ -271,6 +295,52 @@ export default function DonBan() {
                           : <Badge key="s" tone="amber">Chờ xuất HĐ</Badge>],
                         ["Ghi chú", detail.note],
                       ]} />
+
+                      {canKhachLe(detail) && (
+                        <div className={`rounded-xl border p-3 ${detail.end_customer_id ? "border-[#BBE3CC] bg-[#F4FBF7]" : thieuKhachLe(detail) ? "border-[#F0C000] bg-[#FFFCF0]" : "border-[#E3E8EF]"}`}>
+                          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                            <span className="font-bold text-[13.5px] mr-auto">👤 Khách lẻ cuối (đứng tên hóa đơn)</span>
+                            {detail.end_customer_id
+                              ? <Badge tone="green">✓ Đã có</Badge>
+                              : thieuKhachLe(detail) ? <Badge tone="amber">Bắt buộc — xe VinFast</Badge> : <Badge tone="dark">Chưa có</Badge>}
+                          </div>
+
+                          {detail.end_customer_id && !klEdit ? (
+                            <div className="text-[13px] flex flex-col gap-0.5">
+                              <div><b>{detail.end_customer_name}</b> · {detail.end_customer_phone}</div>
+                              <div className="text-[#5A6572]">{detail.end_customer_email}</div>
+                              <div className="text-[#5A6572]">{detail.end_customer_address}</div>
+                              <div className="text-[11px] text-[#8A93A0] mt-1">Cập nhật bởi {detail.end_customer_by_name} · {fmtDate(detail.end_customer_at)}</div>
+                              <button className="btn-ghost !text-xs mt-1.5 self-start" onClick={() => setKlEdit({
+                                name: detail.end_customer_name, phone: detail.end_customer_phone,
+                                email: detail.end_customer_email, address: detail.end_customer_address })}>✎ Sửa</button>
+                            </div>
+                          ) : klEdit ? (
+                            <div className="flex flex-col gap-2">
+                              <div className="grid gap-2 md:grid-cols-2">
+                                <div><label className="lbl">Họ tên *</label><input className="inp !py-1.5 !text-[13px]" value={klEdit.name} onChange={(e) => setKlEdit((p) => ({ ...p, name: e.target.value }))} /></div>
+                                <div><label className="lbl">Điện thoại *</label><input className="inp !py-1.5 !text-[13px]" value={klEdit.phone} onChange={(e) => setKlEdit((p) => ({ ...p, phone: e.target.value }))} /></div>
+                                <div><label className="lbl">Email *</label><input className="inp !py-1.5 !text-[13px]" value={klEdit.email} onChange={(e) => setKlEdit((p) => ({ ...p, email: e.target.value }))} placeholder="ten@email.com" /></div>
+                                <div><label className="lbl">Địa chỉ VNeID *</label><input className="inp !py-1.5 !text-[13px]" value={klEdit.address} onChange={(e) => setKlEdit((p) => ({ ...p, address: e.target.value }))} /></div>
+                              </div>
+                              <div className="flex gap-2">
+                                <button className="btn-ok !text-xs" disabled={busy} onClick={luuKhachLe}>{busy ? "Đang lưu…" : "Lưu khách lẻ"}</button>
+                                <button className="btn-ghost !text-xs" onClick={() => setKlEdit(null)}>Hủy</button>
+                              </div>
+                              <div className="text-[11px] text-[#8A93A0]">Hồ sơ sẽ tự vào danh mục khách hàng với loại <b>Khách lẻ của Đại lý</b>.</div>
+                            </div>
+                          ) : (
+                            <div>
+                              <div className="text-[12px] text-[#5A6572] mb-2">
+                                {thieuKhachLe(detail)
+                                  ? "Xe VinFast bán buôn — bắt buộc có thông tin khách lẻ cuối trước khi xuất hóa đơn."
+                                  : "Đại lý bán lại cho khách lẻ thì bổ sung thông tin ở đây."}
+                              </div>
+                              <button className="btn-primary !text-xs" onClick={() => setKlEdit({ name: "", phone: "", email: "", address: "" })}>+ Thông tin khách lẻ cuối</button>
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                       <MoneyRows
                         lines={[
