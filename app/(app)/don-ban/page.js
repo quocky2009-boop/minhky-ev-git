@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Badge, Toast, KPI, Pager, pageSlice, pageClamp, useSortable, Th, LocSearch } from "@/components/ui";
+import { Badge, Toast, KPI, Pager, pageSlice, pageClamp, useSortable, Th, LocSearch, MoneyInput } from "@/components/ui";
 import { fmtVND, fmtDate, fmtTime, errMsg, downloadCSV } from "@/lib/format";
 import { printOrder } from "@/lib/print";
 import { InfoRows, MoneyRows } from "@/components/detail";
@@ -38,6 +38,7 @@ export default function DonBan() {
   const [invId, setInvId] = useState(null);
   const [invF, setInvF] = useState({ no: "", date: iso(new Date()), bh: false, app: false });
   const [detail, setDetail] = useState(null);
+  const [payEdit, setPayEdit] = useState(null);   // { paid, note } khi dang sua thanh toan
 
   const load = async () => {
     setBusy(true);
@@ -101,6 +102,24 @@ export default function DonBan() {
     setDetail({ ...o, _items: null });
     const { data: di } = await supabase.from("sale_items").select("*").eq("sale_code", o.code);
     setDetail((d) => (d && d.id === o.id ? { ...d, _items: di || [] } : d));
+  };
+
+  const canSuaTT = ["CEO", "MANAGER", "ADMIN"].includes(profile?.role);
+
+  const luuThanhToan = async () => {
+    const paid = Number(payEdit.paid) || 0;
+    if (paid < 0) return notify("Số tiền không hợp lệ.", "err");
+    setBusy(true);
+    const { error } = await supabase.rpc("fn_cap_nhat_da_tra", {
+      p_id: detail.id, p_paid: paid, p_note: payEdit.note || "",
+    });
+    setBusy(false);
+    if (error) return notify(errMsg(error), "err");
+    notify("Đã cập nhật thanh toán — phần thu thêm tự vào sổ quỹ.");
+    setPayEdit(null);
+    const { data } = await supabase.from("sales_orders").select("*").eq("id", detail.id).single();
+    if (data) setDetail((d) => ({ ...d, ...data }));
+    load();
   };
 
   const deleteOrder = async (o) => {
@@ -177,6 +196,10 @@ export default function DonBan() {
                     <td className="td"><div className="flex gap-1.5">
                       {!done && canConfirm && <button className={`!px-2.5 !py-1 !text-xs ${invId === o.id ? "btn-primary" : "btn-ok"}`} onClick={() => { setInvId(invId === o.id ? null : o.id); setInvF({ no: "", date: iso(new Date()), bh: false, app: false }); }}>{invId === o.id ? "Đóng" : "✓ Xác nhận HĐ"}</button>}
                       <button className="btn-ghost !px-2 !py-1 !text-xs" title="Chi tiết đơn" onClick={() => openDetail(o)}>👁</button>
+                      {canSuaTT && total(o) - (o.paid_amount || 0) > 0 && (
+                        <button className="btn-ok !px-2 !py-1 !text-xs" title={`Còn thiếu ${fmtVND(total(o) - (o.paid_amount || 0))} — bấm để thu`}
+                          onClick={async () => { await openDetail(o); setPayEdit({ paid: o.paid_amount || 0, note: "" }); }}>💵</button>
+                      )}
                       <button className="btn-ghost !px-2 !py-1 !text-xs" title="In phiếu xuất" onClick={() => printOrder({ supabase, o, vehicles, locations, settings, notify })}>🖨</button>
                       {done && canCancel && <button className="btn-ghost !px-2 !py-1 !text-xs hover:text-danger" title="Hủy xác nhận" onClick={() => cancelInv(o)}>↺</button>}
                     </div></td>
@@ -219,6 +242,7 @@ export default function DonBan() {
               <div className="bg-white rounded-2xl w-[600px] max-w-full max-h-[88vh] overflow-y-auto p-4" onClick={(e) => e.stopPropagation()}>
                 <div className="flex items-center gap-1.5 mb-3 flex-wrap">
                   <div className="font-extrabold text-base mr-auto">Chi tiết đơn {detail.code}</div>
+                  {canSuaTT && <button className="btn-ok !px-3 !py-1.5 !text-xs" onClick={() => setPayEdit({ paid: detail.paid_amount || 0, note: "" })}>💵 Thu tiền</button>}
                   <button className="btn-primary !px-3 !py-1.5 !text-xs" onClick={() => printOrder({ supabase, o: detail, vehicles, locations, settings, notify })}>🖨 In phiếu</button>
                   {profile.role === "CEO" && <button className="btn-ghost !px-3 !py-1.5 !text-xs !text-danger" disabled={busy} onClick={() => deleteOrder(detail)}>🗑 Xóa đơn</button>}
                   <button className="btn-ghost !px-3 !py-1.5 !text-xs" onClick={() => setDetail(null)}>✕</button>
@@ -259,6 +283,45 @@ export default function DonBan() {
                         ]}
                         total={{ label: conLai > 0 ? "Còn phải thu" : "Đã thanh toán đủ", value: fmtVND(conLai), done: conLai === 0 }}
                       />
+
+                      {payEdit && (
+                        <div className="p-3 rounded-xl border-2 border-brand bg-[#F8FAFC] flex flex-col gap-2.5">
+                          <div className="font-bold text-[13.5px]">Cập nhật thanh toán</div>
+                          <div className="flex gap-1.5 flex-wrap">
+                            {conLai > 0 && (
+                              <button className="btn-ok !px-3 !py-1.5 !text-xs"
+                                onClick={() => setPayEdit((p) => ({ ...p, paid: tong, note: p.note || `Thu nốt ${fmtVND(conLai)}` }))}>
+                                Thu nốt {fmtVND(conLai)}
+                              </button>
+                            )}
+                            {[500000, 1000000, 2000000, 5000000].filter((x) => x <= conLai).map((x) => (
+                              <button key={x} className="btn-ghost !px-2.5 !py-1.5 !text-xs"
+                                onClick={() => setPayEdit((p) => ({ ...p, paid: (detail.paid_amount || 0) + x }))}>
+                                +{(x / 1000000).toFixed(x % 1000000 ? 1 : 0)}tr
+                              </button>
+                            ))}
+                          </div>
+                          <div>
+                            <label className="lbl">Tổng số tiền khách đã trả (sau khi thu thêm)</label>
+                            <MoneyInput value={payEdit.paid} onChange={(v) => setPayEdit((p) => ({ ...p, paid: v }))} />
+                            {Number(payEdit.paid) !== (detail.paid_amount || 0) && (
+                              <div className={`text-[11.5px] mt-1 font-bold ${Number(payEdit.paid) > (detail.paid_amount || 0) ? "text-[#0E7A4A]" : "text-danger"}`}>
+                                {Number(payEdit.paid) > (detail.paid_amount || 0) ? "Thu thêm " : "Giảm "}
+                                {fmtVND(Math.abs(Number(payEdit.paid) - (detail.paid_amount || 0)))}
+                                {Number(payEdit.paid) > (detail.paid_amount || 0) && " — sẽ tự ghi phiếu thu vào sổ quỹ"}
+                              </div>
+                            )}
+                          </div>
+                          <div>
+                            <label className="lbl">Ghi chú (VD: thu tiền mặt 22/07)</label>
+                            <input className="inp" value={payEdit.note} onChange={(e) => setPayEdit((p) => ({ ...p, note: e.target.value }))} />
+                          </div>
+                          <div className="flex gap-2">
+                            <button className="btn-ok !text-xs" disabled={busy} onClick={luuThanhToan}>{busy ? "Đang lưu…" : "Lưu thanh toán"}</button>
+                            <button className="btn-ghost !text-xs" onClick={() => setPayEdit(null)}>Hủy</button>
+                          </div>
+                        </div>
+                      )}
 
                       {httt && httt.length > 1 && (
                         <div className="flex flex-wrap gap-1.5 items-center">
