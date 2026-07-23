@@ -34,25 +34,6 @@ function BanHangInner() {
   const [f, setF] = useState(empty);
   const [show, setShow] = useState(!!params.get("xe") || !!params.get("new"));
 
-  // Den tu phieu dat coc: tu dien so khung + khach + tien coc da nhan
-  const [_cocDone, _setCocDone] = useState(false);
-  useEffect(() => {
-    const sk = params.get("sk"), kh = params.get("kh"), coc = params.get("coc");
-    if (!sk || _cocDone || custs.length === 0) return;
-    _setCocDone(true);
-    (async () => {
-      const { data: u } = await supabase.from("vehicle_units").select("*").eq("frame_number", sk).maybeSingle();
-      if (!u) { notify("Không tìm thấy số khung " + sk, "err"); return; }
-      setF((p) => ({ ...p, vehicle_id: u.vehicle_id, location_code: u.location_code,
-        paid_amount: coc ? Number(coc) : p.paid_amount,
-        note: coc ? `Đã nhận cọc ${Number(coc).toLocaleString("vi-VN")}đ` : p.note }));
-      setFrames([sk]);
-      const c = custs.find((x) => (x.phone || "").replace(/\D/g, "") === String(kh || "").replace(/\D/g, ""));
-      if (c) { setCustId(c.id); setF((p) => ({ ...p, customer_name: c.name, customer_phone: c.phone,
-        customer_cccd: c.cccd || "", customer_address: c.address || "" })); }
-      notify(`Đã nạp xe ${sk} từ phiếu cọc — kiểm tra rồi lưu đơn.`);
-    })();
-  }, [params, custs]);
   const [busy, setBusy] = useState(false);
   const [detail, setDetail] = useState(null);
   const [fotos, setFotos] = useState([]); // [{file, url}] cho don le
@@ -247,6 +228,27 @@ function BanHangInner() {
     if (error) return notify(errMsg(error), "err");
     loadOrders();
   };
+
+
+  // Den tu phieu dat coc: tu dien so khung + khach + tien coc da nhan
+  const [_cocDone, _setCocDone] = useState(false);
+  useEffect(() => {
+    const sk = params.get("sk"), kh = params.get("kh"), coc = params.get("coc");
+    if (!sk || _cocDone || custs.length === 0) return;
+    _setCocDone(true);
+    (async () => {
+      const { data: u } = await supabase.from("vehicle_units").select("*").eq("frame_number", sk).maybeSingle();
+      if (!u) { notify("Không tìm thấy số khung " + sk, "err"); return; }
+      setF((p) => ({ ...p, vehicle_id: u.vehicle_id, location_code: u.location_code,
+        paid_amount: coc ? Number(coc) : p.paid_amount,
+        note: coc ? `Đã nhận cọc ${Number(coc).toLocaleString("vi-VN")}đ` : p.note }));
+      setFrames([sk]);
+      const c = custs.find((x) => (x.phone || "").replace(/\D/g, "") === String(kh || "").replace(/\D/g, ""));
+      if (c) { setCustId(c.id); setF((p) => ({ ...p, customer_name: c.name, customer_phone: c.phone,
+        customer_cccd: c.cccd || "", customer_address: c.address || "" })); }
+      notify(`Đã nạp xe ${sk} từ phiếu cọc — kiểm tra rồi lưu đơn.`);
+    })();
+  }, [params, custs]);
 
   if (loading || !profile) return <div className="card">Đang tải dữ liệu…</div>;
   const canEdit = ["CEO", "MANAGER", "ADMIN"].includes(profile.role);
