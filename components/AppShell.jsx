@@ -59,7 +59,6 @@ export default function AppShell({ profile, children }) {
   const ItemLink = ({ n, sub }) => (
     <Link href={n.href} onClick={() => setOpen(false)}
       className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[13.5px] font-semibold mb-0.5 ${sub ? "ml-3" : ""} ${isActive(n) ? "bg-brand text-white" : "hover:bg-navy-800"}`}>
-      <span className="w-5 text-center opacity-90">{n.icon}</span>
       <span className="flex-1">{n.label}</span>
       {badges[base(n.href)] > 0 && (
         <span className={`min-w-[20px] h-5 px-1.5 rounded-full text-[10.5px] font-extrabold flex items-center justify-center ${isActive(n) ? "bg-white text-brand" : "bg-danger text-white"}`}>
@@ -88,7 +87,6 @@ export default function AppShell({ profile, children }) {
               <div key={g.label} className="mb-0.5">
                 <button onClick={() => toggle(g.label)}
                   className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[12px] font-extrabold tracking-wide ${hasActive && !opened ? "text-white bg-navy-800" : "text-[#8FA0B5]"} hover:bg-navy-800 hover:text-white`}>
-                  <span className="w-5 text-center opacity-90">{g.icon}</span>
                   <span className="flex-1 text-left">{g.label}</span>
                   {!opened && items.reduce((a, n) => a + (badges[base(n.href)] || 0), 0) > 0 && (
                     <span className="min-w-[20px] h-5 px-1.5 rounded-full text-[10.5px] font-extrabold flex items-center justify-center bg-danger text-white">

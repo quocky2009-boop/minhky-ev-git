@@ -285,7 +285,7 @@ function TaoDonInner() {
           <div className="font-extrabold mb-2.5">Thông tin bổ sung</div>
           <div className="flex flex-col gap-2.5">
             <Field label="Điểm bán (ghi nhận doanh số)" required>
-              <LocSearch locations={locations} value={meta.location_code} onChange={(v) => setMeta((p) => ({ ...p, location_code: v }))} placeholder="Bắt buộc chọn" />
+              <LocSearch locations={locations.filter((l) => l.type === "Cửa hàng")} value={meta.location_code} onChange={(v) => setMeta((p) => ({ ...p, location_code: v }))} placeholder="Bắt buộc chọn cửa hàng" />
               <div className="text-[10.5px] text-[#8A93A0] mt-1">Dùng để hạch toán doanh số theo điểm/khu vực. Xe vẫn trừ tồn ở kho của chính nó.</div>
             </Field>
             <Field label="Bán bởi"><input className="inp bg-[#F8FAFC]" value={profile.name} disabled /></Field>

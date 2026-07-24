@@ -4,13 +4,14 @@ import { useCatalog, useToast } from "@/lib/useData";
 import { Badge, Toast, KPI, Field, CustomerSearch, LocSearch, Pager, pageSlice, MoneyInput, FrameSearch } from "@/components/ui";
 import Link from "next/link";
 import { InfoRows, MoneyRows } from "@/components/detail";
+import { printBienNhanCoc } from "@/lib/printCoc";
 import { fmtVND, fmtDate, errMsg } from "@/lib/format";
 
 const iso = (d) => d.toLocaleDateString("sv-SE");
 const ST = { DANG_GIU: { label: "Đang giữ", tone: "amber" }, DA_BAN: { label: "Đã bán", tone: "green" }, HET_HAN: { label: "Hết hạn", tone: "dark" }, HUY: { label: "Đã hủy", tone: "red" } };
 
 export default function DatCoc() {
-  const { supabase, vehicles, locations, profile, loading } = useCatalog();
+  const { supabase, vehicles, locations, settings, profile, loading } = useCatalog();
   const { toast, notify } = useToast();
   const [rows, setRows] = useState([]);
   const [custs, setCusts] = useState([]);
@@ -58,7 +59,11 @@ export default function DatCoc() {
     const { data, error } = await supabase.rpc("fn_dat_coc", { p: { ...f, amount: Number(f.amount) || 0 } });
     setBusy(false);
     if (error) return notify(errMsg(error), "err");
-    notify(`Đã giữ xe — phiếu cọc ${data}. Xe chuyển trạng thái "Giữ chỗ", không ai bán trùng được.`);
+    notify(`Đã giữ xe — phiếu cọc ${data}.`);
+    const { data: pc } = await supabase.from("deposits").select("*").eq("code", data).single();
+    if (pc && confirm(`Đã tạo phiếu cọc ${data}.\nIn biên nhận cho khách ngay?`)) {
+      printBienNhanCoc({ coc: pc, vehicles, locations, settings });
+    }
     setShow(false); setFrameInfo(null);
     setF({ frame_number: "", customer_id: "", customer_name: "", customer_phone: "", amount: "", hold_until: iso(new Date(Date.now() + 3 * 86400000)), note: "" });
     load();
@@ -167,6 +172,7 @@ export default function DatCoc() {
                 {qh && <Badge tone="red">Quá hạn</Badge>}
                 <Badge tone={st.tone}>{st.label}</Badge>
                 <button className="btn-ghost !px-2 !py-1 !text-xs" onClick={() => setDetail(d)}>👁</button>
+                <button className="btn-ghost !px-2 !py-1 !text-xs" title="In biên nhận cọc" onClick={() => printBienNhanCoc({ coc: d, vehicles, locations, settings })}>🖨</button>
                 {d.status === "DANG_GIU" && (
                   <Link href={`/ban-hang?new=1&sk=${encodeURIComponent(d.frame_number)}&kh=${encodeURIComponent(d.customer_phone)}&coc=${d.amount}`}
                     className="btn-ok !px-2.5 !py-1 !text-xs whitespace-nowrap">→ Tạo đơn bán</Link>
@@ -190,6 +196,7 @@ export default function DatCoc() {
                 <span className="text-lg">🔒</span>
                 <div className="font-extrabold text-base text-brand mr-auto">{detail.code}</div>
                 <Badge tone={st.tone}>{st.label}</Badge>
+                <button className="btn-primary !px-3 !py-1 !text-xs" onClick={() => printBienNhanCoc({ coc: detail, vehicles, locations, settings })}>🖨 In biên nhận</button>
                 <button className="btn-ghost !px-2.5 !py-1 !text-xs" onClick={() => setDetail(null)}>✕</button>
               </div>
 
