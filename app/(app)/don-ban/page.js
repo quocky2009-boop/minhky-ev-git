@@ -228,7 +228,7 @@ export default function DonBan() {
                     <td data-label="NV bán" className="td text-xs">{o.seller_name}</td>
                     <td className="td"><div className="flex gap-1.5">
                       {!done && canConfirm && <button className={`!px-2.5 !py-1 !text-xs ${invId === o.id ? "btn-primary" : "btn-ok"}`} onClick={() => { setInvId(invId === o.id ? null : o.id); setInvF({ no: "", date: iso(new Date()), bh: false, app: false }); }}>{invId === o.id ? "Đóng" : "✓ Xác nhận HĐ"}</button>}
-                      <button className="btn-ghost !px-2 !py-1 !text-xs" title="Chi tiết đơn" onClick={() => openDetail(o)}>👁</button>
+                      <button className="btn-ghost !px-2 !py-1 !text-xs" title="Xem nhanh đơn" onClick={() => openDetail(o)}>👁</button>
                       {canSuaTT && total(o) - (o.paid_amount || 0) > 0 && (
                         <button className="btn-ok !px-2 !py-1 !text-xs" title={`Còn thiếu ${fmtVND(total(o) - (o.paid_amount || 0))} — bấm để thu`}
                           onClick={async () => { await openDetail(o); setPayEdit({ paid: o.paid_amount || 0, note: "", method: "Tiền mặt" }); }}>💵</button>
@@ -274,8 +274,11 @@ export default function DonBan() {
             <div className="fixed inset-0 z-[95] bg-black/50 flex items-center justify-center p-3" onClick={() => setDetail(null)}>
               <div className="bg-white rounded-2xl w-[600px] max-w-full max-h-[88vh] overflow-y-auto p-4" onClick={(e) => e.stopPropagation()}>
                 <div className="flex items-center gap-1.5 mb-3 flex-wrap">
-                  <div className="font-extrabold text-base mr-auto">Chi tiết đơn {detail.code}</div>
+                  <div className="font-extrabold text-base mr-auto">Xem nhanh đơn {detail.code}</div>
                   {canSuaTT && <button className="btn-ok !px-3 !py-1.5 !text-xs" onClick={() => setPayEdit({ paid: detail.paid_amount || 0, note: "", method: "Tiền mặt" })}>💵 Thu tiền</button>}
+                  {detail.invoice_status !== "Đã xuất HĐ"
+                    ? <Link href={`/ban-hang?sua=${detail.id}`} className="btn-primary !px-3 !py-1.5 !text-xs">✎ Sửa đơn</Link>
+                    : <span className="text-[10.5px] text-[#8A93A0] px-1">Đã xuất HĐ — hủy xác nhận mới sửa được</span>}
                   <button className="btn-primary !px-3 !py-1.5 !text-xs" onClick={() => printOrder({ supabase, o: detail, vehicles, locations, settings, notify })}>🖨 In phiếu</button>
                   {profile.role === "CEO" && <button className="btn-ghost !px-3 !py-1.5 !text-xs !text-danger" disabled={busy} onClick={() => deleteOrder(detail)}>🗑 Xóa đơn</button>}
                   <button className="btn-ghost !px-3 !py-1.5 !text-xs" onClick={() => setDetail(null)}>✕</button>

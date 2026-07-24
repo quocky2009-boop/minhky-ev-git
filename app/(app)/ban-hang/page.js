@@ -43,6 +43,10 @@ function TaoDonInner() {
   const [custs, setCusts] = useState([]);
   const [busy, setBusy] = useState(false);
   const [ketQua, setKetQua] = useState(null);
+  const [suaId, setSuaId] = useState(null);        // id don dang sua
+  const [suaCheck, setSuaCheck] = useState(null);  // ket qua kiem tra co sua duoc khong
+  const [lyDo, setLyDo] = useState("");
+  const [payCu, setPayCu] = useState([]);          // cac khoan da thu (khong sua duoc)
 
   // Khách hàng
   const [custId, setCustId] = useState("");
@@ -67,6 +71,49 @@ function TaoDonInner() {
     setCusts(data || []);
   };
   useEffect(() => { if (!loading) loadCusts(); }, [loading]);
+
+  // Nạp đơn để SỬA
+  const [suaDone, setSuaDone] = useState(false);
+  useEffect(() => {
+    const id = params.get("sua");
+    if (!id || suaDone || custs.length === 0) return;
+    setSuaDone(true);
+    (async () => {
+      const chk = await supabase.rpc("fn_don_co_sua_duoc", { p_id: Number(id) });
+      if (chk.error) return notify(errMsg(chk.error), "err");
+      setSuaCheck(chk.data);
+      if (!chk.data.ok) { notify(chk.data.ly_do, "err"); return; }
+
+      const [{ data: o }, { data: its }, { data: pays0 }] = await Promise.all([
+        supabase.from("sales_orders").select("*").eq("id", id).single(),
+        supabase.from("sale_items").select("*").eq("sale_code", (await supabase.from("sales_orders").select("code").eq("id", id).single()).data?.code || ""),
+        supabase.from("sale_payments").select("*").eq("sale_code", (await supabase.from("sales_orders").select("code").eq("id", id).single()).data?.code || ""),
+      ]);
+      if (!o) return notify("Không tìm thấy đơn.", "err");
+      setSuaId(o.id);
+      setKh({ customer_name: o.customer_name, customer_phone: o.customer_phone, customer_cccd: o.customer_cccd || "",
+        customer_address: o.customer_address || "", customer_type: o.customer_type, customer_source: o.customer_source });
+      setMeta({ sale_date: o.sale_date, location_code: o.location_code, document_status: o.document_status, note: o.note || "" });
+      setExtra(o.extra || {});
+      setDTong({ type: o.discount_type || "amount", value: o.discount_value || 0 });
+      setPayCu(pays0 || []);
+
+      // Nạp xe của đơn
+      const sks = String(o.frame_number || "").split(",").map((x) => x.trim()).filter(Boolean);
+      const { data: units } = await supabase.from("vehicle_units").select("*").in("frame_number", sks);
+      setXeRows((units || []).map((u) => {
+        const v = vehicles.find((x) => x.id === u.vehicle_id);
+        return { frame_number: u.frame_number, vehicle_id: u.vehicle_id,
+          ten: v ? `${v.brand} ${v.name} ${v.color}` : u.vehicle_id,
+          location_code: u.location_code, giu_cho: false,
+          unit_price: o.sale_price, discount_type: o.vehicle_discount_type || "amount",
+          discount_value: o.vehicle_discount_value || 0 };
+      }));
+      setKemRows((its || []).map((x) => ({ item_type: x.item_type, name: x.name, qty: x.qty,
+        unit_price: x.unit_price, discount_type: x.discount_type || "amount", discount_value: x.discount_value || 0 })));
+      notify(`Đang sửa đơn ${o.code}.`);
+    })();
+  }, [params, custs, vehicles]);
 
   // Nạp từ phiếu cọc
   const [cocDone, setCocDone] = useState(false);
@@ -148,10 +195,31 @@ function TaoDonInner() {
     ? Math.round(tamTinh * Math.min(Math.max(Number(dTong.value) || 0, 0), 100) / 100)
     : Math.min(Math.max(Number(dTong.value) || 0, 0), tamTinh);
   const phaiTra = Math.max(tamTinh - ckTong, 0);
-  const daTra = pays.reduce((s, p) => s + (Number(p.amount) || 0), 0);
+  const daTra = pays.reduce((s, p) => s + (Number(p.amount) || 0), 0) + payCu.reduce((s, p) => s + p.amount, 0);
   const conLai = Math.max(phaiTra - daTra, 0);
 
   // ===== LƯU ĐƠN =====
+  const luuSua = async () => {
+    if (xeRows.length === 0) return notify("Đơn phải có ít nhất 1 xe.", "err");
+    if (!meta.location_code) return notify("Chọn điểm bán.", "err");
+    setBusy(true);
+    const { data, error } = await supabase.rpc("fn_sua_don_ban", { p: {
+      id: suaId, ...kh, ...meta, ly_do: lyDo,
+      frames: xeRows.map((r) => ({ frame_number: r.frame_number, unit_price: Number(r.unit_price) || 0,
+        discount_type: r.discount_type, discount_value: Number(r.discount_value) || 0 })),
+      items: kemRows.filter((r) => r.name?.trim()).map((r) => ({ item_type: r.item_type, name: r.name,
+        qty: Number(r.qty) || 1, unit_price: Number(r.unit_price) || 0,
+        discount_type: r.discount_type, discount_value: Number(r.discount_value) || 0 })),
+      new_payments: pays.filter((p) => Number(p.amount) > 0),
+      discount_type: dTong.type, discount_value: Number(dTong.value) || 0,
+      extra,
+    } });
+    setBusy(false);
+    if (error) return notify(errMsg(error), "err");
+    notify(`Đã sửa đơn ${data.code}.`);
+    router.push(`/don-ban?q=${encodeURIComponent(data.code)}`);
+  };
+
   const luuDon = async () => {
     if (xeRows.length === 0) return notify("Chưa chọn xe nào.", "err");
     if (!kh.customer_name || !kh.customer_phone) return notify("Chọn hoặc nhập khách hàng.", "err");
@@ -248,9 +316,30 @@ function TaoDonInner() {
       <Toast toast={toast} />
 
       <div className="flex items-center gap-2 flex-wrap">
-        <div className="font-extrabold text-lg mr-auto">Tạo đơn bán</div>
+        <div className="font-extrabold text-lg mr-auto">{suaId ? "Sửa đơn bán" : "Tạo đơn bán"}</div>
         <Link href="/don-ban" className="btn-ghost !text-xs">← Danh sách đơn</Link>
       </div>
+
+      {suaId && suaCheck?.muc === "han_che" && (
+        <div className="card !py-2.5 bg-[#FFF6E5] border border-[#F0C000]">
+          <div className="text-[13px]"><b>⚠ Đơn đã thu {fmtVND(suaCheck.da_thu)}</b> — sửa được nhưng tổng đơn mới không được nhỏ hơn số đã thu. Muốn giảm thì hoàn tiền cho khách trước.</div>
+        </div>
+      )}
+      {suaId && payCu.length > 0 && (
+        <div className="card">
+          <div className="font-extrabold mb-2">Các khoản đã thu (không sửa được)</div>
+          <div className="flex flex-col gap-1.5">
+            {payCu.map((p) => (
+              <div key={p.id} className="flex items-center gap-2 text-[13px] p-2 rounded-lg bg-[#F8FAFC]">
+                <Badge tone="green">{p.method}</Badge>
+                <span className="text-[11px] text-[#8A93A0] mr-auto">{p.created_by_name} · {new Date(p.created_at).toLocaleDateString("vi-VN")}</span>
+                <b>{fmtVND(p.amount)}</b>
+              </div>
+            ))}
+          </div>
+          <div className="text-[11px] text-[#8A93A0] mt-2">Thêm khoản thu mới ở khối Thanh toán bên dưới.</div>
+        </div>
+      )}
 
       {/* ===== HÀNG 1: KHÁCH HÀNG | THÔNG TIN BỔ SUNG ===== */}
       <div className="grid gap-4 lg:grid-cols-3">
@@ -410,6 +499,12 @@ function TaoDonInner() {
           <Field label="Ghi chú đơn hàng">
             <textarea className="inp !h-20" value={meta.note} onChange={(e) => setMeta((p) => ({ ...p, note: e.target.value }))} placeholder="VD: khách hẹn lấy xe chiều mai" />
           </Field>
+          {suaId && (
+            <div className="mb-2.5">
+              <label className="lbl">Lý do sửa đơn (ghi vào nhật ký)</label>
+              <input className="inp" value={lyDo} onChange={(e) => setLyDo(e.target.value)} placeholder="VD: khách đổi màu xe, sales gõ nhầm giá" />
+            </div>
+          )}
           <div className="mt-2.5">
             <label className="lbl">📷 Ảnh xe / giấy tờ (không bắt buộc)</label>
             <div className="flex gap-2 flex-wrap items-center">
@@ -430,7 +525,7 @@ function TaoDonInner() {
         </div>
 
         <div className="card">
-          <div className="font-extrabold mb-2.5">Thanh toán</div>
+          <div className="font-extrabold mb-2.5">{suaId ? "Thu thêm (nếu có)" : "Thanh toán"}</div>
           <div className="rounded-xl border border-[#E3E8EF] overflow-hidden mb-3">
             <div className="flex items-center justify-between px-3 py-2 border-b border-dashed border-[#E3E8EF] text-[13.5px]">
               <span className="text-[#5A6572]">Tiền xe ({xeRows.length} xe)</span><span className="font-bold">{fmtVND(tongXe)}</span>
@@ -511,8 +606,8 @@ function TaoDonInner() {
         </div>
         <div className="ml-auto flex gap-2">
           <Link href="/don-ban" className="btn-ghost">Thoát</Link>
-          <button className="btn-ok !px-6" disabled={busy || xeRows.length === 0} onClick={luuDon}>
-            {busy ? "Đang lưu…" : `Tạo đơn hàng${xeRows.length > 1 ? ` (${xeRows.length} xe)` : ""}`}
+          <button className="btn-ok !px-6" disabled={busy || xeRows.length === 0} onClick={suaId ? luuSua : luuDon}>
+            {busy ? "Đang lưu…" : suaId ? "Lưu thay đổi" : `Tạo đơn hàng${xeRows.length > 1 ? ` (${xeRows.length} xe)` : ""}`}
           </button>
         </div>
       </div>
