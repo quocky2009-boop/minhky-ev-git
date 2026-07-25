@@ -57,7 +57,7 @@ function TaoDonInner() {
   const [meta, setMeta] = useState({ sale_date: iso(new Date()), location_code: "", document_status: "Đang làm đăng ký", note: "" });
 
   // Hàng hóa: xe + bán kèm cùng một bảng
-  const [xeRows, setXeRows] = useState([]);   // {frame_number, vehicle_id, ten, unit_price, discount_type, discount_value}
+  const [xeRows, setXeRows] = useState([]);   // {frame_number, vehicle_id, ten, unit_price, discount_type, discount_value, coc_amount}
   const [kemRows, setKemRows] = useState([]); // {item_type, name, qty, unit_price, discount_type, discount_value}
 
   // Chiết khấu tổng + thanh toán
@@ -115,20 +115,16 @@ function TaoDonInner() {
     })();
   }, [params, custs, vehicles]);
 
-  // Nạp từ phiếu cọc
+  // Nạp từ phiếu cọc (chỉ nạp xe + khách; tiền cọc được themXe tự tra từ bảng deposits)
   const [cocDone, setCocDone] = useState(false);
   useEffect(() => {
-    const sk = params.get("sk"), phone = params.get("kh"), coc = params.get("coc");
+    const sk = params.get("sk"), phone = params.get("kh");
     if (!sk || cocDone || custs.length === 0) return;
     setCocDone(true);
     (async () => {
       await themXe(sk);
       const c = custs.find((x) => (x.phone || "").replace(/\D/g, "") === String(phone || "").replace(/\D/g, ""));
       if (c) pickCust(c);
-      if (coc && Number(coc) > 0) {
-        setPays([{ method: "Tiền mặt", amount: Number(coc), note: "Tiền cọc đã nhận" }]);
-        notify(`Đã nạp xe ${sk} và tiền cọc ${fmtVND(Number(coc))} từ phiếu cọc.`);
-      }
     })();
   }, [params, custs]);
 
@@ -167,12 +163,18 @@ function TaoDonInner() {
     if (!["TON_KHO", "GIU_CHO"].includes(u.status)) return notify(`Xe ${s} đang ở trạng thái ${u.status}, không bán được.`, "err");
 
     const v = vehicles.find((x) => x.id === u.vehicle_id);
+    // Xe dang giu cho: tra tien coc da nhan tu bang deposits de tu dong tru vao "khach phai tra"
+    let coc = 0;
+    if (u.status === "GIU_CHO") {
+      const { data: deps } = await supabase.from("deposits").select("amount").eq("frame_number", s).eq("status", "DANG_GIU");
+      coc = (deps || []).reduce((t, d) => t + (Number(d.amount) || 0), 0);
+    }
     setXeRows((p) => [...p, {
       frame_number: s, vehicle_id: u.vehicle_id, ten: v ? `${v.brand} ${v.name} ${v.color}` : u.vehicle_id,
-      location_code: u.location_code, giu_cho: u.status === "GIU_CHO",
+      location_code: u.location_code, giu_cho: u.status === "GIU_CHO", coc_amount: coc,
       unit_price: v?.list_price || 0, discount_type: "amount", discount_value: 0,
     }]);
-    notify(`Đã thêm ${v ? v.name : u.vehicle_id} · ${s}`);
+    notify(`Đã thêm ${v ? v.name : u.vehicle_id} · ${s}` + (coc > 0 ? ` · đã nhận cọc ${fmtVND(coc)}` : ""));
   };
 
   const setXe = (i, k, v) => setXeRows((p) => p.map((x, j) => j === i ? { ...x, [k]: v } : x));
@@ -195,7 +197,10 @@ function TaoDonInner() {
     ? Math.round(tamTinh * Math.min(Math.max(Number(dTong.value) || 0, 0), 100) / 100)
     : Math.min(Math.max(Number(dTong.value) || 0, 0), tamTinh);
   const phaiTra = Math.max(tamTinh - ckTong, 0);
-  const daTra = pays.reduce((s, p) => s + (Number(p.amount) || 0), 0) + payCu.reduce((s, p) => s + p.amount, 0);
+  // Tien coc da nhan cho cac xe GIU_CHO (backend tu cong vao paid_amount khi tao don).
+  // Chi ap dung khi TAO MOI; khi sua don, coc da nam trong paid_amount cu (payCu) roi.
+  const tongCoc = suaId ? 0 : xeRows.reduce((s, r) => s + (Number(r.coc_amount) || 0), 0);
+  const daTra = tongCoc + pays.reduce((s, p) => s + (Number(p.amount) || 0), 0) + payCu.reduce((s, p) => s + p.amount, 0);
   const conLai = Math.max(phaiTra - daTra, 0);
 
   // ===== LƯU ĐƠN =====
@@ -439,7 +444,7 @@ function TaoDonInner() {
                 <td data-label="Tên hàng" className="td">
                   <div className="font-semibold text-[13px]">{r.ten}</div>
                   <div className="font-mono text-[10.5px] text-[#8A93A0]">SK {r.frame_number} · {r.location_code}
-                    {r.giu_cho && <span className="ml-1 text-[#A25F00] font-bold">🔒 đang giữ cọc</span>}</div>
+                    {r.giu_cho && <span className="ml-1 text-[#A25F00] font-bold">🔒 đang giữ cọc{r.coc_amount > 0 ? ` ${fmtVND(r.coc_amount)}` : ""}</span>}</div>
                 </td>
                 <td data-label="SL" className="td text-center">1</td>
                 <td data-label="Đơn giá" className="td"><MoneyInput className="!py-1 !text-xs" value={r.unit_price} onChange={(v) => setXe(i, "unit_price", v)} /></td>
@@ -550,6 +555,12 @@ function TaoDonInner() {
               <span className="font-bold text-[13.5px]">Khách phải trả</span>
               <span className="text-[18px] font-extrabold text-brand">{fmtVND(phaiTra)}</span>
             </div>
+            {tongCoc > 0 && (
+              <div className="flex items-center justify-between px-3 py-2 bg-[#FDF6E3] border-t border-dashed border-[#E3E8EF] text-[13.5px]">
+                <span className="text-[#A25F00] font-semibold">➖ Đã nhận cọc trước</span>
+                <span className="font-bold text-[#A25F00]">−{fmtVND(tongCoc)}</span>
+              </div>
+            )}
           </div>
 
           <div className="flex flex-col gap-1.5 mb-2">
@@ -582,13 +593,15 @@ function TaoDonInner() {
               </button>
             )}
             {pays.length === 0 && (
-              <button className="btn-ghost !text-xs" onClick={() => setPays([{ method: "Tiền mặt", amount: phaiTra }])}>Trả đủ tiền mặt</button>
+              <button className="btn-ghost !text-xs" onClick={() => setPays([{ method: "Tiền mặt", amount: Math.max(phaiTra - tongCoc, 0) }])}>
+                {tongCoc > 0 ? `Trả nốt ${fmtVND(Math.max(phaiTra - tongCoc, 0))} tiền mặt` : "Trả đủ tiền mặt"}
+              </button>
             )}
           </div>
 
           <div className="rounded-xl border border-[#E3E8EF] overflow-hidden">
             <div className="flex items-center justify-between px-3 py-2 border-b border-dashed border-[#E3E8EF] text-[13.5px]">
-              <span className="text-[#5A6572]">Khách đã trả</span><span className="font-bold text-[#0E7A4A]">{fmtVND(daTra)}</span>
+              <span className="text-[#5A6572]">Khách đã trả{tongCoc > 0 ? ` (gồm cọc ${fmtVND(tongCoc)})` : ""}</span><span className="font-bold text-[#0E7A4A]">{fmtVND(daTra)}</span>
             </div>
             <div className={`flex items-center justify-between px-3 py-2.5 ${conLai > 0 ? "bg-[#FFF6E5]" : "bg-[#E7F6EE]"}`}>
               <span className="font-bold text-[13.5px]">{conLai > 0 ? "Còn phải trả" : "Đã thanh toán đủ"}</span>

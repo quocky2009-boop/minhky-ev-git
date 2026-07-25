@@ -175,6 +175,13 @@ exception when others then null; end $do$;
 select cron.schedule('task-nhac-han-15p', '*/15 * * * *', $$ select public.fn_task_nhac_sap_den_han(); $$);
 
 -- ===================== 6) VIEW: is_overdue / thống kê loại trừ 'failed' =====================
+-- Drop truoc vi co them cot moi (khong_dat) lam doi thu tu cot -> create or replace se loi.
+-- Drop theo thu tu phu thuoc: cac view khac phu thuoc v_task_list.
+drop view if exists public.v_task_dashboard;
+drop view if exists public.v_task_theo_diem;
+drop view if exists public.v_task_thong_ke;
+drop view if exists public.v_task_list;
+
 create or replace view public.v_task_list as
 select t.*,
   (t.due_at < now() and t.status not in ('completed','cancelled','failed')) as is_overdue,

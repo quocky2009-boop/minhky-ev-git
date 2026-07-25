@@ -21,6 +21,7 @@ export default function DonBan() {
   const [to, setTo] = useState(iso(new Date()));
   const [fLoc, setFLoc] = useState("");
   const [fInv, setFInv] = useState("");
+  const [showHuy, setShowHuy] = useState(false);
   const [q, setQ] = useState("");
   const _params = useSearchParams();
   useEffect(() => { const v = _params.get("q"); if (v) setQ(v); }, [_params]);
@@ -63,6 +64,7 @@ export default function DonBan() {
   const canCancel = ["ADMIN", "CEO"].includes(profile.role);
 
   const filtered = rows.filter((o) => {
+    if (o.status === "Đã hủy" && !showHuy) return false;
     if (fInv && (o.invoice_status || "Chờ xuất HĐ") !== fInv) return false;
     if (!q) return true;
     const kw = q.toLowerCase();
@@ -74,9 +76,11 @@ export default function DonBan() {
     kho: (o) => locName(o.location_code), kh: (o) => o.customer_name, tien: (o) => total(o),
     hd: (o) => o.invoice_status || "Chờ xuất HĐ", nv: (o) => o.seller_name,
   });
-  const nCho = rows.filter((o) => (o.invoice_status || "Chờ xuất HĐ") === "Chờ xuất HĐ").length;
-  const nXong = rows.length - nCho;
-  const doanhSo = rows.reduce((s, o) => s + total(o), 0);
+  const rowsActive = rows.filter((o) => o.status !== "Đã hủy");
+  const nCho = rowsActive.filter((o) => (o.invoice_status || "Chờ xuất HĐ") === "Chờ xuất HĐ").length;
+  const nXong = rowsActive.length - nCho;
+  const doanhSo = rowsActive.reduce((s, o) => s + total(o), 0);
+  const nHuy = rows.filter((o) => o.status === "Đã hủy").length;
 
   const isVF = (o) => (vOf(o.vehicle_id)?.brand || "").toUpperCase().includes("VINFAST");
   const confirmInv = async (o) => {
@@ -152,18 +156,24 @@ export default function DonBan() {
   };
 
   const deleteOrder = async (o) => {
-    const ly = prompt("XOA VINH VIEN don " + o.code + "?\n- Xe " + o.frame_number + " se HOAN VE TON KHO (neu chua ban lai)\n- Xoa ca ban kem + yeu cau sua gia + anh dinh kem\n- Co luu vet vao lich su kho\n\nNhap LY DO xoa (bat buoc):");
+    const ly = prompt("HỦY đơn " + o.code + "?\n- Đơn được đánh dấu 'Đã hủy' (KHÔNG xóa — vẫn xem lại được)\n- Xe " + o.frame_number + " sẽ HOÀN VỀ TỒN KHO (nếu chưa bán lại)\n- Giữ nguyên thanh toán, bán kèm, ảnh để lưu vết\n\nNhập LÝ DO hủy (bắt buộc):");
     if (ly === null) return;
-    if (!ly.trim()) return notify("Phải nhập lý do xóa đơn.", "err");
+    if (!ly.trim()) return notify("Phải nhập lý do hủy đơn.", "err");
     setBusy(true);
-    try {
-      const paths = (o.photos || []).map((ph) => ph.path).filter(Boolean);
-      if (paths.length > 0) await supabase.storage.from("don-ban").remove(paths);
-    } catch (e) {}
     const { error } = await supabase.rpc("fn_xoa_don", { p_id: o.id, p_ly_do: ly });
     setBusy(false);
     if (error) return notify(errMsg(error), "err");
-    notify("Đã xóa đơn " + o.code + " — xe hoàn về tồn kho (nếu hợp lệ), có lưu vết.");
+    notify("Đã hủy đơn " + o.code + " — xe hoàn về tồn kho (nếu hợp lệ), có lưu vết.");
+    setDetail(null); load();
+  };
+
+  const moLaiDon = async (o) => {
+    if (!confirm(`Mở lại đơn ${o.code} (đã hủy trước đó)?\n\nLưu ý: kiểm tra lại tồn xe — nếu xe đã bán cho đơn khác thì cần xử lý thủ công.`)) return;
+    setBusy(true);
+    const { error } = await supabase.rpc("fn_mo_lai_don", { p_id: o.id });
+    setBusy(false);
+    if (error) return notify(errMsg(error), "err");
+    notify(`Đã mở lại đơn ${o.code}.`);
     setDetail(null); load();
   };
 
@@ -186,7 +196,7 @@ export default function DonBan() {
           <KPI label="Chờ thông tin khách lẻ" value={rows.filter((o) => thieuKhachLe(o)).length} tone="red" />
         )}
         <KPI label="Đã hoàn thành" value={nXong} tone="green" />
-        <KPI label="Tổng đơn" value={rows.length} tone="dark" />
+        <KPI label="Tổng đơn" value={rowsActive.length} tone="dark" />
         <KPI label="Doanh số" value={fmtVND(doanhSo)} tone="blue" />
       </div>
 
@@ -200,6 +210,9 @@ export default function DonBan() {
           <select className="inp !w-auto" value={fInv} onChange={(e) => { setFInv(e.target.value); setPage(1); }}>
             <option value="">Hóa đơn: tất cả</option><option>Chờ xuất HĐ</option><option>Đã xuất HĐ</option>
           </select>
+          <button className={`btn-ghost !text-xs ${showHuy ? "!bg-[#FDEDED] !text-danger" : ""}`} onClick={() => { setShowHuy(!showHuy); setPage(1); }}>
+            {showHuy ? "Đang hiện đơn hủy" : `Đơn đã hủy${nHuy ? ` (${nHuy})` : ""}`}
+          </button>
           <input className="inp !w-56" placeholder="Tìm mã đơn, khách, số khung, số HĐ…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
           <button className="btn-ghost !text-xs" onClick={exportCSV}>⬇ CSV</button>
         </div>
@@ -212,21 +225,30 @@ export default function DonBan() {
                 const v = vOf(o.vehicle_id);
                 const st = o.invoice_status || "Chờ xuất HĐ";
                 const done = st === "Đã xuất HĐ";
+                const huy = o.status === "Đã hủy";
                 return [
-                  <tr key={o.id} className={invId === o.id ? "bg-[#FDF6E3]" : done ? "hover:bg-[#F8FAFC]" : "bg-[#FFFCF5] hover:bg-[#FDF6E3]"}>
+                  <tr key={o.id} className={huy ? "bg-[#F3F4F6] text-[#8A93A0]" : invId === o.id ? "bg-[#FDF6E3]" : done ? "hover:bg-[#F8FAFC]" : "bg-[#FFFCF5] hover:bg-[#FDF6E3]"}>
                     <td data-label="STT" className="td text-center text-xs text-[#8A93A0]">{(pageClamp(page, sorted.length, pageSize) - 1) * pageSize + i + 1}</td>
-                    <td data-label="Mã đơn" className="td font-bold">{o.code}</td>
+                    <td data-label="Mã đơn" className="td font-bold">{o.code}{huy && <Badge tone="red">Đã hủy</Badge>}</td>
                     <td data-label="Ngày" className="td text-xs whitespace-nowrap">{fmtDate(o.sale_date)}</td>
                     <td data-label="Xe" className="td text-[13px]">{v ? `${v.name} ${v.color}` : o.vehicle_id}<div className="font-mono text-[10.5px] text-[#8A93A0]">{o.frame_number}</div></td>
                     <td data-label="Kho" className="td text-xs">{locName(o.location_code)}</td>
                     <td data-label="Khách" className="td text-[13px]">{o.customer_name}<div className="text-[10.5px] text-[#8A93A0]">{o.customer_phone}</div></td>
                     <td data-label="Tổng đơn" className="td font-bold">{fmtVND(total(o))}</td>
-                    <td data-label="Hóa đơn" className="td">{done
+                    <td data-label="Hóa đơn" className="td">{huy
+                      ? <><Badge tone="red">Đã hủy</Badge>{o.cancel_reason && <div className="text-[10.5px] text-[#8A93A0] mt-0.5">{o.cancel_reason}<br/>{o.cancelled_by_name} · {fmtDate(o.cancelled_at)}</div>}</>
+                      : done
                       ? <><Badge tone="green">✓ Hoàn thành</Badge><div className="text-[10.5px] text-[#8A93A0] mt-0.5">HĐ {o.invoice_no} · {fmtDate(o.invoice_date)}<br/>{o.invoice_by_name}<br/>BH ✓{o.app_activated ? " · App ✓" : ""}</div></>
                       : <Badge tone="amber">Chờ xuất HĐ</Badge>}
-                      {thieuKhachLe(o) && <div className="mt-0.5"><Badge tone="red">⚠ Thiếu khách lẻ</Badge></div>}</td>
+                      {!huy && thieuKhachLe(o) && <div className="mt-0.5"><Badge tone="red">⚠ Thiếu khách lẻ</Badge></div>}</td>
                     <td data-label="NV bán" className="td text-xs">{o.seller_name}</td>
                     <td className="td"><div className="flex gap-1.5">
+                      {huy ? (
+                        <>
+                          <button className="btn-ghost !px-2 !py-1 !text-xs" title="Xem nhanh đơn" onClick={() => openDetail(o)}>👁</button>
+                          {profile.role === "CEO" && <button className="btn-ghost !px-2 !py-1 !text-xs hover:text-brand" title="Mở lại đơn (đã hủy nhầm)" onClick={() => moLaiDon(o)}>↩ Mở lại</button>}
+                        </>
+                      ) : (<>
                       {!done && canConfirm && <button className={`!px-2.5 !py-1 !text-xs ${invId === o.id ? "btn-primary" : "btn-ok"}`} onClick={() => { setInvId(invId === o.id ? null : o.id); setInvF({ no: "", date: iso(new Date()), bh: false, app: false }); }}>{invId === o.id ? "Đóng" : "✓ Xác nhận HĐ"}</button>}
                       <button className="btn-ghost !px-2 !py-1 !text-xs" title="Xem nhanh đơn" onClick={() => openDetail(o)}>👁</button>
                       {canSuaTT && total(o) - (o.paid_amount || 0) > 0 && (
@@ -235,6 +257,7 @@ export default function DonBan() {
                       )}
                       <button className="btn-ghost !px-2 !py-1 !text-xs" title="In phiếu xuất" onClick={() => printOrder({ supabase, o, vehicles, locations, settings, notify })}>🖨</button>
                       {done && canCancel && <button className="btn-ghost !px-2 !py-1 !text-xs hover:text-danger" title="Hủy xác nhận" onClick={() => cancelInv(o)}>↺</button>}
+                      </>)}
                     </div></td>
                   </tr>,
                   invId === o.id && (
@@ -274,15 +297,29 @@ export default function DonBan() {
             <div className="fixed inset-0 z-[95] bg-black/50 flex items-center justify-center p-3" onClick={() => setDetail(null)}>
               <div className="bg-white rounded-2xl w-[600px] max-w-full max-h-[88vh] overflow-y-auto p-4" onClick={(e) => e.stopPropagation()}>
                 <div className="flex items-center gap-1.5 mb-3 flex-wrap">
-                  <div className="font-extrabold text-base mr-auto">Xem nhanh đơn {detail.code}</div>
+                  <div className="font-extrabold text-base mr-auto">Xem nhanh đơn {detail.code}{detail.status === "Đã hủy" && <Badge tone="red">Đã hủy</Badge>}</div>
+                  {detail.status === "Đã hủy" ? (
+                    <>
+                      <button className="btn-primary !px-3 !py-1.5 !text-xs" onClick={() => printOrder({ supabase, o: detail, vehicles, locations, settings, notify })}>🖨 In phiếu</button>
+                      {profile.role === "CEO" && <button className="btn-ghost !px-3 !py-1.5 !text-xs !text-brand" disabled={busy} onClick={() => moLaiDon(detail)}>↩ Mở lại đơn</button>}
+                      <button className="btn-ghost !px-3 !py-1.5 !text-xs" onClick={() => setDetail(null)}>✕</button>
+                    </>
+                  ) : (<>
                   {canSuaTT && <button className="btn-ok !px-3 !py-1.5 !text-xs" onClick={() => setPayEdit({ paid: detail.paid_amount || 0, note: "", method: "Tiền mặt" })}>💵 Thu tiền</button>}
                   {detail.invoice_status !== "Đã xuất HĐ"
                     ? <Link href={`/ban-hang?sua=${detail.id}`} className="btn-primary !px-3 !py-1.5 !text-xs">✎ Sửa đơn</Link>
                     : <span className="text-[10.5px] text-[#8A93A0] px-1">Đã xuất HĐ — hủy xác nhận mới sửa được</span>}
                   <button className="btn-primary !px-3 !py-1.5 !text-xs" onClick={() => printOrder({ supabase, o: detail, vehicles, locations, settings, notify })}>🖨 In phiếu</button>
-                  {profile.role === "CEO" && <button className="btn-ghost !px-3 !py-1.5 !text-xs !text-danger" disabled={busy} onClick={() => deleteOrder(detail)}>🗑 Xóa đơn</button>}
+                  {profile.role === "CEO" && <button className="btn-ghost !px-3 !py-1.5 !text-xs !text-danger" disabled={busy} onClick={() => deleteOrder(detail)}>✕ Hủy đơn</button>}
                   <button className="btn-ghost !px-3 !py-1.5 !text-xs" onClick={() => setDetail(null)}>✕</button>
+                  </>)}
                 </div>
+                {detail.status === "Đã hủy" && detail.cancel_reason && (
+                  <div className="mb-3 p-2.5 rounded-xl bg-[#FDEDED] text-[13px]">
+                    <b className="text-danger">Đã hủy</b> — {detail.cancel_reason}
+                    <div className="text-[11px] text-[#8A93A0] mt-0.5">bởi {detail.cancelled_by_name} · {fmtDate(detail.cancelled_at)}</div>
+                  </div>
+                )}
                 {(() => {
                   const conLai = Math.max(0, tong - (detail.paid_amount || 0));
                   const httt = (() => {
