@@ -63,7 +63,7 @@ function KhachHangInner() {
   const locName = (c) => locations.find((l) => l.code === c)?.name || c;
   const vName = (id) => { const v = vehicles.find((x) => x.id === id); return v ? `${v.name} ${v.color}` : id; };
 
-  const openNew = () => { setF(emptyForm); setTab("chung"); setDonHang([]); setPhieuDV([]); setCareLogs([]); setShow(true); };
+  const openNew = () => { setF({ ...emptyForm, location_code: profile.store_code || "" }); setTab("chung"); setDonHang([]); setPhieuDV([]); setCareLogs([]); setShow(true); };
 
   const openEdit = async (c) => {
     setF({
@@ -155,8 +155,8 @@ function KhachHangInner() {
     const TABS = [
       ["chung", "Thông tin chung"],
       ["phanloai", "Phân loại & nhu cầu"],
-      ["muahang", `Lịch sử mua hàng${t.so_don ? ` (${t.so_don})` : ""}`],
       ["chamsoc", `Lịch sử chăm sóc${careLogs.length ? ` (${careLogs.length})` : ""}`],
+      ["muahang", `Lịch sử mua hàng${t.so_don ? ` (${t.so_don})` : ""}`],
     ];
     return (
       <div className="flex flex-col gap-4 pb-24">
@@ -226,10 +226,14 @@ function KhachHangInner() {
                 </select>
               </Field>
               <Field label="Nhân viên phụ trách">
-                <select className="inp" value={f.assigned_to} onChange={(e) => setF((p) => ({ ...p, assigned_to: e.target.value }))}>
-                  <option value="">— Chưa giao —</option>
-                  {staff.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.role})</option>)}
-                </select>
+                {profile.role === "CEO" ? (
+                  <select className="inp" value={f.assigned_to} onChange={(e) => setF((p) => ({ ...p, assigned_to: e.target.value }))}>
+                    <option value="">— Chưa giao —</option>
+                    {staff.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.role})</option>)}
+                  </select>
+                ) : (
+                  <input className="inp bg-[#F8FAFC]" value={f.assigned_name || "— Chưa giao —"} disabled title="Chỉ Ban giám đốc được đổi người phụ trách" />
+                )}
               </Field>
               <Field label="Cửa hàng phụ trách">
                 <LocSearch locations={locations.filter((l) => l.type === "Cửa hàng")} value={f.location_code}

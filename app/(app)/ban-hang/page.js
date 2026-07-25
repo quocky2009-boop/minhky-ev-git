@@ -604,7 +604,7 @@ function TaoDonInner() {
               <span className="text-[#5A6572]">Khách đã trả{tongCoc > 0 ? ` (gồm cọc ${fmtVND(tongCoc)})` : ""}</span><span className="font-bold text-[#0E7A4A]">{fmtVND(daTra)}</span>
             </div>
             <div className={`flex items-center justify-between px-3 py-2.5 ${conLai > 0 ? "bg-[#FFF6E5]" : "bg-[#E7F6EE]"}`}>
-              <span className="font-bold text-[13.5px]">{conLai > 0 ? "Còn phải trả" : "Đã thanh toán đủ"}</span>
+              <span className="font-bold text-[13.5px]">Còn phải trả</span>
               <span className={`text-[18px] font-extrabold ${conLai > 0 ? "text-[#A25F00]" : "text-[#0E7A4A]"}`}>{fmtVND(conLai)}</span>
             </div>
           </div>

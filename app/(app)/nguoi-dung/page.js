@@ -6,7 +6,7 @@ import { ROLES } from "@/lib/const";
 import { errMsg } from "@/lib/format";
 
 export default function NguoiDung() {
-  const { supabase, profile, loading, regions } = useCatalog();
+  const { supabase, profile, loading, regions, locations } = useCatalog();
   const { toast, notify } = useToast();
   const [users, setUsers] = useState([]);
 
@@ -22,6 +22,12 @@ export default function NguoiDung() {
     notify(`Đã cập nhật quyền cho ${u.name}.`); load();
   };
 
+  const setStore = async (u, store) => {
+    const { error } = await supabase.rpc("fn_set_store", { p_user: u.id, p_store: store || "" });
+    if (error) return notify(errMsg(error), "err");
+    notify(`Đã gán cửa hàng cho ${u.name}.`); load();
+  };
+
   if (loading || !profile) return <div className="card">Đang tải dữ liệu…</div>;
 
   return (
@@ -29,9 +35,9 @@ export default function NguoiDung() {
       <Toast toast={toast} />
       <div className="card">
         <div className="font-extrabold mb-1">Người dùng & phân quyền ({users.length})</div>
-        <p className="text-xs text-[#5A6572] mb-3">Tạo tài khoản mới: vào Supabase → Authentication → Add user (email + mật khẩu). Tài khoản mới mặc định là Sales, CEO phân quyền lại tại đây.</p>
+        <p className="text-xs text-[#5A6572] mb-3">Tạo tài khoản mới: vào Supabase → Authentication → Add user (email + mật khẩu). Tài khoản mới mặc định là Sales, CEO phân quyền lại tại đây. Cửa hàng gán ở đây sẽ tự điền làm "cửa hàng phụ trách" khi nhân viên tạo khách mới.</p>
         <div className="overflow-x-auto"><table className="w-full border-collapse">
-          <thead><tr><th className="th">Người dùng</th><th className="th">Vai trò</th><th className="th">Khu vực (với Quản lý)</th><th className="th">Trạng thái</th></tr></thead>
+          <thead><tr><th className="th">Người dùng</th><th className="th">Vai trò</th><th className="th">Khu vực (với Quản lý)</th><th className="th">Cửa hàng</th><th className="th">Trạng thái</th></tr></thead>
           <tbody>{users.map((u) => (
             <tr key={u.id}>
               <td className="td font-bold">{u.name}</td>
@@ -43,6 +49,12 @@ export default function NguoiDung() {
               <td className="td">
                 <select className="inp !w-auto !py-1.5 !text-xs" value={u.region || ""} onChange={(e) => setRole(u, u.role, e.target.value)}>
                   <option value="">Toàn hệ thống</option>{regions.map((r) => <option key={r}>{r}</option>)}
+                </select>
+              </td>
+              <td className="td">
+                <select className="inp !w-auto !py-1.5 !text-xs" value={u.store_code || ""} onChange={(e) => setStore(u, e.target.value)}>
+                  <option value="">— Chưa gán —</option>
+                  {(locations || []).map((l) => <option key={l.code} value={l.code}>{l.name}</option>)}
                 </select>
               </td>
               <td className="td"><Badge tone="green">{u.status}</Badge></td>

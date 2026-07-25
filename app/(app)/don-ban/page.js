@@ -63,8 +63,9 @@ export default function DonBan() {
   const canConfirm = ["SALES", "MANAGER", "ADMIN", "CEO"].includes(profile.role);
   const canCancel = ["ADMIN", "CEO"].includes(profile.role);
 
+  const daDong = (o) => o.status === "Đã hủy" || o.status === "Đã trả hàng";
   const filtered = rows.filter((o) => {
-    if (o.status === "Đã hủy" && !showHuy) return false;
+    if (daDong(o) && !showHuy) return false;
     if (fInv && (o.invoice_status || "Chờ xuất HĐ") !== fInv) return false;
     if (!q) return true;
     const kw = q.toLowerCase();
@@ -76,11 +77,11 @@ export default function DonBan() {
     kho: (o) => locName(o.location_code), kh: (o) => o.customer_name, tien: (o) => total(o),
     hd: (o) => o.invoice_status || "Chờ xuất HĐ", nv: (o) => o.seller_name,
   });
-  const rowsActive = rows.filter((o) => o.status !== "Đã hủy");
+  const rowsActive = rows.filter((o) => o.status !== "Đã hủy" && o.status !== "Đã trả hàng");
   const nCho = rowsActive.filter((o) => (o.invoice_status || "Chờ xuất HĐ") === "Chờ xuất HĐ").length;
   const nXong = rowsActive.length - nCho;
   const doanhSo = rowsActive.reduce((s, o) => s + total(o), 0);
-  const nHuy = rows.filter((o) => o.status === "Đã hủy").length;
+  const nHuy = rows.filter((o) => o.status === "Đã hủy" || o.status === "Đã trả hàng").length;
 
   const isVF = (o) => (vOf(o.vehicle_id)?.brand || "").toUpperCase().includes("VINFAST");
   const confirmInv = async (o) => {
@@ -177,6 +178,18 @@ export default function DonBan() {
     setDetail(null); load();
   };
 
+  const traHang = async (o) => {
+    const ly = prompt("TRẢ LẠI HÀNG BÁN — đơn " + o.code + " (đã giao)?\n- Xe " + o.frame_number + " sẽ NHẬP LẠI KHO\n- Tiền khách đã trả sẽ được HOÀN: nếu phiếu thu cùng ngày chưa chốt quỹ thì trừ lùi, nếu đã chốt thì lập phiếu chi hoàn\n- Đơn đánh dấu 'Đã trả hàng' (giữ lưu vết)\n\nNhập LÝ DO trả hàng (bắt buộc):");
+    if (ly === null) return;
+    if (!ly.trim()) return notify("Phải nhập lý do trả hàng.", "err");
+    setBusy(true);
+    const { error } = await supabase.rpc("fn_tra_hang_ban", { p: { id: o.id, ly_do: ly, location_code: o.location_code } });
+    setBusy(false);
+    if (error) return notify(errMsg(error), "err");
+    notify("Đã trả hàng đơn " + o.code + " — xe nhập lại kho, hoàn tiền theo sổ quỹ.");
+    setDetail(null); load();
+  };
+
   const exportCSV = () => {
     downloadCSV(`don_ban_${from}_den_${to}.csv`,
       [["Ma_Don","Ngay_Ban","Kho","Xe","Mau","So_Khung","Khach","SDT","Tong_Don","Da_TT","Trang_Thai_HD","So_HD","Ngay_HD","Nguoi_Xac_Nhan","Kich_Hoat_Bao_Hanh","Kich_Hoat_App","NV_Ban"],
@@ -211,7 +224,7 @@ export default function DonBan() {
             <option value="">Hóa đơn: tất cả</option><option>Chờ xuất HĐ</option><option>Đã xuất HĐ</option>
           </select>
           <button className={`btn-ghost !text-xs ${showHuy ? "!bg-[#FDEDED] !text-danger" : ""}`} onClick={() => { setShowHuy(!showHuy); setPage(1); }}>
-            {showHuy ? "Đang hiện đơn hủy" : `Đơn đã hủy${nHuy ? ` (${nHuy})` : ""}`}
+            {showHuy ? "Đang hiện đơn hủy/trả" : `Đơn hủy/trả${nHuy ? ` (${nHuy})` : ""}`}
           </button>
           <input className="inp !w-56" placeholder="Tìm mã đơn, khách, số khung, số HĐ…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
           <button className="btn-ghost !text-xs" onClick={exportCSV}>⬇ CSV</button>
@@ -225,18 +238,19 @@ export default function DonBan() {
                 const v = vOf(o.vehicle_id);
                 const st = o.invoice_status || "Chờ xuất HĐ";
                 const done = st === "Đã xuất HĐ";
-                const huy = o.status === "Đã hủy";
+                const huy = o.status === "Đã hủy" || o.status === "Đã trả hàng";
+                const nhanTra = o.status === "Đã trả hàng";
                 return [
                   <tr key={o.id} className={huy ? "bg-[#F3F4F6] text-[#8A93A0]" : invId === o.id ? "bg-[#FDF6E3]" : done ? "hover:bg-[#F8FAFC]" : "bg-[#FFFCF5] hover:bg-[#FDF6E3]"}>
                     <td data-label="STT" className="td text-center text-xs text-[#8A93A0]">{(pageClamp(page, sorted.length, pageSize) - 1) * pageSize + i + 1}</td>
-                    <td data-label="Mã đơn" className="td font-bold">{o.code}{huy && <Badge tone="red">Đã hủy</Badge>}</td>
+                    <td data-label="Mã đơn" className="td font-bold">{o.code}{nhanTra ? <Badge tone="red">Đã trả hàng</Badge> : huy && <Badge tone="red">Đã hủy</Badge>}</td>
                     <td data-label="Ngày" className="td text-xs whitespace-nowrap">{fmtDate(o.sale_date)}</td>
                     <td data-label="Xe" className="td text-[13px]">{v ? `${v.name} ${v.color}` : o.vehicle_id}<div className="font-mono text-[10.5px] text-[#8A93A0]">{o.frame_number}</div></td>
                     <td data-label="Kho" className="td text-xs">{locName(o.location_code)}</td>
                     <td data-label="Khách" className="td text-[13px]">{o.customer_name}<div className="text-[10.5px] text-[#8A93A0]">{o.customer_phone}</div></td>
                     <td data-label="Tổng đơn" className="td font-bold">{fmtVND(total(o))}</td>
                     <td data-label="Hóa đơn" className="td">{huy
-                      ? <><Badge tone="red">Đã hủy</Badge>{o.cancel_reason && <div className="text-[10.5px] text-[#8A93A0] mt-0.5">{o.cancel_reason}<br/>{o.cancelled_by_name} · {fmtDate(o.cancelled_at)}</div>}</>
+                      ? <><Badge tone="red">{nhanTra ? "Đã trả hàng" : "Đã hủy"}</Badge>{o.cancel_reason && <div className="text-[10.5px] text-[#8A93A0] mt-0.5">{o.cancel_reason}<br/>{o.cancelled_by_name} · {fmtDate(o.cancelled_at)}</div>}</>
                       : done
                       ? <><Badge tone="green">✓ Hoàn thành</Badge><div className="text-[10.5px] text-[#8A93A0] mt-0.5">HĐ {o.invoice_no} · {fmtDate(o.invoice_date)}<br/>{o.invoice_by_name}<br/>BH ✓{o.app_activated ? " · App ✓" : ""}</div></>
                       : <Badge tone="amber">Chờ xuất HĐ</Badge>}
@@ -246,7 +260,7 @@ export default function DonBan() {
                       {huy ? (
                         <>
                           <button className="btn-ghost !px-2 !py-1 !text-xs" title="Xem nhanh đơn" onClick={() => openDetail(o)}>👁</button>
-                          {profile.role === "CEO" && <button className="btn-ghost !px-2 !py-1 !text-xs hover:text-brand" title="Mở lại đơn (đã hủy nhầm)" onClick={() => moLaiDon(o)}>↩ Mở lại</button>}
+                          {profile.role === "CEO" && !nhanTra && <button className="btn-ghost !px-2 !py-1 !text-xs hover:text-brand" title="Mở lại đơn (đã hủy nhầm)" onClick={() => moLaiDon(o)}>↩ Mở lại</button>}
                         </>
                       ) : (<>
                       {!done && canConfirm && <button className={`!px-2.5 !py-1 !text-xs ${invId === o.id ? "btn-primary" : "btn-ok"}`} onClick={() => { setInvId(invId === o.id ? null : o.id); setInvF({ no: "", date: iso(new Date()), bh: false, app: false }); }}>{invId === o.id ? "Đóng" : "✓ Xác nhận HĐ"}</button>}
@@ -297,11 +311,11 @@ export default function DonBan() {
             <div className="fixed inset-0 z-[95] bg-black/50 flex items-center justify-center p-3" onClick={() => setDetail(null)}>
               <div className="bg-white rounded-2xl w-[600px] max-w-full max-h-[88vh] overflow-y-auto p-4" onClick={(e) => e.stopPropagation()}>
                 <div className="flex items-center gap-1.5 mb-3 flex-wrap">
-                  <div className="font-extrabold text-base mr-auto">Xem nhanh đơn {detail.code}{detail.status === "Đã hủy" && <Badge tone="red">Đã hủy</Badge>}</div>
-                  {detail.status === "Đã hủy" ? (
+                  <div className="font-extrabold text-base mr-auto">Xem nhanh đơn {detail.code}{(detail.status === "Đã hủy" || detail.status === "Đã trả hàng") && <Badge tone="red">{detail.status}</Badge>}</div>
+                  {(detail.status === "Đã hủy" || detail.status === "Đã trả hàng") ? (
                     <>
                       <button className="btn-primary !px-3 !py-1.5 !text-xs" onClick={() => printOrder({ supabase, o: detail, vehicles, locations, settings, notify })}>🖨 In phiếu</button>
-                      {profile.role === "CEO" && <button className="btn-ghost !px-3 !py-1.5 !text-xs !text-brand" disabled={busy} onClick={() => moLaiDon(detail)}>↩ Mở lại đơn</button>}
+                      {profile.role === "CEO" && detail.status === "Đã hủy" && <button className="btn-ghost !px-3 !py-1.5 !text-xs !text-brand" disabled={busy} onClick={() => moLaiDon(detail)}>↩ Mở lại đơn</button>}
                       <button className="btn-ghost !px-3 !py-1.5 !text-xs" onClick={() => setDetail(null)}>✕</button>
                     </>
                   ) : (<>
@@ -310,13 +324,16 @@ export default function DonBan() {
                     ? <Link href={`/ban-hang?sua=${detail.id}`} className="btn-primary !px-3 !py-1.5 !text-xs">✎ Sửa đơn</Link>
                     : <span className="text-[10.5px] text-[#8A93A0] px-1">Đã xuất HĐ — hủy xác nhận mới sửa được</span>}
                   <button className="btn-primary !px-3 !py-1.5 !text-xs" onClick={() => printOrder({ supabase, o: detail, vehicles, locations, settings, notify })}>🖨 In phiếu</button>
-                  {profile.role === "CEO" && <button className="btn-ghost !px-3 !py-1.5 !text-xs !text-danger" disabled={busy} onClick={() => deleteOrder(detail)}>✕ Hủy đơn</button>}
+                  {profile.role === "CEO" && (detail.invoice_status === "Đã xuất HĐ"
+                    ? <button className="btn-ghost !px-3 !py-1.5 !text-xs !text-danger" disabled={busy} onClick={() => traHang(detail)}>↩ Trả lại hàng bán</button>
+                    : <button className="btn-ghost !px-3 !py-1.5 !text-xs !text-danger" disabled={busy} onClick={() => deleteOrder(detail)}>✕ Hủy đơn</button>
+                  )}
                   <button className="btn-ghost !px-3 !py-1.5 !text-xs" onClick={() => setDetail(null)}>✕</button>
                   </>)}
                 </div>
-                {detail.status === "Đã hủy" && detail.cancel_reason && (
+                {(detail.status === "Đã hủy" || detail.status === "Đã trả hàng") && detail.cancel_reason && (
                   <div className="mb-3 p-2.5 rounded-xl bg-[#FDEDED] text-[13px]">
-                    <b className="text-danger">Đã hủy</b> — {detail.cancel_reason}
+                    <b className="text-danger">{detail.status}</b> — {detail.cancel_reason}
                     <div className="text-[11px] text-[#8A93A0] mt-0.5">bởi {detail.cancelled_by_name} · {fmtDate(detail.cancelled_at)}</div>
                   </div>
                 )}
@@ -400,7 +417,7 @@ export default function DonBan() {
                           ["Tổng đơn", fmtVND(tong), "font-bold text-brand"],
                           ["Đã thanh toán", fmtVND(detail.paid_amount || 0), "font-bold text-[#0E7A4A]"],
                         ]}
-                        total={{ label: conLai > 0 ? "Còn phải thu" : "Đã thanh toán đủ", value: fmtVND(conLai), done: conLai === 0 }}
+                        total={{ label: "Còn phải trả", value: fmtVND(conLai), done: conLai === 0 }}
                       />
 
                       {payEdit && (
