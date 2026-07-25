@@ -26,6 +26,7 @@ export default function SoQuy() {
   const sort = useSortable();
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState("so"); // so | quy | chot
+  const [detail, setDetail] = useState(null);
   const [af, setAf] = useState({ id: null, name: "", type: "Tiền mặt", location_code: "", bank_info: "", opening_balance: 0 });
   const [showAcc, setShowAcc] = useState(false);
 
@@ -182,7 +183,7 @@ export default function SoQuy() {
                 <tbody>{pageSlice(sorted, page, pageSize).map((t, i) => (
                   <tr key={t.id} className="hover:bg-[#F8FAFC]">
                     <td data-label="STT" className="td text-center text-xs text-[#8A93A0]">{(pageClamp(page, sorted.length, pageSize) - 1) * pageSize + i + 1}</td>
-                    <td data-label="Mã phiếu" className="td font-bold text-brand">{t.code}</td>
+                    <td data-label="Mã phiếu" className="td"><button className="font-bold text-brand hover:underline" onClick={() => setDetail(t)}>{t.code}</button></td>
                     <td data-label="Loại phiếu" className="td text-[13px]">{t.ref_doc ? <Badge tone="blue">Tự động</Badge> : <Badge tone="gray">Thủ công</Badge>} {t.category}</td>
                     <td data-label="Tiền thu" className="td rt font-bold text-[#0E7A4A]">{t.direction === "Thu" ? fmtVND(t.amount) : "—"}</td>
                     <td data-label="Tiền chi" className="td rt font-bold text-danger">{t.direction === "Chi" ? fmtVND(t.amount) : "—"}</td>
@@ -266,6 +267,34 @@ export default function SoQuy() {
             {closings.length === 0 && <tr><td className="td" colSpan={7}>Chưa chốt quỹ ngày nào.</td></tr>}
             </tbody>
           </table></div>
+        </div>
+      )}
+      {detail && (
+        <div className="fixed inset-0 z-[95] bg-black/50 flex items-center justify-center p-3" onClick={() => setDetail(null)}>
+          <div className="bg-white rounded-2xl w-[520px] max-w-full max-h-[88vh] overflow-y-auto p-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-2 mb-3">
+              <div className="text-lg font-extrabold mr-auto">{detail.code}</div>
+              <Badge tone={detail.direction === "Thu" ? "green" : "amber"}>{detail.direction === "Thu" ? "Phiếu thu" : "Phiếu chi"}</Badge>
+              {detail.ref_doc && <Badge tone="blue">Tự động</Badge>}
+              <button className="btn-ghost !text-xs" onClick={() => setDetail(null)}>✕</button>
+            </div>
+            <div className="rounded-xl border border-[#E3E8EF] overflow-hidden mb-3">
+              <div className={`flex justify-between px-3 py-2.5 ${detail.direction === "Thu" ? "bg-[#E7F6EE]" : "bg-[#FFF6E5]"}`}>
+                <span className="font-bold">Số tiền</span>
+                <span className={`text-lg font-extrabold ${detail.direction === "Thu" ? "text-[#0E7A4A]" : "text-danger"}`}>{fmtVND(detail.amount)}</span>
+              </div>
+            </div>
+            <div className="flex flex-col gap-1.5 text-[13px]">
+              <div className="flex gap-2"><span className="text-[#8A93A0] w-32 shrink-0">Danh mục</span><span className="font-semibold">{detail.category}</span></div>
+              <div className="flex gap-2"><span className="text-[#8A93A0] w-32 shrink-0">Đối tượng</span><span>{detail.counterparty || "—"}</span></div>
+              <div className="flex gap-2"><span className="text-[#8A93A0] w-32 shrink-0">Quỹ</span><span>{accName(detail.account_id)}</span></div>
+              <div className="flex gap-2"><span className="text-[#8A93A0] w-32 shrink-0">Chứng từ gốc</span><span className="text-brand">{detail.ref_doc || "—"}</span></div>
+              <div className="flex gap-2"><span className="text-[#8A93A0] w-32 shrink-0">Người tạo</span><span>{detail.created_by_name}</span></div>
+              <div className="flex gap-2"><span className="text-[#8A93A0] w-32 shrink-0">Ngày tạo</span><span>{fmtTime(detail.created_at)}</span></div>
+              <div className="flex gap-2"><span className="text-[#8A93A0] w-32 shrink-0">Ngày ghi nhận</span><span>{fmtDate(detail.txn_date)}</span></div>
+              {detail.description && <div className="flex gap-2"><span className="text-[#8A93A0] w-32 shrink-0">Diễn giải</span><span>{detail.description}</span></div>}
+            </div>
+          </div>
         </div>
       )}
     </div>

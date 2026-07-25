@@ -25,6 +25,7 @@ export default function PhieuThuChi({ dir }) {
   const sort = useSortable();
   const [busy, setBusy] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [detail, setDetail] = useState(null);
   const [f, setF] = useState({ account_id: "", amount: "", category: "", counterparty: "", description: "", txn_date: iso(new Date()) });
 
   const can = (p) => profile?.role === "CEO" || !!perms[p];
@@ -92,6 +93,74 @@ export default function PhieuThuChi({ dir }) {
   const tone = isThu ? "green" : "amber";
   const tenPhieu = isThu ? "Phiếu thu" : "Phiếu chi";
   const nhomNhan = isThu ? "người nộp" : "người nhận";
+
+  // ===== CHI TIẾT PHIẾU =====
+  if (detail) {
+    const t = detail;
+    const row = (label, val, link) => (
+      <div className="flex gap-2 text-[13px] py-1">
+        <span className="text-[#8A93A0] w-32 shrink-0">{label}</span>
+        <span className={`font-semibold ${link ? "text-brand" : ""}`}>{val}</span>
+      </div>
+    );
+    return (
+      <div className="flex flex-col gap-4 pb-8">
+        <Toast toast={toast} />
+        <div className="flex items-center gap-2 flex-wrap">
+          <button className="btn-ghost !text-xs" onClick={() => setDetail(null)}>← Quay lại danh sách {tenPhieu.toLowerCase()}</button>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="text-xl font-extrabold">{t.code}</div>
+          <Badge tone="green">Hoàn thành</Badge>
+          {t.ref_doc && <Badge tone="blue">Tự động</Badge>}
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-3">
+          <div className="lg:col-span-2 flex flex-col gap-4">
+            <div className="card">
+              <div className="font-extrabold mb-3">Thông tin chung</div>
+              <div className="grid md:grid-cols-2 gap-x-6">
+                {row(`Nhóm ${nhomNhan}`, t.counterparty ? "Khách/Đối tượng" : "—")}
+                {row(`Tên ${nhomNhan}`, t.counterparty || "—", true)}
+                {row(`Loại ${tenPhieu.toLowerCase()}`, t.ref_doc ? "Tự động" : (t.category || "Thủ công"))}
+                {row("Mã phiếu", t.code)}
+              </div>
+            </div>
+            <div className="card">
+              <div className="font-extrabold mb-3">Giá trị ghi nhận</div>
+              <div className="grid md:grid-cols-2 gap-x-6">
+                {row("Giá trị", <span className={`text-lg font-extrabold ${isThu ? "text-[#0E7A4A]" : "text-danger"}`}>{fmtVND(t.amount)}</span>)}
+                {row("Hình thức thanh toán", accs.find((a) => a.id === t.account_id)?.type || "—")}
+                {row("Quỹ", accName(t.account_id))}
+                {row("Danh mục", t.category || "—")}
+              </div>
+              {t.ref_doc && (
+                <div className="mt-3 text-[13px] text-[#5A6572]">
+                  Phiếu được tạo tự động. Chứng từ gốc: <b className="text-brand">{t.ref_doc}</b>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-4">
+            <div className="card">
+              <div className="font-extrabold mb-3">Thông tin bổ sung</div>
+              <div className="flex flex-col gap-1 text-[13px]">
+                <div className="flex gap-2"><span className="text-[#8A93A0] w-28 shrink-0">Chi nhánh</span><span>{accs.find((a) => a.id === t.account_id)?.location_code ? locName(accs.find((a) => a.id === t.account_id).location_code) : "Mặc định"}</span></div>
+                <div className="flex gap-2"><span className="text-[#8A93A0] w-28 shrink-0">Người tạo</span><span>{t.created_by_name}</span></div>
+                <div className="flex gap-2"><span className="text-[#8A93A0] w-28 shrink-0">Ngày tạo</span><span>{fmtTime(t.created_at)}</span></div>
+                <div className="flex gap-2"><span className="text-[#8A93A0] w-28 shrink-0">Ngày ghi nhận</span><span>{fmtDate(t.txn_date)}</span></div>
+              </div>
+            </div>
+            <div className="card">
+              <div className="font-extrabold mb-2">Mô tả</div>
+              <div className="text-[13px] text-[#3B4552]">{t.description || (t.ref_doc ? `${tenPhieu} tự động tạo khi ${isThu ? "khách thanh toán cho đơn hàng" : "phát sinh chi phí"}` : "—")}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // ===== FORM TẠO PHIẾU =====
   if (showForm) {
@@ -204,7 +273,7 @@ export default function PhieuThuChi({ dir }) {
                 <tr key={t.id} className="hover:bg-[#F8FAFC]">
                   <td data-label="STT" className="td text-center text-xs text-[#8A93A0]">{(pageClamp(page, sorted.length, pageSize) - 1) * pageSize + i + 1}</td>
                   <td data-label="Ngày tạo" className="td text-xs whitespace-nowrap">{fmtTime(t.created_at)}</td>
-                  <td data-label="Mã phiếu" className="td font-bold text-brand">{t.code}</td>
+                  <td data-label="Mã phiếu" className="td"><button className="font-bold text-brand hover:underline" onClick={() => setDetail(t)}>{t.code}</button></td>
                   <td data-label="Danh mục" className="td text-[13px]">{t.ref_doc ? <Badge tone="blue">Tự động</Badge> : null} {t.category}</td>
                   <td data-label={`Tên ${nhomNhan}`} className="td text-[13px]">{t.counterparty || <span className="text-[#8A93A0]">—</span>}</td>
                   <td data-label="Số tiền" className="td rt font-bold"><span className={isThu ? "text-[#0E7A4A]" : "text-danger"}>{fmtVND(t.amount)}</span></td>
