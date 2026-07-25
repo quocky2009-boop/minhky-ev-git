@@ -4,13 +4,13 @@ import { useCatalog, useToast } from "@/lib/useData";
 import { Badge, Toast, KPI, Field, Pager, pageSlice } from "@/components/ui";
 import { errMsg } from "@/lib/format";
 import { uploadAnhDon } from "@/lib/img";
-import { TASK_STATUS, PRIORITY, hanLabel, sortTasks, fmtHan, toLocalInput } from "@/lib/task";
+import { TASK_STATUS, TASK_CLOSED, PRIORITY, hanLabel, sortTasks, fmtHan, toLocalInput } from "@/lib/task";
 import { InfoRows, AuditLog } from "@/components/detail";
 
 const TASK_LOG = {
   create: "Tạo việc", start: "Bắt đầu thực hiện", check: "Tích checklist", uncheck: "Bỏ tích checklist",
   submit: "Gửi kết quả", resubmit: "Gửi lại kết quả", submit_auto_complete: "Gửi & tự hoàn thành",
-  approve: "Xác nhận hoàn thành", revise: "Yêu cầu bổ sung", cancel: "Hủy việc", update: "Cập nhật việc",
+  approve: "Xác nhận hoàn thành", revise: "Yêu cầu bổ sung", reject: "Không đạt", cancel: "Hủy việc", update: "Cập nhật việc",
 };
 
 export default function VievCuaToi() {
@@ -148,6 +148,12 @@ export default function VievCuaToi() {
               {d.completion_note && <div>{d.completion_note}</div>}
             </div>
           )}
+          {d.status === "failed" && (
+            <div className="text-[13px] p-2.5 rounded-xl bg-[#FDEDED]">
+              <b>❌ Không đạt</b> — đánh giá bởi {d.completed_by_name}
+              {d.completion_note && <div>Lý do: {d.completion_note}</div>}
+            </div>
+          )}
           {collabs.length > 0 && <div className="text-[11px] text-[#8A93A0] mt-2">Phối hợp: {collabs.map((c) => c.user_name).join(", ")}</div>}
           {(d.attachments || []).length > 0 && (
             <div className="flex gap-2 flex-wrap mt-2">
@@ -169,7 +175,7 @@ export default function VievCuaToi() {
               {cl.map((x) => (
                 <label key={x.id} className={`flex items-start gap-2.5 p-2.5 rounded-xl border cursor-pointer ${x.is_completed ? "bg-[#F4FBF7] border-[#BBE3CC]" : "border-[#E3E8EF]"}`}>
                   <input type="checkbox" className="w-5 h-5 mt-0.5 shrink-0" checked={x.is_completed}
-                    disabled={["completed", "cancelled"].includes(d.status)}
+                    disabled={TASK_CLOSED.includes(d.status)}
                     onChange={(e) => tichCl(x, e.target.checked)} />
                   <span className="min-w-0">
                     <span className={`text-[13.5px] ${x.is_completed ? "line-through text-[#8A93A0]" : ""}`}>{x.title}</span>
@@ -271,12 +277,12 @@ export default function VievCuaToi() {
   const cuaToi = rows.filter((t) => t.assignee_id === profile.id);
   const dem = (fn) => cuaToi.filter(fn).length;
   const quaHan = dem((t) => t.is_overdue);
-  const homNay = dem((t) => !t.is_overdue && new Date(t.due_at).toDateString() === new Date().toDateString() && !["completed", "cancelled"].includes(t.status));
+  const homNay = dem((t) => !t.is_overdue && new Date(t.due_at).toDateString() === new Date().toDateString() && !TASK_CLOSED.includes(t.status));
   const filtered = sortTasks(rows.filter((t) => {
-    if (fSt === "open") return !["completed", "cancelled"].includes(t.status);
+    if (fSt === "open") return !TASK_CLOSED.includes(t.status);
     if (fSt === "overdue") return t.is_overdue;
     if (fSt) return t.status === fSt;
-    return !["completed", "cancelled"].includes(t.status);
+    return !TASK_CLOSED.includes(t.status);
   }));
 
   return (

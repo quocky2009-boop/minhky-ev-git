@@ -4,9 +4,9 @@ import Link from "next/link";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Badge, Toast, KPI, Pager, pageSlice } from "@/components/ui";
 import { errMsg, downloadCSV } from "@/lib/format";
-import { TASK_STATUS, PRIORITY, hanLabel, sortTasks, fmtHan, toLocalInput } from "@/lib/task";
+import { TASK_STATUS, TASK_CLOSED, PRIORITY, hanLabel, sortTasks, fmtHan, toLocalInput } from "@/lib/task";
 
-const KANBAN = ["not_started", "in_progress", "pending_review", "needs_revision", "completed"];
+const KANBAN = ["not_started", "in_progress", "pending_review", "needs_revision", "completed", "failed"];
 
 export default function VievDoiNhom() {
   const { supabase, profile, loading } = useCatalog();
@@ -53,6 +53,11 @@ export default function VievDoiNhom() {
       if (!note.trim()) return notify("Bắt buộc ghi rõ nội dung cần bổ sung.", "err");
       const h = prompt("Hạn bổ sung mới (bỏ trống = giữ nguyên).\nĐịnh dạng: 2026-07-25 17:00");
       if (h && h.trim()) han = new Date(h.replace(" ", "T")).toISOString();
+    } else if (action === "reject") {
+      note = prompt("Lý do không đạt (bắt buộc — việc sẽ đóng hẳn, không tính hoàn thành):");
+      if (note === null) return;
+      if (!note.trim()) return notify("Bắt buộc ghi rõ lý do không đạt.", "err");
+      if (!confirm("Xác nhận đánh giá KHÔNG ĐẠT? Việc sẽ đóng hẳn và không tính vào tỷ lệ hoàn thành.")) return;
     } else {
       note = prompt("Ghi chú xác nhận (không bắt buộc):") || "";
     }
@@ -60,7 +65,7 @@ export default function VievDoiNhom() {
     const { error } = await supabase.rpc("fn_task_duyet", { p_id: d.id, p_action: action, p_note: note, p_han_moi: han });
     setBusy(false);
     if (error) return notify(errMsg(error), "err");
-    notify(action === "approve" ? "Đã xác nhận hoàn thành." : "Đã yêu cầu bổ sung.");
+    notify(action === "approve" ? "Đã xác nhận hoàn thành." : action === "reject" ? "Đã đánh giá Không đạt." : "Đã yêu cầu bổ sung.");
     setD(null); load();
   };
 
@@ -86,7 +91,7 @@ export default function VievDoiNhom() {
   const filtered = rows.filter((t) => {
     if (fNv && t.assignee_id !== fNv) return false;
     if (fSt === "overdue") { if (!t.is_overdue) return false; }
-    else if (fSt === "open") { if (["completed", "cancelled"].includes(t.status)) return false; }
+    else if (fSt === "open") { if (TASK_CLOSED.includes(t.status)) return false; }
     else if (fSt && t.status !== fSt) return false;
     if (!kw) return true;
     return `${t.code} ${t.title} ${t.assignee_name}`.toLowerCase().includes(kw);
@@ -100,11 +105,12 @@ export default function VievDoiNhom() {
   const theoNv = {};
   rows.forEach((t) => {
     const k = t.assignee_id;
-    theoNv[k] = theoNv[k] || { ten: t.assignee_name, tong: 0, xong: 0, qua_han: 0, dang_mo: 0 };
+    theoNv[k] = theoNv[k] || { ten: t.assignee_name, tong: 0, xong: 0, khong_dat: 0, qua_han: 0, dang_mo: 0 };
     if (t.status !== "cancelled") theoNv[k].tong++;
     if (t.status === "completed") theoNv[k].xong++;
+    if (t.status === "failed") theoNv[k].khong_dat++;
     if (t.is_overdue) theoNv[k].qua_han++;
-    if (!["completed", "cancelled"].includes(t.status)) theoNv[k].dang_mo++;
+    if (!TASK_CLOSED.includes(t.status)) theoNv[k].dang_mo++;
   });
 
   const exportCSV = () => {
@@ -177,17 +183,19 @@ export default function VievDoiNhom() {
           <div className="flex gap-2 flex-wrap">
             {d.status === "pending_review" && (
               <>
-                <button className="btn-ok" disabled={busy} onClick={() => duyet("approve")}>✅ Xác nhận hoàn thành</button>
-                <button className="btn-ghost" disabled={busy} onClick={() => duyet("revise")}>🔁 Yêu cầu bổ sung</button>
+                <button className="btn-ok" disabled={busy} onClick={() => duyet("approve")}>✅ Đạt</button>
+                <button className="btn-ghost" disabled={busy} onClick={() => duyet("revise")}>🔁 Chưa đạt, yêu cầu bổ sung</button>
+                <button className="btn-ghost !text-danger" disabled={busy} onClick={() => duyet("reject")}>❌ Không đạt</button>
               </>
             )}
-            {!["completed", "cancelled"].includes(d.status) && (
+            {!TASK_CLOSED.includes(d.status) && (
               <>
                 <button className="btn-ghost !text-xs" onClick={doiHan}>📅 Đổi hạn</button>
-                <button className="btn-ghost !text-xs !text-danger" onClick={huy}>Hủy việc</button>
+                <button className="btn-ghost !text-xs !text-danger" onClick={huy}>Hủy nhiệm vụ</button>
               </>
             )}
             {d.status === "completed" && <div className="text-[13px] text-[#0E7A4A]">✅ Đã xác nhận bởi {d.completed_by_name} · {fmtHan(d.completed_at)}{d.completion_note && ` · ${d.completion_note}`}</div>}
+            {d.status === "failed" && <div className="text-[13px] text-danger">❌ Không đạt — đánh giá bởi {d.completed_by_name} · {fmtHan(d.completed_at)}{d.completion_note && ` · Lý do: ${d.completion_note}`}</div>}
             {d.status === "cancelled" && <div className="text-[13px] text-danger">Đã hủy: {d.cancellation_reason}</div>}
           </div>
         </div>
@@ -211,6 +219,7 @@ export default function VievDoiNhom() {
         <KPI label="Đang thực hiện" value={dem((t) => t.status === "in_progress")} tone="blue" />
         <KPI label="Cần bổ sung" value={dem((t) => t.status === "needs_revision")} tone="purple" />
         <KPI label="Hoàn thành" value={dem((t) => t.status === "completed")} tone="green" />
+        <KPI label="Không đạt" value={dem((t) => t.status === "failed")} tone={dem((t) => t.status === "failed") ? "red" : "dark"} />
       </div>
 
       <div className="card">
@@ -291,7 +300,7 @@ export default function VievDoiNhom() {
 
         {view === "nv" && (
           <div className="tbl-scroll"><table className="w-full border-collapse tbl-card">
-            <thead><tr><th className="th">Nhân viên</th><th className="th text-center">Đang mở</th><th className="th text-center">Quá hạn</th><th className="th text-center">Hoàn thành</th><th className="th">Tỷ lệ xong</th></tr></thead>
+            <thead><tr><th className="th">Nhân viên</th><th className="th text-center">Đang mở</th><th className="th text-center">Quá hạn</th><th className="th text-center">Hoàn thành</th><th className="th text-center">Không đạt</th><th className="th">Tỷ lệ xong</th></tr></thead>
             <tbody>{Object.values(theoNv).sort((a, b) => b.qua_han - a.qua_han || b.dang_mo - a.dang_mo).map((n, i) => {
               const tl = n.tong ? Math.round(n.xong / n.tong * 100) : 0;
               return (
@@ -300,6 +309,7 @@ export default function VievDoiNhom() {
                   <td data-label="Đang mở" className="td text-center">{n.dang_mo}</td>
                   <td data-label="Quá hạn" className="td text-center"><b className={n.qua_han ? "text-danger" : ""}>{n.qua_han}</b></td>
                   <td data-label="Hoàn thành" className="td text-center">{n.xong}</td>
+                  <td data-label="Không đạt" className="td text-center"><b className={n.khong_dat ? "text-danger" : ""}>{n.khong_dat}</b></td>
                   <td data-label="Tỷ lệ" className="td"><Badge tone={tl >= 80 ? "green" : tl >= 50 ? "amber" : "red"}>{tl}%</Badge></td>
                 </tr>
               );
