@@ -88,8 +88,13 @@ export function SearchPicker({ items, value, onChange, placeholder = "Gõ để 
   const ref = useRef(null);
   const sel = items.find((i) => getKey(i) === value);
   const list = useMemo(() => {
-    const s = q.toLowerCase();
-    return items.filter((i) => getLabel(i).toLowerCase().includes(s)).slice(0, 40);
+    // Khop theo tung tu: moi tu deu phai xuat hien (khong can lien mach).
+    // Nho vay "Amio S2 Đỏ" van khop label "VinFast · Amio S2 · Đỏ".
+    const terms = q.toLowerCase().split(/\s+/).filter(Boolean);
+    return items.filter((i) => {
+      const lbl = getLabel(i).toLowerCase();
+      return terms.every((t) => lbl.includes(t));
+    }).slice(0, 40);
   }, [q, items]);
   useEff(() => {
     const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
@@ -126,6 +131,51 @@ export function VehicleSearch({ vehicles, value, onChange }) {
     placeholder="Gõ tên xe / màu / mã để tìm…"
     getKey={(v) => v.id}
     getLabel={(v) => `${v.brand} · ${v.name} · ${v.color}`} />;
+}
+
+// ===== Combo tu do: chon tu goi y co san HOAC go gia tri moi =====
+// options: danh sach chuoi goi y (vd tat ca ten xe da co). Nguoi dung go
+// se loc theo tung tu; van luu duoc gia tri moi neu khong chon goi y nao.
+export function ComboFree({ value, onChange, options = [], placeholder = "", allowNew = true }) {
+  const [q, setQ] = useSt("");
+  const [open, setOpen] = useSt(false);
+  const [typing, setTyping] = useSt(false);
+  const ref = useRef(null);
+  useEff(() => {
+    const h = (e) => { if (ref.current && !ref.current.contains(e.target)) { setOpen(false); setTyping(false); } };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+  const kw = q.toLowerCase().split(/\s+/).filter(Boolean);
+  const uniq = Array.from(new Set(options.filter(Boolean).map((x) => String(x).trim()))).sort((a, b) => a.localeCompare(b, "vi"));
+  const hits = uniq.filter((o) => { const l = o.toLowerCase(); return kw.every((t) => l.includes(t)); }).slice(0, 40);
+  const daCo = uniq.some((o) => o.toLowerCase() === q.trim().toLowerCase());
+  return (
+    <div className="relative" ref={ref}>
+      <input className="inp" value={typing ? q : (value || "")}
+        placeholder={placeholder}
+        onFocus={() => { setOpen(true); setTyping(true); setQ(value || ""); }}
+        onChange={(e) => { setQ(e.target.value); onChange(e.target.value); setOpen(true); setTyping(true); }} />
+      {open && (
+        <div className="absolute z-30 mt-1 w-full max-h-64 overflow-y-auto bg-white border border-[#D5DBE3] rounded-xl shadow-xl">
+          {allowNew && q.trim() && !daCo && (
+            <div className="px-3 py-2 text-sm cursor-pointer hover:bg-[#EEF3FF] text-brand font-bold border-b border-[#F2F4F7]"
+              onClick={() => { onChange(q.trim()); setOpen(false); setTyping(false); }}>
+              + Dùng giá trị mới: “{q.trim()}”
+            </div>
+          )}
+          {hits.map((o) => (
+            <div key={o} className="px-3 py-2 text-sm cursor-pointer hover:bg-[#EEF3FE]"
+              onClick={() => { onChange(o); setQ(o); setOpen(false); setTyping(false); }}>
+              {o}
+            </div>
+          ))}
+          {hits.length === 0 && !q.trim() && <div className="px-3 py-2 text-sm text-[#8A93A0]">Gõ để tìm hoặc tạo mới…</div>}
+          {hits.length === 0 && q.trim() && !allowNew && <div className="px-3 py-2 text-sm text-[#8A93A0]">Không có gợi ý khớp.</div>}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ===== V2: Chon nhieu so khung (co tim kiem) =====

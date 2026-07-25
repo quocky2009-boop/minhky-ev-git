@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Field, Toast, stockBadge, Badge, Pager, pageSlice, pageClamp, useSortable, Th, LocSearch, VehicleSearch, MoneyInput } from "@/components/ui";
+import { Field, Toast, stockBadge, Badge, Pager, pageSlice, pageClamp, useSortable, Th, LocSearch, VehicleSearch, MoneyInput, ComboFree } from "@/components/ui";
 import { fmtVND, fmtDate, errMsg, parseCSV } from "@/lib/format";
 
 export default function DMXe() {
@@ -11,7 +11,12 @@ export default function DMXe() {
   const fileRef = useRef(null);
   const [show, setShow] = useState(false);
   const [q, setQ] = useState(""); const [fBrand, setFBrand] = useState("");
+  const [fWarn, setFWarn] = useState(""); // "" | het | sap | con
   const [newBrand, setNewBrand] = useState("");
+  const [busy, setBusy] = useState(false);
+  // Cap nhat gia hang loat
+  const [showBulk, setShowBulk] = useState(false);
+  const [bulk, setBulk] = useState({ brand: "", name: "", list_price: "" });
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const empty = { brand: "VinFast", name: "", color: "", mfr_code: "", list_price: "", min_stock: 2 };
@@ -85,11 +90,38 @@ export default function DMXe() {
     setF(empty); setEditId(null); setShow(false); refresh();
   };
 
-  const add = async () => {
+  const add = async (keepOpen) => {
+    if (!f.name?.trim() || !f.color?.trim()) return notify("Nhập đủ Tên xe và Màu xe.", "err");
+    setBusy(true);
     const { data, error } = await supabase.rpc("fn_them_xe", { p: { ...f, list_price: Number(f.list_price) || 0, min_stock: Number(f.min_stock) || 2 } });
+    setBusy(false);
     if (error) return notify(errMsg(error), "err");
     notify(`Đã thêm xe với mã chuẩn: ${data}`);
-    setF(empty); setShow(false); refresh();
+    refresh();
+    if (keepOpen) {
+      // Giu lai hang + gia + ton min de tao loat nhanh, chi xoa ten/mau/ma hang
+      setF((p) => ({ ...p, name: "", color: "", mfr_code: "" }));
+    } else {
+      setF(empty); setShow(false);
+    }
+  };
+
+  const capNhatGiaHangLoat = async () => {
+    if (!bulk.brand && !bulk.name.trim()) return notify("Chọn ít nhất Hãng hoặc Model để giới hạn phạm vi.", "err");
+    const gia = Number(bulk.list_price) || 0;
+    if (gia <= 0) return notify("Nhập giá niêm yết mới (> 0).", "err");
+    const soKhop = vehicles.filter((v) =>
+      (!bulk.brand || v.brand === bulk.brand) &&
+      (!bulk.name.trim() || v.name.toLowerCase().includes(bulk.name.trim().toLowerCase()))
+    ).length;
+    if (soKhop === 0) return notify("Không có mã xe nào khớp điều kiện.", "err");
+    if (!confirm(`Cập nhật giá niêm yết = ${fmtVND(gia)} cho ${soKhop} mã xe khớp điều kiện?\n\nHãng: ${bulk.brand || "tất cả"}\nModel chứa: ${bulk.name.trim() || "tất cả"}`)) return;
+    setBusy(true);
+    const { data, error } = await supabase.rpc("fn_cap_nhat_gia_hang_loat", { p: { brand: bulk.brand, name: bulk.name, list_price: gia } });
+    setBusy(false);
+    if (error) return notify(errMsg(error), "err");
+    notify(`Đã cập nhật giá cho ${data.so_ma_cap_nhat} mã xe.`);
+    setBulk({ brand: "", name: "", list_price: "" }); setShowBulk(false); refresh();
   };
 
   const addBrand = async () => {
@@ -128,11 +160,17 @@ export default function DMXe() {
   };
 
   if (loading) return <div className="card">Đang tải dữ liệu…</div>;
+  const warnOf = (qty, min) => qty <= 0 ? "het" : qty <= min ? "sap" : "con";
   const list = vehicles.filter((v) => {
     if (fBrand && v.brand !== fBrand) return false;
-    const t = (v.id + v.name + v.color + (v.mfr_code || "")).toLowerCase();
-    return !q || t.includes(q.toLowerCase());
+    if (fWarn && warnOf(totalQty(v.id), v.min_stock) !== fWarn) return false;
+    const t = (v.id + " " + v.name + " " + v.color + " " + v.brand + " " + (v.mfr_code || "")).toLowerCase();
+    const terms = q.toLowerCase().split(/\s+/).filter(Boolean);
+    return terms.every((w) => t.includes(w));
   });
+  // Goi y ten/mau tu du lieu da co (loc theo hang dang chon trong form de sat hon)
+  const goiYTen = Array.from(new Set(vehicles.filter((v) => !f.brand || v.brand === f.brand).map((v) => v.name)));
+  const goiYMau = Array.from(new Set(vehicles.map((v) => v.color)));
 
   return (
     <div className="flex flex-col gap-4">
@@ -145,11 +183,39 @@ export default function DMXe() {
       {tab === "loai" && <>
       <div className="flex gap-2 flex-wrap items-center">
         <button className="btn-primary" onClick={() => { setEditId(null); setF(empty); setShow(!show); }}>+ Thêm xe mới</button>
+        <button className="btn-ghost" onClick={() => setShowBulk(!showBulk)}>💲 Sửa giá hàng loạt</button>
         <button className="btn-ghost" onClick={exportCSV}>⬇ Xuất CSV</button>
         <button className="btn-ghost" onClick={() => fileRef.current?.click()}>⬆ Import CSV</button>
         <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={(e) => { if (e.target.files[0]) importCSV(e.target.files[0]); e.target.value = ""; }} />
         <span className="text-xs text-[#8A93A0]">Import: file CSV có cột brand, name, color (+ mfr_code, list_price, min_stock). Excel: Save As → CSV UTF-8.</span>
       </div>
+
+      {showBulk && (
+        <div className="card border-l-4 border-l-brand">
+          <div className="font-extrabold mb-1">Cập nhật giá niêm yết hàng loạt</div>
+          <p className="text-xs text-[#8A93A0] mb-3">Chọn Hãng và/hoặc gõ Model để giới hạn phạm vi, rồi nhập giá mới. Áp dụng cho mọi màu của các mã khớp điều kiện.</p>
+          <div className="grid gap-x-3.5 md:grid-cols-4 sm:grid-cols-2 items-end">
+            <Field label="Hãng (bỏ trống = tất cả)">
+              <select className="inp" value={bulk.brand} onChange={(e) => setBulk((p) => ({ ...p, brand: e.target.value }))}>
+                <option value="">— Tất cả hãng —</option>{brands.map((b) => <option key={b.name}>{b.name}</option>)}
+              </select>
+            </Field>
+            <Field label="Model chứa (bỏ trống = tất cả)">
+              <ComboFree value={bulk.name} onChange={(v) => setBulk((p) => ({ ...p, name: v }))}
+                options={Array.from(new Set(vehicles.filter((v) => !bulk.brand || v.brand === bulk.brand).map((v) => v.name)))}
+                placeholder="VD: Amio S2" />
+            </Field>
+            <Field label="Giá niêm yết mới"><MoneyInput value={bulk.list_price} onChange={(v) => setBulk((p) => ({ ...p, list_price: v }))} /></Field>
+            <div className="pb-3">
+              <button className="btn-ok w-full" disabled={busy} onClick={capNhatGiaHangLoat}>Áp dụng</button>
+            </div>
+          </div>
+          {(bulk.brand || bulk.name.trim()) && (() => {
+            const kh = vehicles.filter((v) => (!bulk.brand || v.brand === bulk.brand) && (!bulk.name.trim() || v.name.toLowerCase().includes(bulk.name.trim().toLowerCase())));
+            return <div className="text-xs text-[#5A6572] mt-1">Khớp <b>{kh.length}</b> mã xe{kh.length > 0 && kh.length <= 8 ? `: ${kh.map((v) => `${v.name} ${v.color}`).join(", ")}` : ""}.</div>;
+          })()}
+        </div>
+      )}
 
       {show && (
         <div className="card">
@@ -160,8 +226,12 @@ export default function DMXe() {
                 {brands.map((b) => <option key={b.name}>{b.name}</option>)}
               </select>
             </Field>
-            <Field label="Tên xe" required><input className="inp" value={f.name} onChange={(e) => set("name", e.target.value)} placeholder="VD: Evo Grand" /></Field>
-            <Field label="Màu xe" required><input className="inp" value={f.color} onChange={(e) => set("color", e.target.value)} placeholder="VD: Xanh Oliu" /></Field>
+            <Field label="Tên xe" required>
+              <ComboFree value={f.name} onChange={(v) => set("name", v)} options={goiYTen} placeholder="Gõ để tìm hoặc tạo mới, VD: Evo Grand" />
+            </Field>
+            <Field label="Màu xe" required>
+              <ComboFree value={f.color} onChange={(v) => set("color", v)} options={goiYMau} placeholder="Gõ để tìm hoặc tạo mới, VD: Xanh Oliu" />
+            </Field>
             <Field label="Mã hãng"><input className="inp" value={f.mfr_code} onChange={(e) => set("mfr_code", e.target.value)} /></Field>
             <Field label="Giá niêm yết"><MoneyInput value={f.list_price} onChange={(v) => set("list_price", v)} /></Field>
             <Field label="Tồn tối thiểu"><input type="number" className="inp" value={f.min_stock} onChange={(e) => set("min_stock", e.target.value)} /></Field>
@@ -177,7 +247,8 @@ export default function DMXe() {
             </div>
           )}
           <div className="flex gap-2.5 items-center flex-wrap">
-            <button className="btn-ok" onClick={editId ? saveEdit : add}>{editId ? "Lưu thay đổi" : "Lưu vào danh mục"}</button>
+            <button className="btn-ok" disabled={busy} onClick={editId ? saveEdit : () => add(false)}>{editId ? "Lưu thay đổi" : "Lưu vào danh mục"}</button>
+            {!editId && <button className="btn-primary" disabled={busy} onClick={() => add(true)}>Lưu và tạo tiếp</button>}
             <button className="btn-ghost" onClick={() => { setShow(false); setEditId(null); setF(empty); }}>Đóng</button>
             <span className="text-xs text-[#8A93A0] ml-3">Thiếu hãng?</span>
             <input className="inp !w-40 !py-1.5 !text-xs" placeholder="Tên hãng mới…" value={newBrand} onChange={(e) => setNewBrand(e.target.value)} />
@@ -189,9 +260,15 @@ export default function DMXe() {
       <div className="card">
         <div className="flex gap-2 flex-wrap items-center mb-3">
           <div className="font-extrabold mr-auto">Danh mục xe ({list.length}/{vehicles.length} mã)</div>
-          <input className="inp !w-56" placeholder="Tìm tên xe, màu, mã…" value={q} onChange={(e) => setQ(e.target.value)} />
+          <input className="inp !w-56" placeholder="Tìm tên xe, màu, mã… (gõ nhiều từ được)" value={q} onChange={(e) => setQ(e.target.value)} />
           <select className="inp !w-auto" value={fBrand} onChange={(e) => setFBrand(e.target.value)}>
             <option value="">Hãng: tất cả</option>{brands.map((b) => <option key={b.name}>{b.name}</option>)}
+          </select>
+          <select className="inp !w-auto" value={fWarn} onChange={(e) => { setFWarn(e.target.value); setPage(1); }}>
+            <option value="">Cảnh báo: tất cả</option>
+            <option value="het">🔴 Hết hàng</option>
+            <option value="sap">🟠 Sắp hết</option>
+            <option value="con">🟢 Còn hàng</option>
           </select>
         </div>
         <div className="overflow-x-auto"><table className="w-full border-collapse">
@@ -211,6 +288,9 @@ export default function DMXe() {
           })}</tbody>
         </table></div>
         <Pager total={list.length} page={page} setPage={setPage} pageSize={pageSize} setPageSize={setPageSize} />
+        <div className="text-[11.5px] text-[#8A93A0] mt-2">
+          Tiêu chí cảnh báo theo tổng tồn so với <b>Tồn tối thiểu</b> của từng mã: 🔴 Hết hàng (tồn = 0) · 🟠 Sắp hết (tồn ≤ tồn tối thiểu) · 🟢 Còn hàng (tồn &gt; tồn tối thiểu). Muốn đổi ngưỡng, sửa cột <b>Tồn tối thiểu</b> ở nút ✎ Sửa của từng mã (mặc định 2).
+        </div>
       </div>
       </>}
 
