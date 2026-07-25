@@ -4,7 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Badge, Toast, KPI, Pager, pageSlice, pageClamp, useSortable, Th, LocSearch, MoneyInput } from "@/components/ui";
 import { fmtVND, fmtDate, fmtTime, errMsg, downloadCSV } from "@/lib/format";
-import { printOrder } from "@/lib/print";
+import { printOrder, printOrderBill } from "@/lib/print";
 import { InfoRows, MoneyRows } from "@/components/detail";
 import Link from "next/link";
 
@@ -324,6 +324,7 @@ export default function DonBan() {
                     ? <Link href={`/ban-hang?sua=${detail.id}`} className="btn-primary !px-3 !py-1.5 !text-xs">✎ Sửa đơn</Link>
                     : <span className="text-[10.5px] text-[#8A93A0] px-1">Đã xuất HĐ — hủy xác nhận mới sửa được</span>}
                   <button className="btn-primary !px-3 !py-1.5 !text-xs" onClick={() => printOrder({ supabase, o: detail, vehicles, locations, settings, notify })}>🖨 In phiếu</button>
+                  <button className="btn-ghost !px-3 !py-1.5 !text-xs" title="In khổ nhiệt 80mm (máy in bill)" onClick={() => printOrderBill({ supabase, o: detail, vehicles, locations, settings, notify })}>🧾 In bill</button>
                   {profile.role === "CEO" && (detail.invoice_status === "Đã xuất HĐ"
                     ? <button className="btn-ghost !px-3 !py-1.5 !text-xs !text-danger" disabled={busy} onClick={() => traHang(detail)}>↩ Trả lại hàng bán</button>
                     : <button className="btn-ghost !px-3 !py-1.5 !text-xs !text-danger" disabled={busy} onClick={() => deleteOrder(detail)}>✕ Hủy đơn</button>

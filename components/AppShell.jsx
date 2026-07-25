@@ -56,6 +56,20 @@ export default function AppShell({ profile, children }) {
 
   const signOut = async () => { await supabase.auth.signOut(); window.location.href = "/login"; };
 
+  // Nap quyen theo vai tro de menu co the hien theo role_perms (ngoai hardcode roles)
+  const [perms, setPerms] = useState({});
+  useEffect(() => {
+    let huy = false;
+    (async () => {
+      const { data } = await supabase.from("role_perms").select("perm,allowed").eq("role", profile.role);
+      if (huy) return;
+      const m = {}; (data || []).forEach((x) => { m[x.perm] = x.allowed; }); setPerms(m);
+    })();
+    return () => { huy = true; };
+  }, [profile.role]);
+  // Item hien khi: role nam trong roles HOAC (co perm gan va user duoc cap perm do)
+  const canSee = (n) => n.roles.includes(profile.role) || (n.perm && perms[n.perm]);
+
   const ItemLink = ({ n, sub }) => (
     <Link href={n.href} onClick={() => setOpen(false)}
       className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[13.5px] font-semibold mb-0.5 ${sub ? "ml-3" : ""} ${isActive(n) ? "bg-brand text-white" : "hover:bg-navy-800"}`}>
@@ -78,7 +92,7 @@ export default function AppShell({ profile, children }) {
         </div>
         <nav className="flex-1 p-2 overflow-y-auto">
           {NAV_GROUPS.map((g, gi) => {
-            const items = g.items.filter((n) => n.roles.includes(profile.role));
+            const items = g.items.filter(canSee);
             if (items.length === 0) return null;
             if (!g.label) return items.map((n) => <ItemLink key={n.href} n={n} />);
             const opened = openGroups.has(g.label);
