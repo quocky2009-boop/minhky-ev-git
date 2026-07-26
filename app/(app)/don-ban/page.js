@@ -271,7 +271,7 @@ export default function DonBan() {
               }}>⬇ Xuất Excel</button>
             </SelectionBar>
             <div className="tbl-scroll"><table className="w-full border-collapse tbl-card">
-              <thead><tr><ThCheck sel={sel} rows={pageSlice(sorted, page, pageSize)} idOf={(o) => o.id} /><Th label="Mã đơn" k="code" sort={sort} /><Th label="Ngày" k="date" sort={sort} /><Th label="Xe · Số khung" k="xe" sort={sort} /><Th label="Kho" k="kho" sort={sort} /><Th label="Khách" k="kh" sort={sort} /><Th label="Loại KH" k="type" sort={sort} /><Th label="Tổng đơn" k="tien" sort={sort} /><Th label="Hóa đơn" k="hd" sort={sort} /><Th label="NV bán" k="nv" sort={sort} /><th className="th"></th></tr></thead>
+              <thead><tr><ThCheck sel={sel} rows={pageSlice(sorted, page, pageSize)} idOf={(o) => o.id} /><Th label="Mã đơn" k="code" sort={sort} /><Th label="Ngày" k="date" sort={sort} /><Th label="Xe · Số khung · Kho" k="xe" sort={sort} /><Th label="Điểm bán" k="kho" sort={sort} /><Th label="Khách" k="kh" sort={sort} /><Th label="Loại KH" k="type" sort={sort} /><Th label="Tổng đơn" k="tien" sort={sort} /><Th label="Hóa đơn" k="hd" sort={sort} /><Th label="NV bán" k="nv" sort={sort} /><th className="th"></th></tr></thead>
               <tbody>{pageSlice(sorted, page, pageSize).map((o, i) => {
                 const v = vOf(o.vehicle_id);
                 const st = o.invoice_status || "Chờ xuất HĐ";
@@ -283,8 +283,8 @@ export default function DonBan() {
                     <TdCheck sel={sel} id={o.id} />
                     <td data-label="Mã đơn" className="td font-bold"><Link href={`/don-ban/${o.id}`} className="text-brand hover:underline">{o.code}</Link>{nhanTra ? <Badge tone="red">Đã trả hàng</Badge> : huy && <Badge tone="red">Đã hủy</Badge>}</td>
                     <td data-label="Ngày" className="td text-xs whitespace-nowrap">{fmtDate(o.sale_date)}</td>
-                    <td data-label="Xe" className="td text-[13px]">{v ? `${v.name} ${v.color}` : o.vehicle_id}<div className="font-mono text-[10.5px] text-[#8A93A0]">{o.frame_number}</div></td>
-                    <td data-label="Kho" className="td text-xs">{locName(o.location_code)}</td>
+                    <td data-label="Xe" className="td text-[13px]">{v ? `${v.name} ${v.color}` : o.vehicle_id}<div className="font-mono text-[10.5px] text-[#8A93A0]">{o.frame_number}</div><div className="text-[10.5px] text-[#8A93A0]">{locName(o.location_code)}</div></td>
+                    <td data-label="Điểm bán" className="td text-xs">{locName(o.location_code)}</td>
                     <td data-label="Khách" className="td text-[13px]">{o.customer_name}<div className="text-[10.5px] text-[#8A93A0]">{o.customer_phone}</div></td>
                     <td data-label="Loại KH" className="td text-xs">{o.customer_type === "Khách buôn" ? <Badge tone="amber">Buôn</Badge> : o.customer_type === "Khách lẻ của Đại lý" ? <Badge tone="blue">Lẻ ĐL</Badge> : <Badge tone="green">Lẻ</Badge>}</td>
                     <td data-label="Tổng đơn" className="td font-bold">{fmtVND(total(o))}</td>
@@ -350,7 +350,7 @@ export default function DonBan() {
           const v = vOf(detail.vehicle_id);
           const st = detail.invoice_status || "Chờ xuất HĐ";
           const kem = (detail._items || []).reduce((sm, it) => sm + it.amount, 0);
-          const tong = detail.sale_price * detail.quantity + kem;
+          const tong = Math.max(detail.sale_price * detail.quantity + kem - (detail.discount_amount || 0), 0);
           return (
             <div className="fixed inset-0 z-[95] bg-black/50 flex items-center justify-center p-3" onClick={() => setDetail(null)}>
               <div className="bg-white rounded-2xl w-[600px] max-w-full max-h-[88vh] overflow-y-auto p-4" onClick={(e) => e.stopPropagation()}>
@@ -396,7 +396,7 @@ export default function DonBan() {
                     <div className="flex flex-col gap-3">
                       <InfoRows rows={[
                         ["Ngày bán", fmtDate(detail.sale_date)],
-                        ["Kho xuất", locName(detail.location_code)],
+                        ["Điểm bán", locName(detail.location_code)],
                         ["Xe", <span key="x">{v ? `${v.brand} · ${v.name} · ${v.color}` : detail.vehicle_id} × {detail.quantity}
                           {detail.frame_number && <span className="block text-[11px] text-[#8A93A0] font-mono">SK {detail.frame_number}</span>}</span>],
                         ["Khách hàng", <span key="k">{detail.customer_name}<span className="block text-[11px] text-[#8A93A0]">{detail.customer_phone}</span></span>],

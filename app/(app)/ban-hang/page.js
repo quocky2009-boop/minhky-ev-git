@@ -2,7 +2,7 @@
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Field, Badge, Toast, LocSearch, CustomerSearch, MoneyInput, FrameSearch } from "@/components/ui";
+import { Field, Badge, Toast, LocSearch, CustomerSearch, MoneyInput, FrameSearch, ComboFree } from "@/components/ui";
 import { printOrder as _printOrder } from "@/lib/print";
 import { uploadAnhDon } from "@/lib/img";
 import Link from "next/link";
@@ -51,7 +51,7 @@ function TaoDonInner() {
 
   // Khách hàng
   const [custId, setCustId] = useState("");
-  const [kh, setKh] = useState({ customer_name: "", customer_phone: "", customer_cccd: "", customer_address: "", customer_type: "Khách lẻ", customer_source: "Khách vãng lai" });
+  const [kh, setKh] = useState({ customer_name: "", customer_phone: "", customer_cccd: "", customer_address: "", customer_type: "Khách lẻ", customer_source: "Khách vãng lai", customer_email: "", customer_gender: "", customer_birthday: "" });
   const [newC, setNewC] = useState(null);
 
   // Thông tin bổ sung
@@ -152,7 +152,22 @@ function TaoDonInner() {
   const pickCust = (c) => {
     if (!c) { setCustId(""); return; }
     setCustId(c.id);
-    setKh((p) => ({ ...p, customer_name: c.name || "", customer_phone: c.phone || "", customer_cccd: c.cccd || "", customer_address: c.address || "" }));
+    setKh((p) => ({
+      ...p,
+      customer_name: c.name || "",
+      customer_phone: c.phone || "",
+      customer_cccd: c.cccd || "",
+      customer_address: c.address || "",
+      customer_type: c.customer_type || p.customer_type,
+      customer_source: c.source || p.customer_source,
+      customer_email: c.email || "",
+      customer_gender: c.gender || "",
+      customer_birthday: c.birthday || "",
+      customer_no: 0,
+    }));
+    // Load cong no
+    supabase.from("v_khach_tong_quan").select("con_no").eq("customer_id", c.id).single()
+      .then(({ data }) => { if (data) setKh((p) => ({ ...p, customer_no: data.con_no || 0 })); });
   };
   const createCust = async (name) => setNewC({ name: name || "", phone: "", address: "", email: "", gender: "", birthday: "" });
   const luuCustMoi = async () => {
@@ -297,7 +312,7 @@ function TaoDonInner() {
   const lamMoi = () => {
     setKetQua(null); setXeRows([]); setKemRows([]); setPays([]); setFotos([]);
     setDTong({ type: "amount", value: 0 }); setCustId(""); setNewC(null); setExtra({});
-    setKh({ customer_name: "", customer_phone: "", customer_cccd: "", customer_address: "", customer_type: "Khách lẻ", customer_source: "Khách vãng lai" });
+    setKh({ customer_name: "", customer_phone: "", customer_cccd: "", customer_address: "", customer_type: "Khách lẻ", customer_source: "Khách vãng lai", customer_email: "", customer_gender: "", customer_birthday: "" });
     if (profile) setMeta((p) => ({ ...p, seller_id: profile.id, seller_name: profile.name }));
   };
 
@@ -405,10 +420,23 @@ function TaoDonInner() {
             <div className="grid gap-2.5 md:grid-cols-2 mt-3">
               <Field label="Họ tên"><input className="inp" value={kh.customer_name} onChange={(e) => setKh((p) => ({ ...p, customer_name: e.target.value }))} /></Field>
               <Field label="SĐT"><input className="inp" value={kh.customer_phone} onChange={(e) => setKh((p) => ({ ...p, customer_phone: e.target.value }))} /></Field>
-              <Field label="CCCD"><input className="inp" value={kh.customer_cccd} onChange={(e) => setKh((p) => ({ ...p, customer_cccd: e.target.value }))} /></Field>
-              <Field label="Địa chỉ"><input className="inp" value={kh.customer_address} onChange={(e) => setKh((p) => ({ ...p, customer_address: e.target.value }))} /></Field>
+              <Field label="Email"><input className="inp" type="email" value={kh.customer_email || ""} onChange={(e) => setKh((p) => ({ ...p, customer_email: e.target.value }))} placeholder="ten@email.com" /></Field>
+              <Field label="Ngày sinh"><input type="date" className="inp" value={kh.customer_birthday || ""} onChange={(e) => setKh((p) => ({ ...p, customer_birthday: e.target.value }))} /></Field>
+              <Field label="Giới tính">
+                <div className="flex gap-1.5">{["Nam", "Nữ", "Khác"].map((g) => (
+                  <button key={g} type="button" className={`btn !px-3 !py-2 !text-xs ${kh.customer_gender === g ? "bg-brand text-white" : "bg-[#EEF1F4]"}`}
+                    onClick={() => setKh((p) => ({ ...p, customer_gender: g }))}>{g}</button>
+                ))}</div>
+              </Field>
               <Field label="Loại khách"><select className="inp" value={kh.customer_type} onChange={(e) => setKh((p) => ({ ...p, customer_type: e.target.value }))}>{CUSTOMER_TYPES.map((x) => <option key={x}>{x}</option>)}</select></Field>
               <Field label="Nguồn khách"><select className="inp" value={kh.customer_source} onChange={(e) => setKh((p) => ({ ...p, customer_source: e.target.value }))}>{CUSTOMER_SOURCES.map((x) => <option key={x}>{x}</option>)}</select></Field>
+              <Field label="Địa chỉ"><input className="inp" value={kh.customer_address} onChange={(e) => setKh((p) => ({ ...p, customer_address: e.target.value }))} /></Field>
+              {custId && (kh.customer_no || 0) > 0 && (
+                <div className="md:col-span-2 p-2 rounded-lg bg-[#FFF6F6] border border-[#F5B5B5] text-[13px] flex justify-between">
+                  <span className="text-danger font-semibold">⚠ Nợ phải thu</span>
+                  <b className="text-danger">{fmtVND(kh.customer_no)}</b>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -417,18 +445,18 @@ function TaoDonInner() {
           <div className="font-extrabold mb-2.5">Thông tin bổ sung</div>
           <div className="flex flex-col gap-2.5">
             <Field label="Điểm bán (ghi nhận doanh số)" required>
-              <LocSearch locations={locations.filter((l) => l.type === "Cửa hàng")} value={meta.location_code} onChange={(v) => setMeta((p) => ({ ...p, location_code: v }))} placeholder="Bắt buộc chọn cửa hàng" />
+              <LocSearch locations={locations.filter((l) => l.type === "Cửa hàng" || l.type === "Showroom")} value={meta.location_code} onChange={(v) => setMeta((p) => ({ ...p, location_code: v }))} placeholder="Bắt buộc chọn cửa hàng" />
               <div className="text-[10.5px] text-[#8A93A0] mt-1">Dùng để hạch toán doanh số theo điểm/khu vực. Xe vẫn trừ tồn ở kho của chính nó.</div>
             </Field>
             <Field label="Bán bởi">
-              <input list="staff-list" className="inp" placeholder="Tìm nhân viên…"
-                value={meta.seller_name || ""}
+              <select className="inp" value={meta.seller_id || ""}
                 onChange={(e) => {
-                  const name = e.target.value;
-                  const found = staff.find((s) => s.name === name);
-                  setMeta((p) => ({ ...p, seller_name: name, seller_id: found ? found.id : "" }));
-                }} />
-              <datalist id="staff-list">{staff.map((s) => <option key={s.id} value={s.name}>{s.name} ({s.role})</option>)}</datalist>
+                  const found = staff.find((s) => s.id === e.target.value);
+                  setMeta((p) => ({ ...p, seller_id: e.target.value, seller_name: found?.name || "" }));
+                }}>
+                <option value="">— Chọn nhân viên —</option>
+                {staff.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.role})</option>)}
+              </select>
             </Field>
             <Field label="Ngày bán"><input type="date" className="inp" value={meta.sale_date} onChange={(e) => setMeta((p) => ({ ...p, sale_date: e.target.value }))} /></Field>
 
@@ -514,9 +542,9 @@ function TaoDonInner() {
                     }}>
                       {Object.entries(ITEM_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                     </select>
-                    <input className="inp !py-1 !text-xs" list={`dm-${r.item_type}`} placeholder="Gõ tìm hoặc nhập tên…" value={r.name}
-                      onChange={(e) => {
-                        const v = e.target.value;
+                    <ComboFree value={r.name} placeholder="Gõ tìm hoặc nhập tên…"
+                      options={(DM[r.item_type] || []).map((x) => x.ten)}
+                      onChange={(v) => {
                         setKem(i, "name", v);
                         const hit = (DM[r.item_type] || []).find((x) => x.ten === v);
                         if (hit && hit.gia > 0) setKem(i, "unit_price", hit.gia);
@@ -534,12 +562,6 @@ function TaoDonInner() {
             )}
           </tbody>
         </table></div>
-        {Object.entries(DM).map(([k, list]) => (
-          <datalist key={k} id={`dm-${k}`}>
-            {list.map((x) => <option key={x.ten} value={x.ten}>{x.gia > 0 ? fmtVND(x.gia) : ""}</option>)}
-          </datalist>
-        ))}
-
         <button className="btn-ghost !text-xs mt-2.5" onClick={() => setKemRows((p) => [...p, { item_type: "PHU_KIEN", name: "", qty: 1, unit_price: 0, discount_type: "amount", discount_value: 0 }])}>
           ⊕ Thêm phụ kiện / dịch vụ đăng ký
         </button>
