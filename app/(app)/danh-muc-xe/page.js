@@ -2,8 +2,8 @@
 import { useState, useRef, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Field, Toast, stockBadge, Badge, Pager, pageSlice, pageClamp, useSortable, Th, LocSearch, VehicleSearch, MoneyInput, ComboFree } from "@/components/ui";
-import { fmtVND, fmtDate, errMsg, parseCSV } from "@/lib/format";
+import { Field, Toast, stockBadge, Badge, Pager, pageSlice, pageClamp, useSortable, Th, LocSearch, VehicleSearch, MoneyInput, ComboFree, useSelection, ThCheck, TdCheck, SelectionBar } from "@/components/ui";
+import { fmtVND, fmtDate, errMsg, parseCSV, downloadCSV } from "@/lib/format";
 
 export default function DMXe() {
   const { supabase, vehicles, brands, loading, totalQty, refresh } = useCatalog();
@@ -37,6 +37,7 @@ export default function DMXe() {
   }, [_params]);
   const [uFBrand, setUFBrand] = useState("");
   const uSort = useSortable();
+  const uSel = useSelection();
   const [uFLoc, setUFLoc] = useState("");
   const [uPage, setUPage] = useState(1);
   const [uPageSize, setUPageSize] = useState(20);
@@ -332,15 +333,24 @@ export default function DMXe() {
             const today = new Date();
             return (
               <>
+                <SelectionBar sel={uSel}>
+                  <span className="text-[12px] font-bold text-brand px-1.5 self-center">Đã chọn {uSel.count} xe</span>
+                  <button className="btn-ghost !text-xs !py-1" onClick={() => {
+                    const rs = list2.filter((u) => uSel.has(u.frame_number));
+                    downloadCSV(`xe_ton_chon.csv`, [["Hãng", "Tên xe", "Màu", "Số khung", "Kho", "Giá vốn", "Ngày nhập", "Trạng thái"],
+                      ...rs.map((u) => { const v = vehicles.find((x) => x.id === u.vehicle_id); const l = locations.find((x) => x.code === u.location_code); return [v?.brand || "", v?.name || u.vehicle_id, v?.color || "", u.frame_number, l?.name || u.location_code, u.cost_price || "", fmtDate(u.imported_at), u.status]; })]);
+                    notify(`Đã xuất ${rs.length} xe đã chọn.`);
+                  }}>⬇ Xuất Excel</button>
+                </SelectionBar>
                 <div className="overflow-x-auto"><table className="w-full border-collapse">
-                  <thead><tr><th className="th w-10">STT</th><Th label="Hãng" k="brand" sort={uSort} /><Th label="Tên xe" k="name" sort={uSort} /><Th label="Màu" k="color" sort={uSort} /><Th label="Số khung" k="frame" sort={uSort} /><Th label="Kho" k="kho" sort={uSort} /><Th label="Giá vốn" k="von" sort={uSort} /><Th label="Ngày nhập" k="nhap" sort={uSort} /><Th label="Ngày tồn" k="ton" sort={uSort} /><Th label="Trạng thái" k="tt" sort={uSort} /><th className="th"></th></tr></thead>
+                  <thead><tr><ThCheck sel={uSel} rows={pg} idOf={(u) => u.frame_number} /><Th label="Hãng" k="brand" sort={uSort} /><Th label="Tên xe" k="name" sort={uSort} /><Th label="Màu" k="color" sort={uSort} /><Th label="Số khung" k="frame" sort={uSort} /><Th label="Kho" k="kho" sort={uSort} /><Th label="Giá vốn" k="von" sort={uSort} /><Th label="Ngày nhập" k="nhap" sort={uSort} /><Th label="Ngày tồn" k="ton" sort={uSort} /><Th label="Trạng thái" k="tt" sort={uSort} /><th className="th"></th></tr></thead>
                   <tbody>{pg.map((u, i) => {
                     const v = vehicles.find((x) => x.id === u.vehicle_id);
                     const l = locations.find((x) => x.code === u.location_code);
                     const days = Math.floor((today - new Date(u.imported_at)) / 86400000);
                     return [
-                      <tr key={u.frame_number} className={euFrame === u.frame_number ? "bg-[#FDF6E3]" : hiSk && u.frame_number.toUpperCase() === hiSk ? "bg-[#E7F6EE] ring-2 ring-[#0E7A4A]" : "hover:bg-[#F8FAFC]"}>
-                        <td className="td text-center text-xs text-[#8A93A0]">{(pageClamp(uPage, list2.length, uPageSize) - 1) * uPageSize + i + 1}</td>
+                      <tr key={u.frame_number} className={euFrame === u.frame_number ? "bg-[#FDF6E3]" : uSel.has(u.frame_number) ? "bg-[#EAF2FF]" : hiSk && u.frame_number.toUpperCase() === hiSk ? "bg-[#E7F6EE] ring-2 ring-[#0E7A4A]" : "hover:bg-[#F8FAFC]"}>
+                        <TdCheck sel={uSel} id={u.frame_number} />
                         <td className="td text-xs">{v?.brand || "?"}</td>
                         <td className="td font-semibold text-[13px]">{v?.name || u.vehicle_id}</td>
                         <td className="td text-xs">{v?.color || ""}</td>

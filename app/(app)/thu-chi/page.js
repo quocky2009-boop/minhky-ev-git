@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Badge, Toast, Field, LocSearch, Pager, pageSlice, pageClamp, useSortable, Th } from "@/components/ui";
+import { Badge, Toast, Field, LocSearch, Pager, pageSlice, pageClamp, useSortable, Th, useSelection, ThCheck, TdCheck, SelectionBar } from "@/components/ui";
 import { fmtVND, fmtTime, fmtDate, errMsg, downloadCSV } from "@/lib/format";
 
 const iso = (d) => d.toLocaleDateString("sv-SE");
@@ -24,6 +24,7 @@ export default function SoQuy() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const sort = useSortable();
+  const sel = useSelection();
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState("so"); // so | quy | chot
   const [detail, setDetail] = useState(null);
@@ -170,9 +171,19 @@ export default function SoQuy() {
 
           {busy && txns.length === 0 ? <div className="text-sm text-[#8A93A0] py-4">Đang tải…</div> : (
             <>
+              <SelectionBar sel={sel}>
+                <span className="text-[12px] font-bold text-[#0E7A4A] px-1.5 self-center">Thu: {fmtVND(sorted.filter((t) => sel.has(t.id) && t.direction === "Thu").reduce((a, b) => a + b.amount, 0))}</span>
+                <span className="text-[12px] font-bold text-danger px-1.5 self-center">Chi: {fmtVND(sorted.filter((t) => sel.has(t.id) && t.direction === "Chi").reduce((a, b) => a + b.amount, 0))}</span>
+                <button className="btn-ghost !text-xs !py-1" onClick={() => {
+                  const rs = sorted.filter((t) => sel.has(t.id));
+                  downloadCSV(`so_quy_chon.csv`, [["Mã phiếu", "Ngày", "Loại", "Tiền thu", "Tiền chi", "Chứng từ gốc", "Quỹ"],
+                    ...rs.map((t) => [t.code, fmtDate(t.txn_date), t.category, t.direction === "Thu" ? t.amount : "", t.direction === "Chi" ? t.amount : "", t.ref_doc, accName(t.account_id)])]);
+                  notify(`Đã xuất ${rs.length} phiếu đã chọn.`);
+                }}>⬇ Xuất Excel</button>
+              </SelectionBar>
               <div className="tbl-scroll"><table className="w-full border-collapse tbl-card">
                 <thead><tr>
-                  <th className="th w-10">STT</th>
+                  <ThCheck sel={sel} rows={pageSlice(sorted, page, pageSize)} idOf={(t) => t.id} />
                   <Th label="Mã phiếu" k="code" sort={sort} />
                   <Th label="Loại phiếu" k="cat" sort={sort} />
                   <Th label="Tiền thu" k="thu" sort={sort} className="text-right" />
@@ -180,9 +191,9 @@ export default function SoQuy() {
                   <Th label="Ngày tạo" k="date" sort={sort} />
                   <Th label="Chứng từ gốc" k="ref" sort={sort} />
                 </tr></thead>
-                <tbody>{pageSlice(sorted, page, pageSize).map((t, i) => (
-                  <tr key={t.id} className="hover:bg-[#F8FAFC]">
-                    <td data-label="STT" className="td text-center text-xs text-[#8A93A0]">{(pageClamp(page, sorted.length, pageSize) - 1) * pageSize + i + 1}</td>
+                <tbody>{pageSlice(sorted, page, pageSize).map((t) => (
+                  <tr key={t.id} className={`hover:bg-[#F8FAFC] ${sel.has(t.id) ? "bg-[#EAF2FF]" : ""}`}>
+                    <TdCheck sel={sel} id={t.id} />
                     <td data-label="Mã phiếu" className="td"><button className="font-bold text-brand hover:underline" onClick={() => setDetail(t)}>{t.code}</button></td>
                     <td data-label="Loại phiếu" className="td text-[13px]">{t.ref_doc ? <Badge tone="blue">Tự động</Badge> : <Badge tone="gray">Thủ công</Badge>} {t.category}</td>
                     <td data-label="Tiền thu" className="td rt font-bold text-[#0E7A4A]">{t.direction === "Thu" ? fmtVND(t.amount) : "—"}</td>

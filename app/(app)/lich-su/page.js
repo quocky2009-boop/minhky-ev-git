@@ -13,13 +13,14 @@ function rangeOf(preset) {
 }
 const PRESETS = [["today","Hôm nay"],["week","Tuần này"],["month","Tháng này"],["quarter","Quý này"],["year","Năm nay"]];
 import { useCatalog } from "@/lib/useData";
-import { Badge, Pager, pageSlice } from "@/components/ui";
+import { Badge, Pager, pageSlice, useSelection, ThCheck, TdCheck, SelectionBar } from "@/components/ui";
 import { InfoRows, MoneyRows } from "@/components/detail";
-import { fmtTime } from "@/lib/format";
+import { fmtTime, downloadCSV } from "@/lib/format";
 
 export default function LichSu() {
   const { supabase, vehicles, locations, loading } = useCatalog();
   const [txns, setTxns] = useState([]);
+  const sel = useSelection();
   const [type, setType] = useState(""); const [loc, setLoc] = useState(""); const [q, setQ] = useState("");
   const [preset, setPreset] = useState("month");
   const [from, setFrom] = useState(rangeOf("month")[0]);
@@ -118,12 +119,20 @@ export default function LichSu() {
         </select>
       </div>
       <div className="text-xs text-[#8A93A0] mb-2.5">{list.length} giao dịch · Lịch sử không thể xóa/sửa — sai sót xử lý bằng giao dịch điều chỉnh mới.</div>
+      <SelectionBar sel={sel}>
+        <button className="btn-ghost !text-xs !py-1" onClick={() => {
+          const rs = list.filter((t) => sel.has(t.id));
+          downloadCSV(`lich_su_chon.csv`, [["Thời gian", "Loại", "Xe", "Kho", "SL", "Tồn trước", "Tồn sau", "Người", "Phiếu", "Ghi chú"],
+            ...rs.map((t) => { const v = vehicles.find((x) => x.id === t.vehicle_id); return [fmtTime(t.created_at), t.txn_type, v ? `${v.name} ${v.color}` : t.vehicle_id, t.from_location && t.to_location ? `${locName(t.from_location)} → ${locName(t.to_location)}` : locName(t.from_location || t.to_location), t.qty, t.stock_before, t.stock_after, t.created_by_name, t.doc_code, t.note]; })]);
+        }}>⬇ Xuất Excel</button>
+      </SelectionBar>
       <div className="overflow-x-auto"><table className="w-full border-collapse">
-        <thead><tr><th className="th">Thời gian</th><th className="th">Loại</th><th className="th">Xe</th><th className="th">Kho</th><th className="th">SL</th><th className="th">Tồn trước → sau</th><th className="th">Người</th><th className="th">Phiếu / Ghi chú</th></tr></thead>
+        <thead><tr><ThCheck sel={sel} rows={pageSlice(list, page, pageSize)} idOf={(t) => t.id} /><th className="th">Thời gian</th><th className="th">Loại</th><th className="th">Xe</th><th className="th">Kho</th><th className="th">SL</th><th className="th">Tồn trước → sau</th><th className="th">Người</th><th className="th">Phiếu / Ghi chú</th></tr></thead>
         <tbody>{pageSlice(list, page, pageSize).map((t) => {
           const v = vehicles.find((x) => x.id === t.vehicle_id);
           return (
-            <tr key={t.id} className="hover:bg-[#F8FAFC] cursor-pointer" onClick={() => openDetail(t)}>
+            <tr key={t.id} className={`hover:bg-[#F8FAFC] cursor-pointer ${sel.has(t.id) ? "bg-[#EAF2FF]" : ""}`} onClick={() => openDetail(t)}>
+              <TdCheck sel={sel} id={t.id} />
               <td className="td whitespace-nowrap">{fmtTime(t.created_at)}</td>
               <td className="td">{tb(t.txn_type)}</td>
               <td className="td">{v ? `${v.name} ${v.color}` : t.vehicle_id}</td>

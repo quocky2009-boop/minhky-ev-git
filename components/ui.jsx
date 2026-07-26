@@ -311,6 +311,58 @@ export function Th({ label, k, sort, className = "" }) {
   );
 }
 
+// ===== CHON NHIEU HANG (dung chung cho moi danh sach) =====
+// Su dung:
+//   const sel = useSelection();
+//   <ThCheck sel={sel} rows={cacHangDangHienThi} idOf={(r)=>r.id} />   // header
+//   <TdCheck sel={sel} id={r.id} />                                    // moi hang
+//   sel.selected -> Set cac id; sel.count; sel.clear(); sel.ids()
+export function useSelection() {
+  const [selected, setSelected] = useSt(() => new Set());
+  const toggle = (id) => setSelected((prev) => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
+  const toggleAll = (ids) => setSelected((prev) => {
+    const all = ids.every((id) => prev.has(id));
+    if (all) { const s = new Set(prev); ids.forEach((id) => s.delete(id)); return s; }
+    return new Set([...prev, ...ids]);
+  });
+  const clear = () => setSelected(new Set());
+  const has = (id) => selected.has(id);
+  return { selected, has, toggle, toggleAll, clear, count: selected.size, ids: () => [...selected] };
+}
+
+export function ThCheck({ sel, rows, idOf }) {
+  const ids = rows.map(idOf);
+  const allChecked = ids.length > 0 && ids.every((id) => sel.has(id));
+  const someChecked = ids.some((id) => sel.has(id));
+  return (
+    <th className="th w-9 text-center">
+      <input type="checkbox" className="cursor-pointer w-4 h-4 align-middle" checked={allChecked}
+        ref={(el) => { if (el) el.indeterminate = !allChecked && someChecked; }}
+        onChange={() => sel.toggleAll(ids)} title="Chọn tất cả trên trang" />
+    </th>
+  );
+}
+
+export function TdCheck({ sel, id }) {
+  return (
+    <td data-label="" className="td text-center" onClick={(e) => e.stopPropagation()}>
+      <input type="checkbox" className="cursor-pointer w-4 h-4 align-middle" checked={sel.has(id)} onChange={() => sel.toggle(id)} />
+    </td>
+  );
+}
+
+// Thanh cong cu hien khi da chon it nhat 1 hang. children la cac nut thao tac.
+export function SelectionBar({ sel, children }) {
+  if (sel.count === 0) return null;
+  return (
+    <div className="flex items-center gap-2 flex-wrap mb-2 px-3 py-2 rounded-xl bg-[#EAF2FF] border border-[#CFE0FB]">
+      <span className="text-[13px] font-bold text-brand">Đã chọn {sel.count}</span>
+      <div className="flex gap-1.5 flex-wrap">{children}</div>
+      <button className="btn-ghost !text-xs ml-auto" onClick={sel.clear}>Bỏ chọn</button>
+    </div>
+  );
+}
+
 // ===== O NHAP TIEN: tu them dau cham phan cach khi go =====
 // Dung nhu <input>: value la SO (number/string so), onChange tra ve SO
 export function MoneyInput({ value, onChange, className = "", placeholder = "", ...rest }) {

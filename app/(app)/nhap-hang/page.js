@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Field, Badge, Toast, KPI, LocSearch, VehicleSearch, MoneyInput, Pager, pageSlice, pageClamp, useSortable, Th } from "@/components/ui";
+import { Field, Badge, Toast, KPI, LocSearch, VehicleSearch, MoneyInput, Pager, pageSlice, pageClamp, useSortable, Th, useSelection, ThCheck, TdCheck, SelectionBar } from "@/components/ui";
 import { fmtVND, fmtTime, errMsg, downloadCSV } from "@/lib/format";
 import Scanner from "@/components/Scanner";
 
@@ -24,6 +24,7 @@ export default function NhapHang() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const sort = useSortable();
+  const sel = useSelection();
   const [detail, setDetail] = useState(null);
 
   // ===== FORM =====
@@ -350,9 +351,18 @@ export default function NhapHang() {
 
         {busy && txns.length === 0 ? <div className="text-sm text-[#8A93A0] py-4">Đang tải đơn nhập…</div> : (
           <>
+            <SelectionBar sel={sel}>
+              <span className="text-[12px] font-bold text-brand px-1.5 self-center">Tổng xe: {sorted.filter((d) => sel.has(d.doc)).reduce((a, b) => a + b.so_xe, 0)}</span>
+              <button className="btn-ghost !text-xs !py-1" onClick={() => {
+                const rs = sorted.filter((d) => sel.has(d.doc));
+                downloadCSV(`don_nhap_chon.csv`, [["Mã phiếu", "Ngày", "Kho", "NCC", "Số mã", "Số xe", "Người nhập"],
+                  ...rs.map((d) => [d.doc, fmtTime(d.created_at), locName(d.location_code), d.supplier, d.so_ma, d.so_xe, d.by])]);
+                notify(`Đã xuất ${rs.length} phiếu đã chọn.`);
+              }}>⬇ Xuất Excel</button>
+            </SelectionBar>
             <div className="tbl-scroll"><table className="w-full border-collapse tbl-card">
               <thead><tr>
-                <th className="th w-10">STT</th>
+                <ThCheck sel={sel} rows={pageSlice(sorted, page, pageSize)} idOf={(d) => d.doc} />
                 <Th label="Mã phiếu" k="doc" sort={sort} />
                 <Th label="Ngày nhập" k="date" sort={sort} />
                 <Th label="Kho" k="kho" sort={sort} />
@@ -361,9 +371,9 @@ export default function NhapHang() {
                 <Th label="Người nhập" k="nv" sort={sort} />
                 <th className="th"></th>
               </tr></thead>
-              <tbody>{pageSlice(sorted, page, pageSize).map((d, i) => (
-                <tr key={d.doc} className="hover:bg-[#F8FAFC]">
-                  <td data-label="STT" className="td text-center text-xs text-[#8A93A0]">{(pageClamp(page, sorted.length, pageSize) - 1) * pageSize + i + 1}</td>
+              <tbody>{pageSlice(sorted, page, pageSize).map((d) => (
+                <tr key={d.doc} className={`hover:bg-[#F8FAFC] ${sel.has(d.doc) ? "bg-[#EAF2FF]" : ""}`}>
+                  <TdCheck sel={sel} id={d.doc} />
                   <td data-label="Mã phiếu" className="td font-bold">{d.doc}</td>
                   <td data-label="Ngày nhập" className="td text-xs whitespace-nowrap">{fmtTime(d.created_at)}</td>
                   <td data-label="Kho" className="td text-[13px]">{locName(d.location_code)}</td>

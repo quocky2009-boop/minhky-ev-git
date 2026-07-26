@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Badge, Toast, KPI, Pager, pageSlice, pageClamp, useSortable, Th, LocSearch, MoneyInput } from "@/components/ui";
+import { Badge, Toast, KPI, Pager, pageSlice, pageClamp, useSortable, Th, LocSearch, MoneyInput, useSelection, ThCheck, TdCheck, SelectionBar } from "@/components/ui";
 import { fmtVND, fmtDate, fmtTime, errMsg, downloadCSV } from "@/lib/format";
 import { printOrder, printOrderBill } from "@/lib/print";
 import { InfoRows, MoneyRows } from "@/components/detail";
@@ -36,6 +36,7 @@ export default function DonBan() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const sort = useSortable();
+  const sel = useSelection();
   const [invId, setInvId] = useState(null);
   const [invF, setInvF] = useState({ no: "", date: iso(new Date()), bh: false, app: false });
   const [detail, setDetail] = useState(null);
@@ -254,8 +255,17 @@ export default function DonBan() {
 
         {busy && rows.length === 0 ? <div className="text-sm text-[#8A93A0] py-4">Đang tải đơn bán…</div> : (
           <>
+            <SelectionBar sel={sel}>
+              <span className="text-[12px] font-bold text-brand px-1.5 self-center">Tổng đơn: {fmtVND(sorted.filter((o) => sel.has(o.id)).reduce((a, b) => a + total(b), 0))}</span>
+              <button className="btn-ghost !text-xs !py-1" onClick={() => {
+                const rs = sorted.filter((o) => sel.has(o.id));
+                downloadCSV(`don_ban_chon.csv`, [["Mã đơn", "Ngày", "Xe", "Số khung", "Kho", "Khách", "SĐT", "Tổng đơn", "Đã trả", "Hóa đơn", "NV bán"],
+                  ...rs.map((o) => { const v = vOf(o.vehicle_id); return [o.code, fmtDate(o.sale_date), v ? `${v.name} ${v.color}` : o.vehicle_id, o.frame_number, locName(o.location_code), o.customer_name, o.customer_phone, total(o), o.paid_amount || 0, o.invoice_status || "Chờ xuất HĐ", o.seller_name]; })]);
+                notify(`Đã xuất ${rs.length} đơn đã chọn.`);
+              }}>⬇ Xuất Excel</button>
+            </SelectionBar>
             <div className="tbl-scroll"><table className="w-full border-collapse tbl-card">
-              <thead><tr><th className="th w-10">STT</th><Th label="Mã đơn" k="code" sort={sort} /><Th label="Ngày" k="date" sort={sort} /><Th label="Xe · Số khung" k="xe" sort={sort} /><Th label="Kho" k="kho" sort={sort} /><Th label="Khách" k="kh" sort={sort} /><Th label="Tổng đơn" k="tien" sort={sort} /><Th label="Hóa đơn" k="hd" sort={sort} /><Th label="NV bán" k="nv" sort={sort} /><th className="th"></th></tr></thead>
+              <thead><tr><ThCheck sel={sel} rows={pageSlice(sorted, page, pageSize)} idOf={(o) => o.id} /><Th label="Mã đơn" k="code" sort={sort} /><Th label="Ngày" k="date" sort={sort} /><Th label="Xe · Số khung" k="xe" sort={sort} /><Th label="Kho" k="kho" sort={sort} /><Th label="Khách" k="kh" sort={sort} /><Th label="Tổng đơn" k="tien" sort={sort} /><Th label="Hóa đơn" k="hd" sort={sort} /><Th label="NV bán" k="nv" sort={sort} /><th className="th"></th></tr></thead>
               <tbody>{pageSlice(sorted, page, pageSize).map((o, i) => {
                 const v = vOf(o.vehicle_id);
                 const st = o.invoice_status || "Chờ xuất HĐ";
@@ -263,8 +273,8 @@ export default function DonBan() {
                 const huy = o.status === "Đã hủy" || o.status === "Đã trả hàng";
                 const nhanTra = o.status === "Đã trả hàng";
                 return [
-                  <tr key={o.id} className={huy ? "bg-[#F3F4F6] text-[#8A93A0]" : invId === o.id ? "bg-[#FDF6E3]" : done ? "hover:bg-[#F8FAFC]" : "bg-[#FFFCF5] hover:bg-[#FDF6E3]"}>
-                    <td data-label="STT" className="td text-center text-xs text-[#8A93A0]">{(pageClamp(page, sorted.length, pageSize) - 1) * pageSize + i + 1}</td>
+                  <tr key={o.id} className={huy ? "bg-[#F3F4F6] text-[#8A93A0]" : sel.has(o.id) ? "bg-[#EAF2FF]" : invId === o.id ? "bg-[#FDF6E3]" : done ? "hover:bg-[#F8FAFC]" : "bg-[#FFFCF5] hover:bg-[#FDF6E3]"}>
+                    <TdCheck sel={sel} id={o.id} />
                     <td data-label="Mã đơn" className="td font-bold">{o.code}{nhanTra ? <Badge tone="red">Đã trả hàng</Badge> : huy && <Badge tone="red">Đã hủy</Badge>}</td>
                     <td data-label="Ngày" className="td text-xs whitespace-nowrap">{fmtDate(o.sale_date)}</td>
                     <td data-label="Xe" className="td text-[13px]">{v ? `${v.name} ${v.color}` : o.vehicle_id}<div className="font-mono text-[10.5px] text-[#8A93A0]">{o.frame_number}</div></td>

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Badge, Toast, KPI, Field, LocSearch, MoneyInput, Pager, pageSlice, pageClamp, useSortable, Th } from "@/components/ui";
+import { Badge, Toast, KPI, Field, LocSearch, MoneyInput, Pager, pageSlice, pageClamp, useSortable, Th, useSelection, ThCheck, TdCheck, SelectionBar } from "@/components/ui";
 import { fmtVND, fmtTime, fmtDate, errMsg, downloadCSV } from "@/lib/format";
 
 const iso = (d) => d.toLocaleDateString("sv-SE");
@@ -23,6 +23,7 @@ export default function PhieuThuChi({ dir }) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const sort = useSortable();
+  const sel = useSelection();
   const [busy, setBusy] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [detail, setDetail] = useState(null);
@@ -88,6 +89,33 @@ export default function PhieuThuChi({ dir }) {
       [["Mã phiếu", "Ngày", "Quỹ", "Danh mục", "Số tiền", "Đối tượng", "Diễn giải", "Chứng từ gốc", "Người tạo"],
        ...sorted.map((t) => [t.code, fmtTime(t.created_at), accName(t.account_id), t.category, t.amount, t.counterparty, t.description, t.ref_doc, t.created_by_name])]);
     notify(`Đã xuất ${sorted.length} phiếu.`);
+  };
+
+  // ===== THAO TÁC HÀNG LOẠT trên phiếu đã chọn =====
+  const chon = () => sorted.filter((t) => sel.has(t.id));
+  const tongChon = chon().reduce((a, b) => a + b.amount, 0);
+  const exportChon = () => {
+    const rs = chon();
+    downloadCSV(`phieu_${isThu ? "thu" : "chi"}_chon_${sorted.length ? iso(new Date()) : ""}.csv`,
+      [["Mã phiếu", "Ngày", "Quỹ", "Danh mục", "Số tiền", "Đối tượng", "Diễn giải", "Chứng từ gốc", "Người tạo"],
+       ...rs.map((t) => [t.code, fmtTime(t.created_at), accName(t.account_id), t.category, t.amount, t.counterparty, t.description, t.ref_doc, t.created_by_name])]);
+    notify(`Đã xuất ${rs.length} phiếu đã chọn.`);
+  };
+  const huyChon = async () => {
+    const rs = chon();
+    const tuDong = rs.filter((t) => t.ref_doc);
+    if (tuDong.length) return notify(`Có ${tuDong.length} phiếu tự động (từ đơn/DV) — không hủy trực tiếp được. Bỏ chọn các phiếu này rồi thử lại.`, "err");
+    if (!confirm(`Hủy ${rs.length} ${tenPhieu.toLowerCase()} thủ công đã chọn? Số dư quỹ sẽ điều chỉnh tương ứng.`)) return;
+    setBusy(true);
+    let ok = 0, fail = 0;
+    for (const t of rs) {
+      const { error } = await supabase.rpc("fn_huy_phieu_thu_chi", { p_id: t.id });
+      if (error) fail++; else ok++;
+    }
+    setBusy(false);
+    sel.clear();
+    notify(fail ? `Đã hủy ${ok} phiếu, ${fail} phiếu lỗi.` : `Đã hủy ${ok} phiếu.`, fail ? "err" : "ok");
+    load();
   };
 
   const tone = isThu ? "green" : "amber";
@@ -258,9 +286,14 @@ export default function PhieuThuChi({ dir }) {
 
         {busy && txns.length === 0 ? <div className="text-sm text-[#8A93A0] py-4">Đang tải…</div> : (
           <>
+            <SelectionBar sel={sel}>
+              <button className="btn-ghost !text-xs !py-1" onClick={exportChon}>⬇ Xuất Excel</button>
+              <span className="text-[12px] font-bold text-brand px-1.5 self-center">Tổng: {fmtVND(tongChon)}</span>
+              {can("thu_chi_chot") && <button className="btn-ghost !text-xs !py-1 !text-danger" onClick={huyChon}>✕ Hủy phiếu</button>}
+            </SelectionBar>
             <div className="tbl-scroll"><table className="w-full border-collapse tbl-card">
               <thead><tr>
-                <th className="th w-10">STT</th>
+                <ThCheck sel={sel} rows={pageSlice(sorted, page, pageSize)} idOf={(t) => t.id} />
                 <Th label="Ngày tạo" k="date" sort={sort} />
                 <Th label="Mã phiếu" k="code" sort={sort} />
                 <Th label="Danh mục" k="cat" sort={sort} />
@@ -269,9 +302,9 @@ export default function PhieuThuChi({ dir }) {
                 <Th label="Quỹ" k="acc" sort={sort} />
                 <Th label="Chứng từ gốc" k="ref" sort={sort} />
               </tr></thead>
-              <tbody>{pageSlice(sorted, page, pageSize).map((t, i) => (
-                <tr key={t.id} className="hover:bg-[#F8FAFC]">
-                  <td data-label="STT" className="td text-center text-xs text-[#8A93A0]">{(pageClamp(page, sorted.length, pageSize) - 1) * pageSize + i + 1}</td>
+              <tbody>{pageSlice(sorted, page, pageSize).map((t) => (
+                <tr key={t.id} className={`hover:bg-[#F8FAFC] ${sel.has(t.id) ? "bg-[#EAF2FF]" : ""}`}>
+                  <TdCheck sel={sel} id={t.id} />
                   <td data-label="Ngày tạo" className="td text-xs whitespace-nowrap">{fmtTime(t.created_at)}</td>
                   <td data-label="Mã phiếu" className="td"><button className="font-bold text-brand hover:underline" onClick={() => setDetail(t)}>{t.code}</button></td>
                   <td data-label="Danh mục" className="td text-[13px]">{t.ref_doc ? <Badge tone="blue">Tự động</Badge> : null} {t.category}</td>
