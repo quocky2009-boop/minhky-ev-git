@@ -116,15 +116,17 @@ export default function DonBanChiTiet() {
       </div>
 
       {/* TIMELINE */}
-      <div className="card !py-3">
-        <div className="flex items-center justify-between gap-1">
+      <div className="card !py-4 overflow-hidden">
+        <div className="relative flex items-start justify-between">
+          {/* Đường line nối các bước */}
+          <div className="absolute top-3 left-0 right-0 h-0.5 bg-[#E3E8EF]" style={{ zIndex: 0 }} />
+          <div className="absolute top-3 left-0 h-0.5 bg-brand" style={{ zIndex: 0, width: `${(steps.filter((s) => s.done).length - 1) / (steps.length - 1) * 100}%` }} />
           {steps.map((s, i) => (
-            <div key={i} className="flex flex-col items-center flex-1 gap-0.5">
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-[11px] font-bold ${s.done ? "bg-brand" : "bg-[#D5DBE3]"}`}>
-                {s.done ? "✓" : i + 1}
+            <div key={i} className="flex flex-col items-center relative" style={{ zIndex: 1, flex: 1 }}>
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-[11px] font-bold border-2 ${s.done ? "bg-brand border-brand" : "bg-white border-[#D5DBE3]"}`}>
+                {s.done ? "✓" : ""}
               </div>
-              {i < steps.length - 1 && <div className={`absolute translate-x-[calc(100%+2px)] w-full h-0.5 ${s.done ? "bg-brand" : "bg-[#D5DBE3]"}`} />}
-              <div className="text-[10.5px] font-semibold text-center">{s.label}</div>
+              <div className="text-[10.5px] font-semibold text-center mt-1 px-0.5">{s.label}</div>
               {s.at && <div className="text-[9.5px] text-[#8A93A0] text-center">{fmtTime(s.at)}</div>}
             </div>
           ))}
@@ -145,7 +147,8 @@ export default function DonBanChiTiet() {
           <div className="card">
             <div className="font-extrabold mb-2">Thông tin khách hàng</div>
             <div className="text-brand font-bold text-[15px]">{o.customer_name} — {o.customer_phone}</div>
-            <div className="text-[12px] text-[#5A6572] mt-1 uppercase font-semibold tracking-wide">Địa chỉ giao hàng</div>
+            {o.customer_type && <div className="text-[12px] text-[#5A6572] mt-0.5">{o.customer_type}</div>}
+            <div className="text-[12px] text-[#5A6572] mt-2 uppercase font-semibold tracking-wide">Địa chỉ giao hàng</div>
             <div className="text-[13px]">{o.customer_phone}</div>
             {o.customer_address && <div className="text-[13px]">{o.customer_address}</div>}
           </div>
@@ -188,6 +191,7 @@ export default function DonBanChiTiet() {
                     <td className="py-2.5 pl-2">
                       <div className="font-semibold">{v ? `${v.brand} ${v.name} ${v.color}` : o.vehicle_id}</div>
                       <div className="text-[10.5px] text-[#8A93A0] font-mono">SK: {o.frame_number}</div>
+                      <div className="text-[10.5px] text-[#8A93A0]">Kho: {locName(o.location_code)}</div>
                       {o.coc_giao && <Badge tone="green">COC đã giao</Badge>}
                     </td>
                     <td className="py-2.5 text-right">{o.quantity}</td>

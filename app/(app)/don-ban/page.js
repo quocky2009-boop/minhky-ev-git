@@ -60,7 +60,7 @@ export default function DonBan() {
 
   const vOf = (id) => vehicles.find((x) => x.id === id);
   const locName = (c) => locations.find((l) => l.code === c)?.name || c;
-  const total = (o) => o.sale_price * o.quantity + (itemSum[o.code] || 0);
+  const total = (o) => Math.max(o.sale_price * o.quantity + (itemSum[o.code] || 0) - (o.discount_amount || 0), 0);
   const canConfirm = ["SALES", "MANAGER", "ADMIN", "CEO"].includes(profile.role);
   const canCancel = ["ADMIN", "CEO"].includes(profile.role);
 
@@ -296,6 +296,7 @@ export default function DonBan() {
                         </>
                       ) : (<>
                       {!done && canConfirm && <button className={`!px-2.5 !py-1 !text-xs ${invId === o.id ? "btn-primary" : "btn-ok"}`} onClick={() => { setInvId(invId === o.id ? null : o.id); setInvF({ no: "", date: iso(new Date()), bh: false, app: false, coc: false }); }}>{invId === o.id ? "Đóng" : "✓ Xác nhận HĐ"}</button>}
+                      {thieuKhachLe(o) && <button className="btn-primary !px-2 !py-1 !text-xs !bg-danger !border-danger" title="Nhập thông tin khách lẻ mua sau cùng" onClick={() => openDetail(o)}>👤 Khách lẻ</button>}
                       <Link href={`/don-ban/${o.id}`} className="btn-ghost !px-2 !py-1 !text-xs" title="Xem chi tiết đơn">👁</Link>
                       {canSuaTT && total(o) - (o.paid_amount || 0) > 0 && (
                         <button className="btn-ok !px-2 !py-1 !text-xs" title={`Còn thiếu ${fmtVND(total(o) - (o.paid_amount || 0))} — bấm để thu`}

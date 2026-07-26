@@ -1,5 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Field, Badge, Toast, KPI, LocSearch, VehicleSearch, MoneyInput, Pager, pageSlice, pageClamp, useSortable, Th, useSelection, ThCheck, TdCheck, SelectionBar } from "@/components/ui";
 import { fmtVND, fmtTime, errMsg, downloadCSV } from "@/lib/format";
@@ -9,7 +11,7 @@ const iso = (d) => d.toLocaleDateString("sv-SE");
 const firstOfMonth = () => { const d = new Date(); return iso(new Date(d.getFullYear(), d.getMonth(), 1)); };
 const emptyLine = { vehicle_id: "", frames: [], cost_price: 0, note: "" };
 
-export default function NhapHang() {
+function NhapHangInner() {
   const { supabase, vehicles, locations, settings, profile, loading, refresh } = useCatalog();
   const { toast, notify } = useToast();
 
@@ -21,6 +23,8 @@ export default function NhapHang() {
   const [fLoc, setFLoc] = useState("");
   const [fSup, setFSup] = useState("");
   const [q, setQ] = useState("");
+  const searchParams = useSearchParams();
+  useEffect(() => { const d = searchParams.get("doc"); if (d) setQ(d); }, [searchParams]);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const sort = useSortable();
@@ -374,13 +378,13 @@ export default function NhapHang() {
               <tbody>{pageSlice(sorted, page, pageSize).map((d) => (
                 <tr key={d.doc} className={`hover:bg-[#F8FAFC] ${sel.has(d.doc) ? "bg-[#EAF2FF]" : ""}`}>
                   <TdCheck sel={sel} id={d.doc} />
-                  <td data-label="Mã phiếu" className="td font-bold">{d.doc}</td>
+                  <td data-label="Mã phiếu" className="td font-bold"><Link href={`/nhap-hang/${encodeURIComponent(d.doc)}`} className="text-brand hover:underline">{d.doc}</Link></td>
                   <td data-label="Ngày nhập" className="td text-xs whitespace-nowrap">{fmtTime(d.created_at)}</td>
                   <td data-label="Kho" className="td text-[13px]">{locName(d.location_code)}</td>
                   <td data-label="NCC" className="td text-[13px]">{d.supplier || <span className="text-[#8A93A0]">—</span>}</td>
                   <td data-label="Xe" className="td text-[13px]">{d.so_ma} mã · <b>{d.so_xe} chiếc</b></td>
                   <td data-label="Người nhập" className="td text-xs">{d.by}</td>
-                  <td className="td"><button className="btn-ghost !px-2 !py-1 !text-xs" title="Xem chi tiết phiếu" onClick={() => openDetail(d)}>👁</button></td>
+                  <td className="td"><Link href={`/nhap-hang/${encodeURIComponent(d.doc)}`} className="btn-ghost !px-2 !py-1 !text-xs" title="Xem chi tiết phiếu">👁</Link></td>
                 </tr>
               ))}
               {sorted.length === 0 && <tr><td className="td" colSpan={8}>Không có đơn nhập nào khớp bộ lọc.</td></tr>}
@@ -436,4 +440,8 @@ export default function NhapHang() {
       )}
     </div>
   );
+}
+
+export default function NhapHang() {
+  return <Suspense fallback={<div className="card">Đang tải…</div>}><NhapHangInner /></Suspense>;
 }

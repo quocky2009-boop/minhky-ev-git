@@ -285,38 +285,42 @@ function DieuChuyenInner() {
             <ThCheck sel={sel} rows={pageSlice(sorted, page, pageSize)} idOf={(t) => t.id} />
             <Th label="Mã phiếu" k="code" sort={sort} />
             <Th label="Xe · SL" k="xe" sort={sort} />
-            <Th label="Kho xuất" k="from" sort={sort} />
-            <Th label="Kho nhận" k="to" sort={sort} />
+            <Th label="Kho xuất → Kho nhận" k="from" sort={sort} />
             <Th label="Trạng thái" k="tt" sort={sort} />
-            <Th label="Người lập" k="nv" sort={sort} />
-            <Th label="Ngày lập" k="ngay" sort={sort} />
-            <Th label="Người nhận xác nhận" k="nvnhan" sort={sort} />
-            <Th label="Ngày nhận" k="ngaynhan" sort={sort} />
+            <Th label="Người lập · Ngày lập" k="ngay" sort={sort} />
+            <Th label="Người nhận · Ngày nhận" k="ngaynhan" sort={sort} />
             <th className="th">Ghi chú / SK</th>
             <th className="th"></th>
           </tr></thead>
           <tbody>{pageSlice(sorted, page, pageSize).map((t) => (
             <tr key={t.id} className={`${sel.has(t.id) ? "bg-[#EAF2FF]" : t.status === "Đang chuyển" ? "bg-[#FFFCF0] hover:bg-[#FFF8E0]" : "hover:bg-[#F8FAFC]"}`}>
               <TdCheck sel={sel} id={t.id} />
-              <td data-label="Mã phiếu" className="td font-bold">{t.code}</td>
+              <td data-label="Mã phiếu" className="td font-bold text-xs">{t.code}</td>
               <td data-label="Xe" className="td text-[13px]">{vName(t.vehicle_id)}<div className="text-[10.5px] text-[#8A93A0]">{t.quantity} xe</div></td>
-              <td data-label="Kho xuất" className="td text-xs">{locName(t.from_location)}</td>
-              <td data-label="Kho nhận" className="td text-xs">{locName(t.to_location)}</td>
+              <td data-label="Kho" className="td text-xs">
+                <div>{locName(t.from_location)}</div>
+                <div className="text-[#8A93A0]">→ {locName(t.to_location)}</div>
+              </td>
               <td data-label="Trạng thái" className="td"><Badge tone={t.status === "Đã nhận" ? "green" : t.status === "Đang chuyển" ? "amber" : "dark"}>{t.status}</Badge></td>
-              <td data-label="Người lập" className="td text-xs">{t.requested_by_name}</td>
-              <td data-label="Ngày lập" className="td text-xs whitespace-nowrap">{fmtTime(t.requested_at)}</td>
-              <td data-label="Người nhận XN" className="td text-xs">{t.confirmed_by_name || <span className="text-[#C6CDD6]">—</span>}</td>
-              <td data-label="Ngày nhận" className="td text-xs whitespace-nowrap">{t.confirmed_at ? fmtTime(t.confirmed_at) : <span className="text-[#C6CDD6]">—</span>}</td>
-              <td data-label="Ghi chú" className="td text-xs max-w-[160px]">
-                {t.note && <div className="truncate">{t.note}</div>}
-                {(t.frames || []).length > 0 && <div className="font-mono text-[10px] text-[#8A93A0] truncate">SK: {t.frames.join(", ")}</div>}
+              <td data-label="Người lập" className="td text-xs">
+                <div>{t.requested_by_name}</div>
+                <div className="text-[#8A93A0] whitespace-nowrap">{fmtTime(t.requested_at)}</div>
+              </td>
+              <td data-label="Người nhận" className="td text-xs">
+                {t.confirmed_by_name
+                  ? <><div>{t.confirmed_by_name}</div><div className="text-[#8A93A0] whitespace-nowrap">{fmtTime(t.confirmed_at)}</div></>
+                  : <span className="text-[#C6CDD6]">—</span>}
+              </td>
+              <td data-label="Ghi chú" className="td text-xs" style={{ minWidth: "120px", maxWidth: "200px", wordBreak: "break-word" }}>
+                {t.note && <div>{t.note}</div>}
+                {(t.frames || []).length > 0 && <div className="font-mono text-[10px] text-[#8A93A0]">{t.frames.join(", ")}</div>}
               </td>
               <td className="td">{t.status === "Đang chuyển" && ["CEO","MANAGER","ADMIN"].includes(profile.role) && (
                 <button className="btn-ok !px-2 !py-1 !text-xs whitespace-nowrap" onClick={() => nhanXe(t)}>✓ Nhận xe</button>
               )}</td>
             </tr>
           ))}
-          {sorted.length === 0 && <tr><td className="td" colSpan={12}>Không có phiếu điều chuyển nào.</td></tr>}
+          {sorted.length === 0 && <tr><td className="td" colSpan={9}>Không có phiếu điều chuyển nào.</td></tr>}
           </tbody>
         </table></div>
         <Pager total={sorted.length} page={page} setPage={setPage} pageSize={pageSize} setPageSize={setPageSize} />

@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Badge, Toast, KPI, Field, LocSearch, Pager, pageSlice, useSortable, Th, useSelection, ThCheck, TdCheck, SelectionBar } from "@/components/ui";
 import { fmtDate, errMsg, downloadCSV } from "@/lib/format";
@@ -27,12 +28,15 @@ export default function GiayCOC() {
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+  const [loPage, setLoPage] = useState(1);
+  const [loPageSize, setLoPageSize] = useState(20);
   const [busy, setBusy] = useState(false);
   const sort = useSortable();
   const sel = useSelection();
 
   const canSua = profile && ["CEO", "MANAGER", "ADMIN"].includes(profile.role);
 
+  const [orders, setOrders] = useState({});
   const load = async () => {
     setBusy(true);
     const [{ data: u }, { data: l }] = await Promise.all([
@@ -40,6 +44,12 @@ export default function GiayCOC() {
       supabase.from("v_coc_lo").select("*").order("ngay_nhap", { ascending: false }).limit(500),
     ]);
     setUnits(u || []); setLos(l || []);
+    // Nap thong tin don ban cho cac xe da giao COC (co sale_code)
+    const saleCodes = [...new Set((u || []).filter((x) => x.sale_code).map((x) => x.sale_code))];
+    if (saleCodes.length) {
+      const { data: os } = await supabase.from("sales_orders").select("id,code,customer_name,customer_phone,sale_date").in("code", saleCodes);
+      const m = {}; (os || []).forEach((o) => { m[o.code] = o; }); setOrders(m);
+    }
     setBusy(false);
   };
   useEffect(() => { if (!loading) load(); }, [loading]);
@@ -185,6 +195,12 @@ export default function GiayCOC() {
                   <td data-label="Giấy COC" className="td">
                     <Badge tone={COC_TT[u.coc_status]?.tone || "gray"}>{COC_TT[u.coc_status]?.label || u.coc_status}</Badge>
                     {u.coc_received_at && <div className="text-[10.5px] text-[#8A93A0] mt-0.5">nhận {fmtDate(u.coc_received_at)}</div>}
+                    {u.coc_status === "DA_GIAO" && u.sale_code && orders[u.sale_code] && (
+                      <div className="text-[10.5px] text-[#5A6572] mt-0.5">
+                        → <Link href={`/don-ban/${orders[u.sale_code].id}`} className="text-brand hover:underline font-semibold">{u.sale_code}</Link>
+                        <div>{orders[u.sale_code].customer_name} · {fmtDate(orders[u.sale_code].sale_date)}</div>
+                      </div>
+                    )}
                     {tre && <div className="text-[10.5px] text-danger font-bold mt-0.5">quá {HAN_NGAY} ngày!</div>}
                   </td>
                 </tr>
@@ -206,13 +222,16 @@ export default function GiayCOC() {
               <th className="th">Lô nhập</th><th className="th">Ngày nhập</th><th className="th">Hãng</th><th className="th">Kho</th>
               <th className="th">Tổng xe</th><th className="th">Chưa về</th><th className="th">Đã về</th><th className="th">Đã giao</th><th className="th">Tiến độ</th><th className="th"></th>
             </tr></thead>
-            <tbody>{los.map((l, i) => {
+            <tbody>{pageSlice(los, loPage, loPageSize).map((l, i) => {
               const xong = l.tong_xe - l.chua_ve - l.that_lac;
               const pct = l.tong_xe ? Math.round((xong / l.tong_xe) * 100) : 0;
               const tre = l.chua_ve > 0 && l.so_ngay > HAN_NGAY;
+              const coLo = l.lo && l.lo !== "(không rõ lô)";
               return (
                 <tr key={l.lo + i} className={tre ? "bg-[#FFF6F6]" : "hover:bg-[#F8FAFC]"}>
-                  <td data-label="Lô" className="td font-bold">{l.lo}</td>
+                  <td data-label="Lô" className="td font-bold">
+                    {coLo ? <Link href={`/nhap-hang?doc=${encodeURIComponent(l.lo)}`} className="text-brand hover:underline">{l.lo}</Link> : l.lo}
+                  </td>
                   <td data-label="Ngày nhập" className="td text-xs whitespace-nowrap">{fmtDate(l.ngay_nhap)}<div className={`text-[10.5px] ${tre ? "text-danger font-bold" : "text-[#8A93A0]"}`}>{l.so_ngay} ngày trước</div></td>
                   <td data-label="Hãng" className="td text-[13px]">{l.hang}</td>
                   <td data-label="Kho" className="td text-xs">{locName(l.location_code)}</td>
@@ -229,7 +248,7 @@ export default function GiayCOC() {
                     </div>
                   </td>
                   <td className="td">{l.chua_ve > 0 && (
-                    <button className="btn-ghost !px-2 !py-1 !text-xs" onClick={() => { setFLo(l.lo === "(không rõ lô)" ? "" : l.lo); setFTT("CHUA_VE"); setTab("xe"); setPage(1); }}>Xem xe thiếu</button>
+                    <button className="btn-ghost !px-2 !py-1 !text-xs" onClick={() => { setFLo(coLo ? l.lo : ""); setFTT("CHUA_VE"); setTab("xe"); setPage(1); }}>Xem xe thiếu</button>
                   )}</td>
                 </tr>
               );
@@ -237,6 +256,7 @@ export default function GiayCOC() {
             {los.length === 0 && <tr><td className="td" colSpan={10}>Chưa có lô nhập nào.</td></tr>}
             </tbody>
           </table></div>
+          <Pager total={los.length} page={loPage} setPage={setLoPage} pageSize={loPageSize} setPageSize={setLoPageSize} />
         </div>
       )}
     </div>

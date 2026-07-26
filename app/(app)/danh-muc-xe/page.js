@@ -108,17 +108,18 @@ export default function DMXe() {
   };
 
   const capNhatGiaHangLoat = async () => {
-    if (!bulk.brand && !bulk.name.trim()) return notify("Chọn ít nhất Hãng hoặc Model để giới hạn phạm vi.", "err");
+    if (!bulk.brand && !bulk.name) return notify("Chọn ít nhất Hãng hoặc Model để giới hạn phạm vi.", "err");
     const gia = Number(bulk.list_price) || 0;
     if (gia <= 0) return notify("Nhập giá niêm yết mới (> 0).", "err");
+    // So sanh chinh xac ten xe
     const soKhop = vehicles.filter((v) =>
       (!bulk.brand || v.brand === bulk.brand) &&
-      (!bulk.name.trim() || v.name.toLowerCase().includes(bulk.name.trim().toLowerCase()))
+      (!bulk.name || v.name === bulk.name)
     ).length;
     if (soKhop === 0) return notify("Không có mã xe nào khớp điều kiện.", "err");
-    if (!confirm(`Cập nhật giá niêm yết = ${fmtVND(gia)} cho ${soKhop} mã xe khớp điều kiện?\n\nHãng: ${bulk.brand || "tất cả"}\nModel chứa: ${bulk.name.trim() || "tất cả"}`)) return;
+    if (!confirm(`Cập nhật giá niêm yết = ${fmtVND(gia)} cho ${soKhop} mã xe?\n\nHãng: ${bulk.brand || "tất cả"}\nModel: ${bulk.name || "tất cả"}`)) return;
     setBusy(true);
-    const { data, error } = await supabase.rpc("fn_cap_nhat_gia_hang_loat", { p: { brand: bulk.brand, name: bulk.name, list_price: gia } });
+    const { data, error } = await supabase.rpc("fn_cap_nhat_gia_hang_loat", { p: { brand: bulk.brand || null, name: bulk.name || null, list_price: gia } });
     setBusy(false);
     if (error) return notify(errMsg(error), "err");
     notify(`Đã cập nhật giá cho ${data.so_ma_cap_nhat} mã xe.`);
@@ -194,26 +195,47 @@ export default function DMXe() {
       {showBulk && (
         <div className="card border-l-4 border-l-brand">
           <div className="font-extrabold mb-1">Cập nhật giá niêm yết hàng loạt</div>
-          <p className="text-xs text-[#8A93A0] mb-3">Chọn Hãng và/hoặc gõ Model để giới hạn phạm vi, rồi nhập giá mới. Áp dụng cho mọi màu của các mã khớp điều kiện.</p>
+          <p className="text-xs text-[#8A93A0] mb-3">Chọn Hãng và/hoặc gõ Model <b>chính xác</b> để giới hạn phạm vi, rồi nhập giá mới. Áp dụng cho mọi màu của các mã khớp điều kiện.</p>
           <div className="grid gap-x-3.5 md:grid-cols-4 sm:grid-cols-2 items-end">
             <Field label="Hãng (bỏ trống = tất cả)">
-              <select className="inp" value={bulk.brand} onChange={(e) => setBulk((p) => ({ ...p, brand: e.target.value }))}>
+              <select className="inp" value={bulk.brand} onChange={(e) => setBulk((p) => ({ ...p, brand: e.target.value, name: "" }))}>
                 <option value="">— Tất cả hãng —</option>{brands.map((b) => <option key={b.name}>{b.name}</option>)}
               </select>
             </Field>
-            <Field label="Model chứa (bỏ trống = tất cả)">
-              <ComboFree value={bulk.name} onChange={(v) => setBulk((p) => ({ ...p, name: v }))}
-                options={Array.from(new Set(vehicles.filter((v) => !bulk.brand || v.brand === bulk.brand).map((v) => v.name)))}
-                placeholder="VD: Amio S2" />
+            <Field label="Model (chọn chính xác)">
+              <select className="inp" value={bulk.name} onChange={(e) => setBulk((p) => ({ ...p, name: e.target.value }))}>
+                <option value="">— Tất cả model —</option>
+                {Array.from(new Set(vehicles.filter((v) => !bulk.brand || v.brand === bulk.brand).map((v) => v.name))).sort().map((n) => <option key={n}>{n}</option>)}
+              </select>
             </Field>
             <Field label="Giá niêm yết mới"><MoneyInput value={bulk.list_price} onChange={(v) => setBulk((p) => ({ ...p, list_price: v }))} /></Field>
             <div className="pb-3">
               <button className="btn-ok w-full" disabled={busy} onClick={capNhatGiaHangLoat}>Áp dụng</button>
             </div>
           </div>
-          {(bulk.brand || bulk.name.trim()) && (() => {
-            const kh = vehicles.filter((v) => (!bulk.brand || v.brand === bulk.brand) && (!bulk.name.trim() || v.name.toLowerCase().includes(bulk.name.trim().toLowerCase())));
-            return <div className="text-xs text-[#5A6572] mt-1">Khớp <b>{kh.length}</b> mã xe{kh.length > 0 && kh.length <= 8 ? `: ${kh.map((v) => `${v.name} ${v.color}`).join(", ")}` : ""}.</div>;
+          {(bulk.brand || bulk.name) && (() => {
+            // So sanh CHINH XAC ten xe (khong dung includes de tranh Flazz khop Flazz Max)
+            const kh = vehicles.filter((v) =>
+              (!bulk.brand || v.brand === bulk.brand) &&
+              (!bulk.name || v.name === bulk.name)
+            );
+            const giaHienTai = bulk.name ? [...new Set(kh.map((v) => v.list_price))] : [];
+            return (
+              <div className="mt-2">
+                {giaHienTai.length > 0 && (
+                  <div className="mb-2 p-2 rounded-lg bg-[#FDF6E3] text-[12.5px]">
+                    💰 <b>Giá niêm yết hiện tại</b> của <i>{bulk.name}</i>:{" "}
+                    {giaHienTai.map((g) => fmtVND(g)).join(" / ")}
+                    {giaHienTai.length === 1 && bulk.list_price && Number(bulk.list_price) !== giaHienTai[0] && (
+                      <span className="ml-2 text-[#A25F00]">→ sẽ đổi thành <b>{fmtVND(Number(bulk.list_price))}</b></span>
+                    )}
+                  </div>
+                )}
+                <div className="text-xs text-[#5A6572]">
+                  Sẽ cập nhật <b>{kh.length}</b> mã xe{kh.length > 0 && kh.length <= 10 ? `: ${kh.map((v) => `${v.name} ${v.color}`).join(", ")}` : ""}.
+                </div>
+              </div>
+            );
           })()}
         </div>
       )}

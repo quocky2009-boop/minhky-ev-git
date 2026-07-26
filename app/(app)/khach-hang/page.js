@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Field, Badge, Toast, KPI, Pager, pageSlice, useSortable, Th, LocSearch, MoneyInput } from "@/components/ui";
 import { InfoRows, MoneyRows } from "@/components/detail";
@@ -74,7 +75,7 @@ function KhachHangInner() {
       interested_products: c.interested_products || "", budget: c.budget || "",
       buy_timeline: c.buy_timeline || "", potential: c.potential || "", status: c.status || "Lead mới",
     });
-    setTab("chung"); setShow(true); setCareF(null);
+    setTab("muahang"); setShow(true); setCareF(null);
     const [{ data: o }, { data: dv }, { data: care }] = await Promise.all([
       supabase.from("sales_orders").select("*").eq("customer_id", c.id).order("sale_date", { ascending: false }),
       supabase.from("dv_tickets").select("*").eq("customer_id", c.id).order("created_at", { ascending: false }).limit(50),
@@ -152,43 +153,73 @@ function KhachHangInner() {
   // ===== FORM / CHI TIẾT =====
   if (show) {
     const t = tq[f.id] || {};
-    const TABS = [
-      ["chung", "Thông tin chung"],
-      ["phanloai", "Phân loại & nhu cầu"],
-      ["chamsoc", `Lịch sử chăm sóc${careLogs.length ? ` (${careLogs.length})` : ""}`],
+    const DTABS = [
       ["muahang", `Lịch sử mua hàng${t.so_don ? ` (${t.so_don})` : ""}`],
+      ["cong_no", "Công nợ"],
+      ["chamsoc", `Lịch sử chăm sóc${careLogs.length ? ` (${careLogs.length})` : ""}`],
     ];
     return (
-      <div className="flex flex-col gap-4 pb-24">
+      <div className="flex flex-col gap-4 pb-8">
         <Toast toast={toast} />
         <div className="flex items-center gap-2 flex-wrap">
-          <button className="btn-ghost !text-xs" onClick={() => { setShow(false); load(); }}>← Danh sách</button>
-          <div className="font-extrabold text-lg mr-auto">{f.id ? f.name : "Khách hàng mới"}</div>
-          {f.id && <Badge tone={f.status === "Đã mua" ? "green" : f.status === "Không mua" ? "red" : "amber"}>{f.status}</Badge>}
-          {f.potential && <Badge tone={f.potential === "Cao" ? "red" : f.potential === "Trung bình" ? "amber" : "dark"}>Tiềm năng {f.potential}</Badge>}
+          <button className="btn-ghost !text-xs" onClick={() => { setShow(false); load(); }}>← Quay lại danh sách khách hàng</button>
+          <div className="ml-auto flex gap-2">
+            <button className="btn-primary !text-xs" disabled={busy} onClick={luu}>{busy ? "Đang lưu…" : f.id ? "Cập nhật" : "Thêm khách hàng"}</button>
+          </div>
         </div>
+        <div className="font-extrabold text-xl">{f.name || "Khách hàng mới"}</div>
 
         {f.id && (
-          <div className="flex gap-3 flex-wrap">
-            <KPI label="Số đơn đã mua" value={t.so_don || 0} tone="dark" />
-            <KPI label="Tổng giá trị" value={fmtVND(t.tong_mua || 0)} tone="blue" />
-            <KPI label="Còn nợ" value={fmtVND(t.con_no || 0)} tone={Number(t.con_no) > 0 ? "red" : "green"} />
-            <KPI label="Lần chăm sóc" value={t.so_lan_cham_soc || 0} tone="purple" />
-            {t.hen_ke_tiep && <KPI label="Hẹn kế tiếp" value={fmtDate(t.hen_ke_tiep)} tone="amber" />}
+          <div className="grid gap-4 lg:grid-cols-3">
+            <div className="card lg:col-span-2">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="font-extrabold mr-auto">Thông tin cá nhân</div>
+                <Badge tone={f.status === "Đã mua" ? "green" : f.status === "Không mua" ? "red" : "amber"}>{f.status}</Badge>
+                <button className="btn-ghost !text-xs" onClick={() => setTab("chung")}>Cập nhật</button>
+              </div>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-[13px]">
+                {[["Ngày sinh", f.birthday ? fmtDate(f.birthday) : "—"], ["Nhóm khách hàng", f.customer_type || "—"],
+                  ["Giới tính", f.gender || "—"], ["Mã khách hàng", f.code || "—"],
+                  ["Số điện thoại", f.phone], ["Email", f.email || "—"],
+                  ["Nhân viên phụ trách", f.assigned_name || "—"], ["Mô tả", f.note || "—"],
+                ].map(([k, v]) => (
+                  <div key={k} className="flex gap-2">
+                    <span className="text-[#8A93A0] w-36 shrink-0">{k}</span>
+                    <span className={v === "—" ? "text-[#8A93A0]" : "font-medium"}>{v}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="card">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="font-extrabold mr-auto">Thông tin mua hàng</div>
+                <button className="btn-ghost !text-xs" onClick={() => setTab("muahang")}>Chi tiết</button>
+              </div>
+              <div className="flex flex-col gap-1.5 text-[13px]">
+                {[["Tổng chi tiêu", fmtVND(t.tong_mua || 0)],
+                  ["Tổng SL đơn hàng", `${t.so_don || 0}`],
+                  ["Ngày cuối cùng mua hàng", t.ngay_mua_cuoi ? fmtDate(t.ngay_mua_cuoi) : "—"],
+                  ["Tổng SL sản phẩm đã mua", `${t.so_xe || 0}`],
+                  ["Tổng SL sản phẩm hoàn trả", "0"],
+                  ["Công nợ hiện tại", fmtVND(t.con_no || 0)],
+                ].map(([k, v]) => (
+                  <div key={k} className="flex justify-between gap-2">
+                    <span className="text-[#8A93A0] shrink-0">{k}</span>
+                    <span className={k === "Công nợ hiện tại" && Number(t.con_no) > 0 ? "font-bold text-danger" : "font-medium text-right"}>{v}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 
-        <div className="flex gap-1.5 flex-wrap">
-          {TABS.map(([k, v]) => (
-            <button key={k} disabled={!f.id && (k === "muahang" || k === "chamsoc")}
-              className={`btn !px-3 !py-2 !text-xs ${tab === k ? "bg-brand text-white" : "bg-[#EEF1F4]"} ${!f.id && (k === "muahang" || k === "chamsoc") ? "opacity-40" : ""}`}
-              onClick={() => setTab(k)}>{v}</button>
-          ))}
-        </div>
-
-        {/* TAB 1: THÔNG TIN CHUNG */}
-        {tab === "chung" && (
-          <div className="card">
+        <div className="card">
+          <div className="flex gap-1.5 mb-3">
+            {[["chung", "Thông tin chung"], ["phanloai", "Phân loại & nhu cầu"]].map(([k, v]) => (
+              <button key={k} className={`btn !px-3 !py-2 !text-xs ${tab === k ? "bg-brand text-white" : "bg-[#EEF1F4]"}`} onClick={() => setTab(k)}>{v}</button>
+            ))}
+          </div>
+          {tab === "chung" && (
             <div className="grid gap-3 md:grid-cols-2">
               <Field label="Họ tên" required><input className="inp" value={f.name} onChange={(e) => setF((p) => ({ ...p, name: e.target.value }))} /></Field>
               <Field label="Số điện thoại" required><input className="inp" value={f.phone} onChange={(e) => setF((p) => ({ ...p, phone: e.target.value }))} /></Field>
@@ -197,12 +228,9 @@ function KhachHangInner() {
               <Field label="Số CCCD"><input className="inp" value={f.cccd} onChange={(e) => setF((p) => ({ ...p, cccd: e.target.value }))} /></Field>
               <Field label="Ngày sinh"><input type="date" className="inp" value={f.birthday} onChange={(e) => setF((p) => ({ ...p, birthday: e.target.value }))} /></Field>
               <Field label="Giới tính" required>
-                <div className="flex gap-1.5">
-                  {["Nam", "Nữ", "Khác"].map((g) => (
-                    <button key={g} className={`btn !px-4 !py-2 !text-xs ${f.gender === g ? "bg-brand text-white" : "bg-[#EEF1F4]"}`}
-                      onClick={() => setF((p) => ({ ...p, gender: g }))}>{g}</button>
-                  ))}
-                </div>
+                <div className="flex gap-1.5">{["Nam", "Nữ", "Khác"].map((g) => (
+                  <button key={g} className={`btn !px-4 !py-2 !text-xs ${f.gender === g ? "bg-brand text-white" : "bg-[#EEF1F4]"}`} onClick={() => setF((p) => ({ ...p, gender: g }))}>{g}</button>
+                ))}</div>
               </Field>
               <Field label="Loại khách" required>
                 <select className="inp" value={f.customer_type} onChange={(e) => setF((p) => ({ ...p, customer_type: e.target.value }))}>
@@ -212,12 +240,8 @@ function KhachHangInner() {
               <div className="md:col-span-2"><Field label="Địa chỉ VNeID"><input className="inp" value={f.address} onChange={(e) => setF((p) => ({ ...p, address: e.target.value }))} /></Field></div>
               <div className="md:col-span-2"><Field label="Ghi chú"><textarea className="inp !h-16" value={f.note} onChange={(e) => setF((p) => ({ ...p, note: e.target.value }))} /></Field></div>
             </div>
-          </div>
-        )}
-
-        {/* TAB 2: PHÂN LOẠI & NHU CẦU */}
-        {tab === "phanloai" && (
-          <div className="card">
+          )}
+          {tab === "phanloai" && (
             <div className="grid gap-3 md:grid-cols-2">
               <Field label="Nguồn khách">
                 <select className="inp" value={f.source} onChange={(e) => setF((p) => ({ ...p, source: e.target.value }))}>
@@ -232,178 +256,191 @@ function KhachHangInner() {
                     {staff.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.role})</option>)}
                   </select>
                 ) : (
-                  <input className="inp bg-[#F8FAFC]" value={f.assigned_name || "— Chưa giao —"} disabled title="Chỉ Ban giám đốc được đổi người phụ trách" />
+                  <input className="inp bg-[#F8FAFC]" value={f.assigned_name || "— Chưa giao —"} disabled />
                 )}
               </Field>
-              <Field label="Cửa hàng phụ trách">
-                <LocSearch locations={locations.filter((l) => l.type === "Cửa hàng")} value={f.location_code}
-                  onChange={(v) => setF((p) => ({ ...p, location_code: v }))} placeholder="Chọn cửa hàng" />
+              <Field label="Tiềm năng">
+                <div className="flex gap-1.5">{["Cao", "Trung bình", "Thấp"].map((g) => (
+                  <button key={g} className={`btn !px-3 !py-2 !text-xs ${f.potential === g ? "bg-brand text-white" : "bg-[#EEF1F4]"}`} onClick={() => setF((p) => ({ ...p, potential: g }))}>{g}</button>
+                ))}</div>
               </Field>
               <Field label="Trạng thái">
                 <select className="inp" value={f.status} onChange={(e) => setF((p) => ({ ...p, status: e.target.value }))}>
                   {STATUSES.map((x) => <option key={x}>{x}</option>)}
                 </select>
               </Field>
-              <div className="md:col-span-2">
-                <Field label="Sản phẩm quan tâm">
-                  <input className="inp" list="dm-xe" value={f.interested_products}
-                    onChange={(e) => setF((p) => ({ ...p, interested_products: e.target.value }))}
-                    placeholder="Gõ tên xe hoặc mô tả nhu cầu" />
-                  <datalist id="dm-xe">{vehicles.map((v) => <option key={v.id} value={`${v.brand} ${v.name} ${v.color}`} />)}</datalist>
-                </Field>
-              </div>
-              <Field label="Ngân sách dự kiến"><MoneyInput value={f.budget} onChange={(v) => setF((p) => ({ ...p, budget: v }))} placeholder="VD: 20.000.000" /></Field>
-              <Field label="Thời gian dự kiến mua">
-                <select className="inp" value={f.buy_timeline} onChange={(e) => setF((p) => ({ ...p, buy_timeline: e.target.value }))}>
-                  <option value="">— Chọn —</option>
-                  {TIMELINES.map((x) => <option key={x}>{x}</option>)}
+              <Field label="Xe quan tâm">
+                <select className="inp" value={f.interested_vehicle_id || ""} onChange={(e) => setF((p) => ({ ...p, interested_vehicle_id: e.target.value }))}>
+                  <option value="">— Chưa xác định —</option>
+                  {vehicles.map((v) => <option key={v.id} value={v.id}>{v.brand} {v.name} {v.color}</option>)}
                 </select>
               </Field>
-              <Field label="Mức độ tiềm năng">
-                <div className="flex gap-1.5">
-                  {POTENTIALS.map((x) => (
-                    <button key={x} className={`btn !px-3 !py-2 !text-xs ${f.potential === x ? (x === "Cao" ? "bg-danger text-white" : x === "Trung bình" ? "bg-[#A25F00] text-white" : "bg-brand text-white") : "bg-[#EEF1F4]"}`}
-                      onClick={() => setF((p) => ({ ...p, potential: x }))}>{x}</button>
-                  ))}
-                </div>
+              <Field label="Sản phẩm quan tâm">
+                <input className="inp" value={f.interested_products} onChange={(e) => setF((p) => ({ ...p, interested_products: e.target.value }))} />
+              </Field>
+              <Field label="Ngân sách"><input type="number" className="inp" value={f.budget} onChange={(e) => setF((p) => ({ ...p, budget: e.target.value }))} /></Field>
+              <Field label="Dự kiến mua"><input className="inp" value={f.buy_timeline} onChange={(e) => setF((p) => ({ ...p, buy_timeline: e.target.value }))} /></Field>
+              <Field label="Cửa hàng phụ trách">
+                <LocSearch locations={locations} value={f.location_code} onChange={(v) => setF((p) => ({ ...p, location_code: v }))} placeholder="Chọn cửa hàng" />
               </Field>
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
-        {/* TAB 3: LỊCH SỬ MUA HÀNG */}
-        {tab === "muahang" && (
-          <div className="flex flex-col gap-4">
-            <div className="card">
-              <div className="font-extrabold mb-2.5">Xe đã mua ({donHang.length})</div>
-              {donHang.length === 0 ? <div className="text-sm text-[#8A93A0]">Khách chưa mua xe nào.</div> : (
-                <div className="flex flex-col gap-2">
-                  {donHang.map((o) => {
-                    const conNo = Math.max(0, o.sale_price * o.quantity - (o.paid_amount || 0));
-                    return (
-                      <div key={o.id} className={`p-2.5 rounded-xl border ${conNo > 0 ? "border-[#F5B5B5] bg-[#FFF6F6]" : "border-[#E3E8EF]"}`}>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <div className="mr-auto min-w-0">
-                            <div className="font-semibold text-[13.5px]">{vName(o.vehicle_id)}</div>
-                            <div className="text-[11px] text-[#8A93A0]">{o.code} · {fmtDate(o.sale_date)} · SK {o.frame_number} · {locName(o.location_code)}</div>
-                          </div>
-                          <Badge tone={o.invoice_status === "Đã xuất HĐ" ? "green" : "amber"}>
-                            {o.invoice_status === "Đã xuất HĐ" ? `HĐ ${o.invoice_no}` : "Chưa xuất HĐ"}
-                          </Badge>
-                          <b className="whitespace-nowrap">{fmtVND(o.sale_price * o.quantity)}</b>
-                        </div>
-                        {conNo > 0 && <div className="text-[12px] text-danger font-semibold mt-1">Còn nợ {fmtVND(conNo)}</div>}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+        {f.id && (
+          <>
+            <div className="flex gap-1.5 flex-wrap">
+              {DTABS.map(([k, v]) => (
+                <button key={k} className={`btn !px-3 !py-2 !text-xs ${tab === k ? "bg-brand text-white" : "bg-[#EEF1F4]"}`} onClick={() => setTab(k)}>{v}</button>
+              ))}
             </div>
-            <div className="card">
-              <div className="font-extrabold mb-2.5">Phiếu dịch vụ ({phieuDV.length})</div>
-              {phieuDV.length === 0 ? <div className="text-sm text-[#8A93A0]">Chưa có phiếu dịch vụ nào.</div> : (
-                <div className="flex flex-col gap-1.5">
-                  {phieuDV.map((d) => (
-                    <div key={d.id} className="flex items-center gap-2 p-2.5 rounded-xl border border-[#E3E8EF] text-[13px]">
-                      <div className="mr-auto min-w-0">
-                        <div className="font-semibold">{d.code}</div>
-                        <div className="text-[11px] text-[#8A93A0]">{fmtDate(d.created_at)} · {d.vehicle_desc || d.frame_number}</div>
-                      </div>
-                      <Badge tone={d.status === "DA_GIAO" ? "green" : "amber"}>{d.status === "DA_GIAO" ? "Đã giao" : "Đang xử lý"}</Badge>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
 
-        {/* TAB 4: LỊCH SỬ CHĂM SÓC */}
-        {tab === "chamsoc" && (
-          <div className="flex flex-col gap-4">
-            <div className="card">
-              <div className="flex items-center gap-2 mb-2.5">
-                <div className="font-extrabold mr-auto">Lịch sử chăm sóc ({careLogs.length})</div>
-                <button className="btn-primary !text-xs" onClick={() => setCareF({
-                  care_date: iso(new Date()),
-                  contact_at: new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16),
-                  channel: "Gọi điện", content: "", result: "", next_care_date: "",
-                })}>+ Ghi nhận chăm sóc</button>
+            {tab === "muahang" && (
+              <div className="flex flex-col gap-4">
+                <div className="card">
+                  <div className="font-extrabold mb-2">Xe đã mua ({donHang.length})</div>
+                  {donHang.length === 0 ? <div className="text-sm text-[#8A93A0]">Khách chưa mua xe nào.</div> : (
+                    <div className="tbl-scroll"><table className="w-full border-collapse tbl-card">
+                      <thead><tr>
+                        <th className="th">Mã đơn hàng</th><th className="th">Trạng thái</th>
+                        <th className="th">Xe</th><th className="th">Số khung</th>
+                        <th className="th text-right">Giá trị</th><th className="th">Chi nhánh</th>
+                        <th className="th">Nhân viên xử lý</th><th className="th">Ngày ghi nhận</th>
+                      </tr></thead>
+                      <tbody>{donHang.map((o) => {
+                        const conNo = Math.max(0, o.sale_price * o.quantity - (o.paid_amount || 0));
+                        return (
+                          <tr key={o.id} className={conNo > 0 ? "bg-[#FFF6F6] hover:bg-[#FDEDED]" : "hover:bg-[#F8FAFC]"}>
+                            <td className="td font-bold"><Link href={`/don-ban/${o.id}`} className="text-brand hover:underline">{o.code}</Link></td>
+                            <td className="td"><Badge tone={o.invoice_status === "Đã xuất HĐ" ? "green" : "amber"}>{o.invoice_status === "Đã xuất HĐ" ? "Hoàn thành" : "Chờ xuất HĐ"}</Badge></td>
+                            <td className="td text-[13px]">{vName(o.vehicle_id)}</td>
+                            <td className="td font-mono text-xs">{o.frame_number}</td>
+                            <td className="td text-right font-bold">{fmtVND(o.sale_price * o.quantity)}</td>
+                            <td className="td text-xs">{locName(o.location_code)}</td>
+                            <td className="td text-xs">{o.seller_name || "—"}</td>
+                            <td className="td text-xs whitespace-nowrap">{fmtDate(o.sale_date)}</td>
+                          </tr>
+                        );
+                      })}</tbody>
+                    </table></div>
+                  )}
+                </div>
+                <div className="card">
+                  <div className="font-extrabold mb-2">Phiếu dịch vụ ({phieuDV.length})</div>
+                  {phieuDV.length === 0 ? <div className="text-sm text-[#8A93A0]">Chưa có phiếu dịch vụ nào.</div> : (
+                    <div className="tbl-scroll"><table className="w-full border-collapse tbl-card">
+                      <thead><tr>
+                        <th className="th">Mã phiếu</th><th className="th">Ngày tạo</th>
+                        <th className="th">Xe / SK</th><th className="th">Trạng thái</th>
+                        <th className="th text-right">Tổng tiền</th>
+                      </tr></thead>
+                      <tbody>{phieuDV.map((d) => (
+                        <tr key={d.id} className="hover:bg-[#F8FAFC]">
+                          <td className="td font-bold text-brand">{d.code}</td>
+                          <td className="td text-xs whitespace-nowrap">{fmtDate(d.created_at)}</td>
+                          <td className="td text-xs">{d.vehicle_desc || d.frame_number || "—"}</td>
+                          <td className="td"><Badge tone={d.status === "DA_GIAO" ? "green" : "amber"}>{d.status === "DA_GIAO" ? "Đã giao" : "Đang xử lý"}</Badge></td>
+                          <td className="td text-right font-bold">{d.total_amount ? fmtVND(d.total_amount) : "—"}</td>
+                        </tr>
+                      ))}</tbody>
+                    </table></div>
+                  )}
+                </div>
               </div>
+            )}
 
-              {careF && (
-                <div className="p-3 rounded-xl border-2 border-brand mb-3 flex flex-col gap-2.5">
-                  <div className="grid gap-2.5 md:grid-cols-2">
-                    <Field label="Thời gian liên hệ">
-                      <input type="datetime-local" className="inp" value={careF.contact_at}
-                        onChange={(e) => setCareF((p) => ({ ...p, contact_at: e.target.value, care_date: e.target.value.slice(0, 10) }))} />
-                    </Field>
-                    <Field label="Hình thức liên hệ">
-                      <select className="inp" value={careF.channel} onChange={(e) => setCareF((p) => ({ ...p, channel: e.target.value }))}>
-                        {CHANNELS.map((x) => <option key={x}>{x}</option>)}
-                      </select>
-                    </Field>
-                    <div className="md:col-span-2">
-                      <Field label="Nội dung trao đổi" required>
-                        <textarea className="inp !h-20" value={careF.content} onChange={(e) => setCareF((p) => ({ ...p, content: e.target.value }))}
-                          placeholder="VD: tư vấn Amio S, khách hỏi trả góp" />
-                      </Field>
-                    </div>
-                    <div className="md:col-span-2">
-                      <Field label="Kết quả">
-                        <input className="inp" value={careF.result} onChange={(e) => setCareF((p) => ({ ...p, result: e.target.value }))}
-                          placeholder="VD: khách hẹn tuần sau qua xem xe" />
-                      </Field>
-                    </div>
-                    <Field label="Ngày hẹn liên hệ tiếp">
-                      <input type="date" className="inp" value={careF.next_care_date} onChange={(e) => setCareF((p) => ({ ...p, next_care_date: e.target.value }))} />
-                    </Field>
-                  </div>
-                  <div className="flex gap-2">
-                    <button className="btn-ok !text-xs" disabled={busy} onClick={luuCare}>{busy ? "Đang lưu…" : "Lưu"}</button>
-                    <button className="btn-ghost !text-xs" onClick={() => setCareF(null)}>Hủy</button>
-                  </div>
+            {tab === "cong_no" && (
+              <div className="card">
+                <div className="font-extrabold mb-2">Công nợ</div>
+                {donHang.filter((o) => Math.max(0, o.sale_price * o.quantity - (o.paid_amount || 0)) > 0).length === 0
+                  ? <div className="text-sm text-[#0E7A4A]">✓ Khách không có công nợ.</div>
+                  : (
+                    <div className="tbl-scroll"><table className="w-full border-collapse tbl-card">
+                      <thead><tr>
+                        <th className="th">Mã đơn</th><th className="th">Ngày bán</th><th className="th">Xe</th>
+                        <th className="th text-right">Tổng đơn</th><th className="th text-right">Đã trả</th><th className="th text-right">Còn nợ</th>
+                      </tr></thead>
+                      <tbody>{donHang.filter((o) => Math.max(0, o.sale_price * o.quantity - (o.paid_amount || 0)) > 0).map((o) => (
+                        <tr key={o.id} className="bg-[#FFF6F6]">
+                          <td className="td font-bold"><Link href={`/don-ban/${o.id}`} className="text-brand hover:underline">{o.code}</Link></td>
+                          <td className="td text-xs">{fmtDate(o.sale_date)}</td>
+                          <td className="td text-[13px]">{vName(o.vehicle_id)}</td>
+                          <td className="td text-right">{fmtVND(o.sale_price * o.quantity)}</td>
+                          <td className="td text-right text-[#0E7A4A]">{fmtVND(o.paid_amount || 0)}</td>
+                          <td className="td text-right font-bold text-danger">{fmtVND(Math.max(0, o.sale_price * o.quantity - (o.paid_amount || 0)))}</td>
+                        </tr>
+                      ))}</tbody>
+                    </table></div>
+                  )
+                }
+              </div>
+            )}
+
+            {tab === "chamsoc" && (
+              <div className="card">
+                <div className="flex items-center gap-2 mb-2.5">
+                  <div className="font-extrabold mr-auto">Lịch sử chăm sóc ({careLogs.length})</div>
+                  <button className="btn-primary !text-xs" onClick={() => setCareF({
+                    care_date: iso(new Date()),
+                    contact_at: new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16),
+                    channel: "Gọi điện", content: "", result: "", next_care_date: "",
+                  })}>+ Ghi nhận chăm sóc</button>
                 </div>
-              )}
-
-              {careLogs.length === 0 ? <div className="text-sm text-[#8A93A0]">Chưa có lần chăm sóc nào.</div> : (
-                <div className="flex flex-col gap-2">
-                  {careLogs.map((k) => {
-                    const quaHan = k.next_care_date && new Date(k.next_care_date) <= new Date();
-                    return (
-                      <div key={k.id} className="p-2.5 rounded-xl border border-[#E3E8EF]">
-                        <div className="flex items-center gap-2 flex-wrap mb-1">
-                          <Badge tone="blue">{k.channel || "Liên hệ"}</Badge>
-                          <span className="text-[11px] text-[#8A93A0] mr-auto">
-                            {k.contact_at ? fmtTime(k.contact_at) : fmtDate(k.care_date)} · {k.created_by_name || k.by_name || "—"}
-                          </span>
-                          {k.next_care_date && (
-                            <Badge tone={quaHan ? "red" : "amber"}>Hẹn {fmtDate(k.next_care_date)}{quaHan ? " · quá hạn" : ""}</Badge>
-                          )}
-                        </div>
-                        <div className="text-[13px] whitespace-pre-wrap">{k.content}</div>
-                        {k.result && <div className="text-[12px] text-[#0E7A4A] mt-1">→ {k.result}</div>}
+                {careF && (
+                  <div className="p-3 rounded-xl border-2 border-brand mb-3 flex flex-col gap-2.5">
+                    <div className="grid gap-2.5 md:grid-cols-2">
+                      <Field label="Thời gian liên hệ">
+                        <input type="datetime-local" className="inp" value={careF.contact_at}
+                          onChange={(e) => setCareF((p) => ({ ...p, contact_at: e.target.value, care_date: e.target.value.slice(0, 10) }))} />
+                      </Field>
+                      <Field label="Hình thức liên hệ">
+                        <select className="inp" value={careF.channel} onChange={(e) => setCareF((p) => ({ ...p, channel: e.target.value }))}>
+                          {CHANNELS.map((x) => <option key={x}>{x}</option>)}
+                        </select>
+                      </Field>
+                      <div className="md:col-span-2">
+                        <Field label="Nội dung trao đổi" required>
+                          <textarea className="inp !h-20" value={careF.content} onChange={(e) => setCareF((p) => ({ ...p, content: e.target.value }))} placeholder="VD: tư vấn Amio S, khách hỏi trả góp" />
+                        </Field>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* THANH DÍNH ĐÁY */}
-        {(tab === "chung" || tab === "phanloai") && (
-          <div className="fixed bottom-0 left-0 right-0 lg:left-[248px] bg-white border-t border-[#E6EAEF] px-4 py-3 flex items-center gap-3 z-30">
-            <div className="text-[13px] hidden sm:block">
-              <span className="text-[#8A93A0]">Khách:</span> <b>{f.name || "—"}</b>
-              {f.phone && <span className="text-[#5A6572] ml-2">· {f.phone}</span>}
-            </div>
-            <div className="ml-auto flex gap-2">
-              <button className="btn-ghost" onClick={() => { setShow(false); load(); }}>Thoát</button>
-              <button className="btn-ok !px-6" disabled={busy} onClick={luu}>{busy ? "Đang lưu…" : f.id ? "Lưu thay đổi" : "Thêm khách hàng"}</button>
-            </div>
-          </div>
+                      <div className="md:col-span-2">
+                        <Field label="Kết quả"><input className="inp" value={careF.result} onChange={(e) => setCareF((p) => ({ ...p, result: e.target.value }))} /></Field>
+                      </div>
+                      <Field label="Ngày hẹn liên hệ tiếp">
+                        <input type="date" className="inp" value={careF.next_care_date} onChange={(e) => setCareF((p) => ({ ...p, next_care_date: e.target.value }))} />
+                      </Field>
+                    </div>
+                    <div className="flex gap-2">
+                      <button className="btn-ok !text-xs" disabled={busy} onClick={luuCare}>{busy ? "Đang lưu…" : "Lưu"}</button>
+                      <button className="btn-ghost !text-xs" onClick={() => setCareF(null)}>Hủy</button>
+                    </div>
+                  </div>
+                )}
+                {careLogs.length === 0 ? <div className="text-sm text-[#8A93A0]">Chưa có lần chăm sóc nào.</div> : (
+                  <div className="flex flex-col gap-2">
+                    {careLogs.map((k) => {
+                      const quaHan = k.next_care_date && new Date(k.next_care_date) <= new Date();
+                      return (
+                        <div key={k.id} className="p-2.5 rounded-xl border border-[#E3E8EF]">
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            <Badge tone="blue">{k.channel || "Liên hệ"}</Badge>
+                            <span className="text-[11px] text-[#8A93A0] mr-auto">
+                              {k.contact_at ? fmtTime(k.contact_at) : fmtDate(k.care_date)} · {k.created_by_name || k.by_name || "—"}
+                            </span>
+                            {k.next_care_date && (
+                              <Badge tone={quaHan ? "red" : "amber"}>Hẹn {fmtDate(k.next_care_date)}{quaHan ? " · quá hạn" : ""}</Badge>
+                            )}
+                          </div>
+                          <div className="text-[13px] whitespace-pre-wrap">{k.content}</div>
+                          {k.result && <div className="text-[12px] text-[#0E7A4A] mt-1">→ {k.result}</div>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </>
         )}
       </div>
     );
