@@ -42,12 +42,16 @@ export default function AppShell({ profile, children }) {
         supabase.from("dv_tickets").select("id", { count: "exact", head: true }).not("status", "in", "(DA_GIAO,HUY)"),
         supabase.from("deposits").select("id", { count: "exact", head: true }).eq("status", "DANG_GIU"),
         supabase.from("v_task_list").select("id", { count: "exact", head: true })
-          .not("status", "in", "(completed,cancelled)"),
+          .eq("assignee_id", profile.id)
+          .not("status", "in", "(completed,cancelled,failed)"),
         supabase.from("v_task_list").select("id", { count: "exact", head: true }).eq("status", "pending_review"),
+        supabase.from("vehicle_units").select("frame_number", { count: "exact", head: true })
+          .eq("coc_status", "CHUA_VE").neq("status", "DA_XOA")
+          .lt("imported_at", new Date(Date.now() - 7 * 86400000).toISOString()),
       ];
-      const [don, dc, dv, coc, task, taskDuyet] = await Promise.all(q.map((x) => x.then((r) => r.count || 0).catch(() => 0)));
+      const [don, dc, dv, coc, task, taskDuyet, cocTre] = await Promise.all(q.map((x) => x.then((r) => r.count || 0).catch(() => 0)));
       if (!huy) setBadges({ "/don-ban": don, "/dieu-chinh": dc, "/dich-vu": dv, "/dat-coc": coc,
-        "/cong-viec": task, "/cong-viec/doi-nhom": taskDuyet });
+        "/cong-viec": task, "/cong-viec/doi-nhom": taskDuyet, "/giay-coc": cocTre });
     };
     dem();
     const t = setInterval(dem, 60000);

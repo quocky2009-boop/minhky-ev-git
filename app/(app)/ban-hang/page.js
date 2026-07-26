@@ -172,9 +172,13 @@ function TaoDonInner() {
     setXeRows((p) => [...p, {
       frame_number: s, vehicle_id: u.vehicle_id, ten: v ? `${v.brand} ${v.name} ${v.color}` : u.vehicle_id,
       location_code: u.location_code, giu_cho: u.status === "GIU_CHO", coc_amount: coc,
+      thieu_coc: u.coc_status === "CHUA_VE" || u.coc_status === "THAT_LAC",
       unit_price: v?.list_price || 0, discount_type: "amount", discount_value: 0,
     }]);
     notify(`Đã thêm ${v ? v.name : u.vehicle_id} · ${s}` + (coc > 0 ? ` · đã nhận cọc ${fmtVND(coc)}` : ""));
+    if (u.coc_status === "CHUA_VE" || u.coc_status === "THAT_LAC") {
+      notify(`⚠ Xe ${s} CHƯA có giấy COC — vẫn bán được nhưng nhớ bổ sung giấy cho khách sau.`, "err");
+    }
   };
 
   const setXe = (i, k, v) => setXeRows((p) => p.map((x, j) => j === i ? { ...x, [k]: v } : x));
@@ -444,7 +448,8 @@ function TaoDonInner() {
                 <td data-label="Tên hàng" className="td">
                   <div className="font-semibold text-[13px]">{r.ten}</div>
                   <div className="font-mono text-[10.5px] text-[#8A93A0]">SK {r.frame_number} · {r.location_code}
-                    {r.giu_cho && <span className="ml-1 text-[#A25F00] font-bold">🔒 đang giữ cọc{r.coc_amount > 0 ? ` ${fmtVND(r.coc_amount)}` : ""}</span>}</div>
+                    {r.giu_cho && <span className="ml-1 text-[#A25F00] font-bold">🔒 đang giữ cọc{r.coc_amount > 0 ? ` ${fmtVND(r.coc_amount)}` : ""}</span>}
+                    {r.thieu_coc && <span className="ml-1 text-danger font-bold">⚠ chưa có giấy COC</span>}</div>
                 </td>
                 <td data-label="SL" className="td text-center">1</td>
                 <td data-label="Đơn giá" className="td"><MoneyInput className="!py-1 !text-xs" value={r.unit_price} onChange={(v) => setXe(i, "unit_price", v)} /></td>

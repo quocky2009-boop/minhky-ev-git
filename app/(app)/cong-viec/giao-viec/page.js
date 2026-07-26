@@ -2,12 +2,12 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Badge, Toast, Field, LocSearch } from "@/components/ui";
+import { Badge, Toast, Field } from "@/components/ui";
 import { errMsg } from "@/lib/format";
 import { PRIORITY, toLocalInput } from "@/lib/task";
 
 const empty = {
-  title: "", description: "", completion_criteria: "", category_id: "", location_code: "",
+  title: "", description: "", completion_criteria: "", category_id: "", location_codes: [], region: "",
   priority: "Bình thường", due_at: toLocalInput(new Date(Date.now() + 86400000)),
   reviewer_id: "", requires_review: true,
   require_text_result: false, require_link: false, require_image: false, require_file: false,
@@ -15,7 +15,7 @@ const empty = {
 };
 
 export default function GiaoViec() {
-  const { supabase, locations, profile, loading } = useCatalog();
+  const { supabase, locations, regions, profile, loading } = useCatalog();
   const { toast, notify } = useToast();
   const [staff, setStaff] = useState([]);
   const [cats, setCats] = useState([]);
@@ -45,6 +45,11 @@ export default function GiaoViec() {
   const nhanVien = profile.role === "MANAGER" && profile.region
     ? staff.filter((s) => s.region === profile.region) : staff;
 
+  // Chi lay diem loai "Cua hang"; neu da chon khu vuc thi loc theo khu vuc do
+  const cuaHang = (locations || [])
+    .filter((l) => l.type === "Cửa hàng" && l.status !== "Đã xóa")
+    .filter((l) => !f.region || l.region === f.region);
+
   const dungMau = async (id) => {
     setTplId(id);
     if (!id) { setCl([]); return; }
@@ -71,7 +76,8 @@ export default function GiaoViec() {
       ...f,
       category_id: f.category_id || null,
       reviewer_id: f.reviewer_id || null,
-      location_code: f.location_code || null,
+      location_codes: f.location_codes,
+      region: f.region || null,
       due_at: new Date(f.due_at).toISOString(),
       template_id: tplId || null,
       checklist: cl.filter((x) => x.title.trim()).map((x, i) => ({ ...x, sort_order: i })),
@@ -123,7 +129,12 @@ export default function GiaoViec() {
               {cats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </Field>
-          <Field label="Điểm / cửa hàng"><LocSearch locations={locations} value={f.location_code} onChange={(v) => setF((p) => ({ ...p, location_code: v }))} placeholder="Không bắt buộc" /></Field>
+          <Field label="Khu vực (không bắt buộc)">
+            <select className="inp" value={f.region} onChange={(e) => setF((p) => ({ ...p, region: e.target.value }))}>
+              <option value="">— Tự theo người thực hiện —</option>
+              {(regions || []).map((r) => <option key={r}>{r}</option>)}
+            </select>
+          </Field>
           <Field label="Mức độ ưu tiên">
             <div className="flex gap-1.5 flex-wrap">
               {Object.keys(PRIORITY).map((k) => (
@@ -132,6 +143,23 @@ export default function GiaoViec() {
             </div>
           </Field>
           <Field label="Hạn hoàn thành" required><input type="datetime-local" className="inp" value={f.due_at} onChange={(e) => setF((p) => ({ ...p, due_at: e.target.value }))} /></Field>
+          <div className="md:col-span-2">
+            <Field label={`Cửa hàng áp dụng (không bắt buộc)${f.location_codes.length ? ` — đã chọn ${f.location_codes.length}` : ""}`}>
+              <div className="flex gap-1.5 flex-wrap">
+                {cuaHang.length === 0 && <span className="text-xs text-[#8A93A0]">Chưa có điểm nào loại "Cửa hàng" trong danh mục.</span>}
+                {cuaHang.map((l) => {
+                  const on = f.location_codes.includes(l.code);
+                  return (
+                    <button key={l.code} type="button"
+                      className={`btn !px-2.5 !py-1.5 !text-xs ${on ? "bg-brand text-white" : "bg-[#EEF1F4]"}`}
+                      onClick={() => setF((p) => ({ ...p, location_codes: on ? p.location_codes.filter((x) => x !== l.code) : [...p.location_codes, l.code] }))}>
+                      {on ? "✓ " : ""}{l.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </Field>
+          </div>
         </div>
       </div>
 
