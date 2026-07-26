@@ -18,16 +18,16 @@ export default function DonBanChiTiet() {
   const [busy, setBusy] = useState(false);
 
   const load = async () => {
-    const [{ data: ord }, { data: its }, { data: ps }] = await Promise.all([
-      supabase.from("sales_orders").select("*").eq("id", id).single(),
-      supabase.from("sale_items").select("*"),
-      supabase.from("sale_payments").select("*"),
-    ]);
+    const { data: ord } = await supabase.from("sales_orders").select("*").eq("id", id).single();
     if (!ord) return;
     const code = ord.code;
+    const [{ data: its }, { data: ps }] = await Promise.all([
+      supabase.from("sale_items").select("*").eq("sale_code", code),
+      supabase.from("sale_payments").select("*").eq("sale_code", code),
+    ]);
     setO(ord);
-    setItems((its || []).filter((x) => x.sale_code === code));
-    setPays((ps || []).filter((x) => x.sale_code === code));
+    setItems(its || []);
+    setPays(ps || []);
   };
   useEffect(() => { if (!loading) load(); }, [loading, id]);
 

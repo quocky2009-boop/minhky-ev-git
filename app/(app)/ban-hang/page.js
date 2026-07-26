@@ -57,8 +57,8 @@ function TaoDonInner() {
   const [meta, setMeta] = useState({ sale_date: iso(new Date()), location_code: "", document_status: "Đang làm đăng ký", note: "", seller_id: "", seller_name: "" });
   const [staff, setStaff] = useState([]);
   useEffect(() => {
-    supabase.from("profiles").select("id,name,role").eq("status", "Hoạt động").order("name").then(({ data }) => setStaff(data || []));
-  }, []);
+    if (!loading) supabase.from("profiles").select("id,name,role").eq("status", "Hoạt động").order("name").then(({ data }) => setStaff(data || []));
+  }, [loading]);
 
   // Hàng hóa: xe + bán kèm cùng một bảng
   const [xeRows, setXeRows] = useState([]);   // {frame_number, vehicle_id, ten, unit_price, discount_type, discount_value, coc_amount}
@@ -74,7 +74,13 @@ function TaoDonInner() {
     const { data } = await supabase.from("customers").select("id,code,name,phone,cccd,address,status").order("created_at", { ascending: false }).limit(2000);
     setCusts(data || []);
   };
-  useEffect(() => { if (!loading) loadCusts(); }, [loading]);
+  useEffect(() => {
+    if (!loading) {
+      loadCusts();
+      // Dat mac dinh seller = nguoi dang dang nhap sau khi loading xong
+      if (profile && !meta.seller_id) setMeta((p) => ({ ...p, seller_id: profile.id, seller_name: profile.name }));
+    }
+  }, [loading]);
 
   // Nạp đơn để SỬA
   const [suaDone, setSuaDone] = useState(false);
@@ -282,11 +288,6 @@ function TaoDonInner() {
     notify(`Đã tạo ${data.count} đơn bán.`);
     refresh();
   };
-
-  // Dat mac dinh seller = nguoi dang dang nhap (co the doi)
-  useEffect(() => {
-    if (profile && !meta.seller_id) setMeta((p) => ({ ...p, seller_id: profile.id, seller_name: profile.name }));
-  }, [profile]);
 
   const lamMoi = () => {
     setKetQua(null); setXeRows([]); setKemRows([]); setPays([]); setFotos([]);
