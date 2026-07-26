@@ -21,6 +21,7 @@ export default function DonBan() {
   const [to, setTo] = useState(iso(new Date()));
   const [fLoc, setFLoc] = useState("");
   const [fInv, setFInv] = useState("");
+  const [fType, setFType] = useState("");
   const [showHuy, setShowHuy] = useState(false);
   const [q, setQ] = useState("");
   const _params = useSearchParams();
@@ -68,6 +69,7 @@ export default function DonBan() {
   const filtered = rows.filter((o) => {
     if (daDong(o) && !showHuy) return false;
     if (fInv && (o.invoice_status || "Chờ xuất HĐ") !== fInv) return false;
+    if (fType && (o.customer_type || "") !== fType) return false;
     if (!q) return true;
     const kw = q.toLowerCase();
     const v = vOf(o.vehicle_id);
@@ -75,7 +77,7 @@ export default function DonBan() {
   });
   const sorted = sort.sortFn(filtered, {
     code: (o) => o.code, date: (o) => o.sale_date, xe: (o) => vOf(o.vehicle_id)?.name || o.vehicle_id,
-    kho: (o) => locName(o.location_code), kh: (o) => o.customer_name, tien: (o) => total(o),
+    kho: (o) => locName(o.location_code), kh: (o) => o.customer_name, type: (o) => o.customer_type || "", tien: (o) => total(o),
     hd: (o) => o.invoice_status || "Chờ xuất HĐ", nv: (o) => o.seller_name,
   });
   const rowsActive = rows.filter((o) => o.status !== "Đã hủy" && o.status !== "Đã trả hàng");
@@ -246,6 +248,10 @@ export default function DonBan() {
           <select className="inp !w-auto" value={fInv} onChange={(e) => { setFInv(e.target.value); setPage(1); }}>
             <option value="">Hóa đơn: tất cả</option><option>Chờ xuất HĐ</option><option>Đã xuất HĐ</option>
           </select>
+          <select className="inp !w-auto" value={fType} onChange={(e) => { setFType(e.target.value); setPage(1); }}>
+            <option value="">Loại khách: tất cả</option>
+            <option>Khách lẻ</option><option>Khách buôn</option><option>Khách lẻ của Đại lý</option>
+          </select>
           <button className={`btn-ghost !text-xs ${showHuy ? "!bg-[#FDEDED] !text-danger" : ""}`} onClick={() => { setShowHuy(!showHuy); setPage(1); }}>
             {showHuy ? "Đang hiện đơn hủy/trả" : `Đơn hủy/trả${nHuy ? ` (${nHuy})` : ""}`}
           </button>
@@ -265,7 +271,7 @@ export default function DonBan() {
               }}>⬇ Xuất Excel</button>
             </SelectionBar>
             <div className="tbl-scroll"><table className="w-full border-collapse tbl-card">
-              <thead><tr><ThCheck sel={sel} rows={pageSlice(sorted, page, pageSize)} idOf={(o) => o.id} /><Th label="Mã đơn" k="code" sort={sort} /><Th label="Ngày" k="date" sort={sort} /><Th label="Xe · Số khung" k="xe" sort={sort} /><Th label="Kho" k="kho" sort={sort} /><Th label="Khách" k="kh" sort={sort} /><Th label="Tổng đơn" k="tien" sort={sort} /><Th label="Hóa đơn" k="hd" sort={sort} /><Th label="NV bán" k="nv" sort={sort} /><th className="th"></th></tr></thead>
+              <thead><tr><ThCheck sel={sel} rows={pageSlice(sorted, page, pageSize)} idOf={(o) => o.id} /><Th label="Mã đơn" k="code" sort={sort} /><Th label="Ngày" k="date" sort={sort} /><Th label="Xe · Số khung" k="xe" sort={sort} /><Th label="Kho" k="kho" sort={sort} /><Th label="Khách" k="kh" sort={sort} /><Th label="Loại KH" k="type" sort={sort} /><Th label="Tổng đơn" k="tien" sort={sort} /><Th label="Hóa đơn" k="hd" sort={sort} /><Th label="NV bán" k="nv" sort={sort} /><th className="th"></th></tr></thead>
               <tbody>{pageSlice(sorted, page, pageSize).map((o, i) => {
                 const v = vOf(o.vehicle_id);
                 const st = o.invoice_status || "Chờ xuất HĐ";
@@ -280,6 +286,7 @@ export default function DonBan() {
                     <td data-label="Xe" className="td text-[13px]">{v ? `${v.name} ${v.color}` : o.vehicle_id}<div className="font-mono text-[10.5px] text-[#8A93A0]">{o.frame_number}</div></td>
                     <td data-label="Kho" className="td text-xs">{locName(o.location_code)}</td>
                     <td data-label="Khách" className="td text-[13px]">{o.customer_name}<div className="text-[10.5px] text-[#8A93A0]">{o.customer_phone}</div></td>
+                    <td data-label="Loại KH" className="td text-xs">{o.customer_type === "Khách buôn" ? <Badge tone="amber">Buôn</Badge> : o.customer_type === "Khách lẻ của Đại lý" ? <Badge tone="blue">Lẻ ĐL</Badge> : <Badge tone="green">Lẻ</Badge>}</td>
                     <td data-label="Tổng đơn" className="td font-bold">{fmtVND(total(o))}</td>
                     <td data-label="Hóa đơn" className="td">{huy
                       ? <><Badge tone="red">{nhanTra ? "Đã trả hàng" : "Đã hủy"}</Badge>{o.cancel_reason && <div className="text-[10.5px] text-[#8A93A0] mt-0.5">{o.cancel_reason}<br/>{o.cancelled_by_name} · {fmtDate(o.cancelled_at)}</div>}</>
@@ -297,7 +304,8 @@ export default function DonBan() {
                       ) : (<>
                       {!done && canConfirm && <button className={`!px-2.5 !py-1 !text-xs ${invId === o.id ? "btn-primary" : "btn-ok"}`} onClick={() => { setInvId(invId === o.id ? null : o.id); setInvF({ no: "", date: iso(new Date()), bh: false, app: false, coc: false }); }}>{invId === o.id ? "Đóng" : "✓ Xác nhận HĐ"}</button>}
                       {thieuKhachLe(o) && <button className="btn-primary !px-2 !py-1 !text-xs !bg-danger !border-danger" title="Nhập thông tin khách lẻ mua sau cùng" onClick={() => openDetail(o)}>👤 Khách lẻ</button>}
-                      <Link href={`/don-ban/${o.id}`} className="btn-ghost !px-2 !py-1 !text-xs" title="Xem chi tiết đơn">👁</Link>
+                      <button className="btn-ghost !px-2 !py-1 !text-xs" title="Xem nhanh đơn" onClick={() => openDetail(o)}>👁</button>
+                      <Link href={`/don-ban/${o.id}`} className="btn-ghost !px-2 !py-1 !text-xs" title="Xem chi tiết đầy đủ">↗</Link>
                       {canSuaTT && total(o) - (o.paid_amount || 0) > 0 && (
                         <button className="btn-ok !px-2 !py-1 !text-xs" title={`Còn thiếu ${fmtVND(total(o) - (o.paid_amount || 0))} — bấm để thu`}
                           onClick={async () => { await openDetail(o); setPayEdit({ paid: o.paid_amount || 0, note: "", method: "Tiền mặt" }); }}>💵</button>
@@ -308,7 +316,7 @@ export default function DonBan() {
                     </div></td>
                   </tr>,
                   invId === o.id && (
-                    <tr key={o.id + "f"}><td colSpan={10} className="td bg-[#FFFDF5]">
+                    <tr key={o.id + "f"}><td colSpan={11} className="td bg-[#FFFDF5]">
                       <div className="flex gap-1.5 items-end flex-wrap">
                         <div><label className="lbl">Số hóa đơn (bắt buộc)</label><input className="inp !py-2 !w-48" autoFocus value={invF.no} onChange={(e) => setInvF((p) => ({ ...p, no: e.target.value }))} placeholder="VD: 00012345" /></div>
                         <div><label className="lbl">Ngày xuất HĐ</label><input type="date" className="inp !py-2 !w-40" value={invF.date} onChange={(e) => setInvF((p) => ({ ...p, date: e.target.value }))} /></div>
@@ -333,7 +341,7 @@ export default function DonBan() {
                   ),
                 ];
               })}
-              {sorted.length === 0 && <tr><td className="td" colSpan={10}>Không có đơn bán nào khớp bộ lọc.</td></tr>}
+              {sorted.length === 0 && <tr><td className="td" colSpan={11}>Không có đơn bán nào khớp bộ lọc.</td></tr>}
               </tbody>
             </table></div>
             <Pager total={sorted.length} page={page} setPage={setPage} pageSize={pageSize} setPageSize={setPageSize} />

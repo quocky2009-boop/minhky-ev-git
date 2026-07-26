@@ -295,7 +295,7 @@ function DieuChuyenInner() {
           <tbody>{pageSlice(sorted, page, pageSize).map((t) => (
             <tr key={t.id} className={`${sel.has(t.id) ? "bg-[#EAF2FF]" : t.status === "Đang chuyển" ? "bg-[#FFFCF0] hover:bg-[#FFF8E0]" : "hover:bg-[#F8FAFC]"}`}>
               <TdCheck sel={sel} id={t.id} />
-              <td data-label="Mã phiếu" className="td font-bold text-xs">{t.code}</td>
+              <td data-label="Mã phiếu" className="td font-bold text-xs"><Link href={`/dieu-chuyen/${t.id}`} className="text-brand hover:underline">{t.code}</Link></td>
               <td data-label="Xe" className="td text-[13px]">{vName(t.vehicle_id)}<div className="text-[10.5px] text-[#8A93A0]">{t.quantity} xe</div></td>
               <td data-label="Kho" className="td text-xs">
                 <div>{locName(t.from_location)}</div>
