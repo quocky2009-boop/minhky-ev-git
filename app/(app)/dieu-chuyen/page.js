@@ -2,8 +2,8 @@
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Field, Badge, Toast, LocSearch, FrameSearch } from "@/components/ui";
-import { fmtTime, errMsg } from "@/lib/format";
+import { Field, Badge, Toast, LocSearch, FrameSearch, Pager, pageSlice, useSortable, Th, useSelection, ThCheck, TdCheck, SelectionBar } from "@/components/ui";
+import { fmtTime, fmtDate, errMsg, downloadCSV } from "@/lib/format";
 import Link from "next/link";
 
 function DieuChuyenInner() {
@@ -17,6 +17,15 @@ function DieuChuyenInner() {
   const [meta, setMeta] = useState({ from: "", to: "", note: "" });
   const [rows, setRows] = useState([]);
   const [tonKho, setTonKho] = useState([]);
+  // Filter + bảng lịch sử
+  const [fStatus, setFStatus] = useState("");
+  const [fFrom, setFFrom] = useState("");
+  const [fTo, setFTo] = useState("");
+  const [q, setQ] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const sort = useSortable();
+  const sel = useSelection();
 
   const load = async () => {
     const { data } = await supabase.from("transfer_orders").select("*").order("requested_at", { ascending: false }).limit(100);
@@ -37,6 +46,21 @@ function DieuChuyenInner() {
 
   const vName = (id) => { const v = vehicles.find((x) => x.id === id); return v ? `${v.brand} ${v.name} ${v.color}` : id; };
   const locName = (c) => locations.find((l) => l.code === c)?.name || c;
+
+  // Filter + sort danh sach phieu
+  const kw = q.trim().toLowerCase();
+  const filtered = list.filter((t) => {
+    if (fStatus && t.status !== fStatus) return false;
+    if (fFrom && t.from_location !== fFrom) return false;
+    if (fTo && t.to_location !== fTo) return false;
+    if (!kw) return true;
+    return `${t.code} ${vName(t.vehicle_id)} ${t.requested_by_name} ${t.confirmed_by_name || ""} ${t.note || ""}`.toLowerCase().includes(kw);
+  });
+  const sorted = sort.sortFn(filtered, {
+    code: (t) => t.code, xe: (t) => vName(t.vehicle_id), from: (t) => locName(t.from_location),
+    to: (t) => locName(t.to_location), tt: (t) => t.status, nv: (t) => t.requested_by_name,
+    ngay: (t) => t.requested_at, nvnhan: (t) => t.confirmed_by_name || "", ngaynhan: (t) => t.confirmed_at || "",
+  });
 
   const themXe = async (sk) => {
     const s = String(sk || "").trim().toUpperCase();
@@ -230,26 +254,72 @@ function DieuChuyenInner() {
       )}
 
       <div className="card">
-        <div className="font-extrabold mb-2.5">Phiếu điều chuyển gần đây ({list.length})</div>
-        <div className="flex flex-col gap-1.5">
-          {list.slice(0, 40).map((t) => (
-            <div key={t.id} className={`flex items-center gap-2 p-2.5 rounded-xl border text-[13px] ${t.status === "Đang chuyển" ? "border-[#F0C000] bg-[#FFFCF0]" : "border-[#E3E8EF]"}`}>
-              <div className="mr-auto min-w-0">
-                <div className="font-semibold">{t.code} · {vName(t.vehicle_id)} × {t.quantity}</div>
-                <div className="text-[11px] text-[#8A93A0] truncate">
-                  {locName(t.from_location)} → {locName(t.to_location)} · {fmtTime(t.requested_at)} · {t.requested_by_name}
-                  {t.note ? " · " + t.note : ""}
-                </div>
-                {(t.frames || []).length > 0 && <div className="text-[10.5px] text-[#8A93A0] font-mono truncate">SK: {t.frames.join(", ")}</div>}
-              </div>
-              <Badge tone={t.status === "Đã nhận" ? "green" : t.status === "Đang chuyển" ? "amber" : "dark"}>{t.status}</Badge>
-              {t.status === "Đang chuyển" && ["CEO", "MANAGER", "ADMIN"].includes(profile.role) && (
-                <button className="btn-ok !px-2.5 !py-1 !text-xs whitespace-nowrap" onClick={() => nhanXe(t)}>✓ Nhận xe</button>
-              )}
-            </div>
-          ))}
-          {list.length === 0 && <div className="text-sm text-[#8A93A0]">Chưa có phiếu điều chuyển nào.</div>}
+        <div className="font-extrabold mb-3">Lịch sử phiếu điều chuyển ({list.length})</div>
+        <div className="flex gap-2 flex-wrap items-center mb-3">
+          <select className="inp !w-auto" value={fStatus} onChange={(e) => { setFStatus(e.target.value); setPage(1); }}>
+            <option value="">Trạng thái: tất cả</option>
+            <option>Đang chuyển</option><option>Đã nhận</option><option>Đã hủy</option><option>Lỗi/chênh lệch</option>
+          </select>
+          <div className="!w-44"><LocSearch locations={locations} value={fFrom} onChange={(v) => { setFFrom(v); setPage(1); }} placeholder="Kho xuất…" /></div>
+          <div className="!w-44"><LocSearch locations={locations} value={fTo} onChange={(v) => { setFTo(v); setPage(1); }} placeholder="Kho nhận…" /></div>
+          <input className="inp !w-52" placeholder="Tìm mã phiếu, xe, người lập…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
+          <button className="btn-ghost !text-xs ml-auto" onClick={() => {
+            const rs = sorted.filter((t) => sel.has(t.id));
+            const exp = rs.length ? rs : sorted;
+            downloadCSV(`dieu_chuyen.csv`, [["Mã phiếu","Xe","SL","Kho xuất","Kho nhận","Trạng thái","Ngày lập","Người lập","Ngày nhận","Người nhận","Ghi chú"],
+              ...exp.map((t) => [t.code, vName(t.vehicle_id), t.quantity, locName(t.from_location), locName(t.to_location), t.status, fmtTime(t.requested_at), t.requested_by_name, t.confirmed_at ? fmtTime(t.confirmed_at) : "", t.confirmed_by_name || "", t.note || ""])]);
+            notify(`Đã xuất ${exp.length} phiếu.`);
+          }}>⬇ Xuất Excel</button>
         </div>
+        <SelectionBar sel={sel}>
+          <span className="text-[12px] font-bold text-brand px-1 self-center">{sel.count} phiếu</span>
+          <button className="btn-ghost !text-xs !py-1" onClick={() => {
+            const rs = sorted.filter((t) => sel.has(t.id));
+            downloadCSV(`dieu_chuyen_chon.csv`, [["Mã phiếu","Xe","SL","Kho xuất","Kho nhận","Trạng thái","Ngày lập","Người lập","Ngày nhận","Người nhận"],
+              ...rs.map((t) => [t.code, vName(t.vehicle_id), t.quantity, locName(t.from_location), locName(t.to_location), t.status, fmtTime(t.requested_at), t.requested_by_name, t.confirmed_at ? fmtTime(t.confirmed_at) : "", t.confirmed_by_name || ""])]);
+            notify(`Đã xuất ${rs.length} phiếu.`);
+          }}>⬇ Xuất Excel</button>
+        </SelectionBar>
+        <div className="tbl-scroll"><table className="w-full border-collapse tbl-card">
+          <thead><tr>
+            <ThCheck sel={sel} rows={pageSlice(sorted, page, pageSize)} idOf={(t) => t.id} />
+            <Th label="Mã phiếu" k="code" sort={sort} />
+            <Th label="Xe · SL" k="xe" sort={sort} />
+            <Th label="Kho xuất" k="from" sort={sort} />
+            <Th label="Kho nhận" k="to" sort={sort} />
+            <Th label="Trạng thái" k="tt" sort={sort} />
+            <Th label="Người lập" k="nv" sort={sort} />
+            <Th label="Ngày lập" k="ngay" sort={sort} />
+            <Th label="Người nhận xác nhận" k="nvnhan" sort={sort} />
+            <Th label="Ngày nhận" k="ngaynhan" sort={sort} />
+            <th className="th">Ghi chú / SK</th>
+            <th className="th"></th>
+          </tr></thead>
+          <tbody>{pageSlice(sorted, page, pageSize).map((t) => (
+            <tr key={t.id} className={`${sel.has(t.id) ? "bg-[#EAF2FF]" : t.status === "Đang chuyển" ? "bg-[#FFFCF0] hover:bg-[#FFF8E0]" : "hover:bg-[#F8FAFC]"}`}>
+              <TdCheck sel={sel} id={t.id} />
+              <td data-label="Mã phiếu" className="td font-bold">{t.code}</td>
+              <td data-label="Xe" className="td text-[13px]">{vName(t.vehicle_id)}<div className="text-[10.5px] text-[#8A93A0]">{t.quantity} xe</div></td>
+              <td data-label="Kho xuất" className="td text-xs">{locName(t.from_location)}</td>
+              <td data-label="Kho nhận" className="td text-xs">{locName(t.to_location)}</td>
+              <td data-label="Trạng thái" className="td"><Badge tone={t.status === "Đã nhận" ? "green" : t.status === "Đang chuyển" ? "amber" : "dark"}>{t.status}</Badge></td>
+              <td data-label="Người lập" className="td text-xs">{t.requested_by_name}</td>
+              <td data-label="Ngày lập" className="td text-xs whitespace-nowrap">{fmtTime(t.requested_at)}</td>
+              <td data-label="Người nhận XN" className="td text-xs">{t.confirmed_by_name || <span className="text-[#C6CDD6]">—</span>}</td>
+              <td data-label="Ngày nhận" className="td text-xs whitespace-nowrap">{t.confirmed_at ? fmtTime(t.confirmed_at) : <span className="text-[#C6CDD6]">—</span>}</td>
+              <td data-label="Ghi chú" className="td text-xs max-w-[160px]">
+                {t.note && <div className="truncate">{t.note}</div>}
+                {(t.frames || []).length > 0 && <div className="font-mono text-[10px] text-[#8A93A0] truncate">SK: {t.frames.join(", ")}</div>}
+              </td>
+              <td className="td">{t.status === "Đang chuyển" && ["CEO","MANAGER","ADMIN"].includes(profile.role) && (
+                <button className="btn-ok !px-2 !py-1 !text-xs whitespace-nowrap" onClick={() => nhanXe(t)}>✓ Nhận xe</button>
+              )}</td>
+            </tr>
+          ))}
+          {sorted.length === 0 && <tr><td className="td" colSpan={12}>Không có phiếu điều chuyển nào.</td></tr>}
+          </tbody>
+        </table></div>
+        <Pager total={sorted.length} page={page} setPage={setPage} pageSize={pageSize} setPageSize={setPageSize} />
       </div>
     </div>
   );

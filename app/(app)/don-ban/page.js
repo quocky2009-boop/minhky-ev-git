@@ -38,7 +38,7 @@ export default function DonBan() {
   const sort = useSortable();
   const sel = useSelection();
   const [invId, setInvId] = useState(null);
-  const [invF, setInvF] = useState({ no: "", date: iso(new Date()), bh: false, app: false });
+  const [invF, setInvF] = useState({ no: "", date: iso(new Date()), bh: false, app: false, coc: false });
   const [detail, setDetail] = useState(null);
   const [payEdit, setPayEdit] = useState(null);
   const [klEdit, setKlEdit] = useState(null);   // khach le cuoi (don ban buon)
@@ -90,7 +90,7 @@ export default function DonBan() {
     if (!invF.bh) return notify("Phải tích xác nhận đã kích hoạt bảo hành cho xe.", "err");
     if (isVF(o) && !invF.app) return notify("Xe VinFast: phải tích xác nhận đã kích hoạt app VF eScooter.", "err");
     setBusy(true);
-    const { error } = await supabase.rpc("fn_xac_nhan_hoa_don", { p: { id: o.id, invoice_no: invF.no, invoice_date: invF.date, warranty_activated: invF.bh, app_activated: invF.app } });
+    const { error } = await supabase.rpc("fn_xac_nhan_hoa_don", { p: { id: o.id, invoice_no: invF.no, invoice_date: invF.date, warranty_activated: invF.bh, app_activated: invF.app, coc_giao: invF.coc } });
     setBusy(false);
     if (error) return notify(errMsg(error), "err");
     notify(`Đơn ${o.code} hoàn thành: HĐ ${invF.no}, đã kích hoạt bảo hành${invF.app ? " + app VF eScooter" : ""}.`);
@@ -275,7 +275,7 @@ export default function DonBan() {
                 return [
                   <tr key={o.id} className={huy ? "bg-[#F3F4F6] text-[#8A93A0]" : sel.has(o.id) ? "bg-[#EAF2FF]" : invId === o.id ? "bg-[#FDF6E3]" : done ? "hover:bg-[#F8FAFC]" : "bg-[#FFFCF5] hover:bg-[#FDF6E3]"}>
                     <TdCheck sel={sel} id={o.id} />
-                    <td data-label="Mã đơn" className="td font-bold">{o.code}{nhanTra ? <Badge tone="red">Đã trả hàng</Badge> : huy && <Badge tone="red">Đã hủy</Badge>}</td>
+                    <td data-label="Mã đơn" className="td font-bold"><Link href={`/don-ban/${o.id}`} className="text-brand hover:underline">{o.code}</Link>{nhanTra ? <Badge tone="red">Đã trả hàng</Badge> : huy && <Badge tone="red">Đã hủy</Badge>}</td>
                     <td data-label="Ngày" className="td text-xs whitespace-nowrap">{fmtDate(o.sale_date)}</td>
                     <td data-label="Xe" className="td text-[13px]">{v ? `${v.name} ${v.color}` : o.vehicle_id}<div className="font-mono text-[10.5px] text-[#8A93A0]">{o.frame_number}</div></td>
                     <td data-label="Kho" className="td text-xs">{locName(o.location_code)}</td>
@@ -284,19 +284,19 @@ export default function DonBan() {
                     <td data-label="Hóa đơn" className="td">{huy
                       ? <><Badge tone="red">{nhanTra ? "Đã trả hàng" : "Đã hủy"}</Badge>{o.cancel_reason && <div className="text-[10.5px] text-[#8A93A0] mt-0.5">{o.cancel_reason}<br/>{o.cancelled_by_name} · {fmtDate(o.cancelled_at)}</div>}</>
                       : done
-                      ? <><Badge tone="green">✓ Hoàn thành</Badge><div className="text-[10.5px] text-[#8A93A0] mt-0.5">HĐ {o.invoice_no} · {fmtDate(o.invoice_date)}<br/>{o.invoice_by_name}<br/>BH ✓{o.app_activated ? " · App ✓" : ""}</div></>
+                      ? <><Badge tone="green">✓ Hoàn thành</Badge><div className="text-[10.5px] text-[#8A93A0] mt-0.5">HĐ {o.invoice_no} · {fmtDate(o.invoice_date)}<br/>{o.invoice_by_name}<br/>BH ✓{o.app_activated ? " · App ✓" : ""}{o.coc_giao ? " · COC ✓" : ""}</div></>
                       : <Badge tone="amber">Chờ xuất HĐ</Badge>}
                       {!huy && thieuKhachLe(o) && <div className="mt-0.5"><Badge tone="red">⚠ Thiếu khách lẻ</Badge></div>}</td>
                     <td data-label="NV bán" className="td text-xs">{o.seller_name}</td>
                     <td className="td"><div className="flex gap-1.5">
                       {huy ? (
                         <>
-                          <button className="btn-ghost !px-2 !py-1 !text-xs" title="Xem nhanh đơn" onClick={() => openDetail(o)}>👁</button>
+                          <Link href={`/don-ban/${o.id}`} className="btn-ghost !px-2 !py-1 !text-xs" title="Xem chi tiết đơn">👁</Link>
                           {profile.role === "CEO" && !nhanTra && <button className="btn-ghost !px-2 !py-1 !text-xs hover:text-brand" title="Mở lại đơn (đã hủy nhầm)" onClick={() => moLaiDon(o)}>↩ Mở lại</button>}
                         </>
                       ) : (<>
-                      {!done && canConfirm && <button className={`!px-2.5 !py-1 !text-xs ${invId === o.id ? "btn-primary" : "btn-ok"}`} onClick={() => { setInvId(invId === o.id ? null : o.id); setInvF({ no: "", date: iso(new Date()), bh: false, app: false }); }}>{invId === o.id ? "Đóng" : "✓ Xác nhận HĐ"}</button>}
-                      <button className="btn-ghost !px-2 !py-1 !text-xs" title="Xem nhanh đơn" onClick={() => openDetail(o)}>👁</button>
+                      {!done && canConfirm && <button className={`!px-2.5 !py-1 !text-xs ${invId === o.id ? "btn-primary" : "btn-ok"}`} onClick={() => { setInvId(invId === o.id ? null : o.id); setInvF({ no: "", date: iso(new Date()), bh: false, app: false, coc: false }); }}>{invId === o.id ? "Đóng" : "✓ Xác nhận HĐ"}</button>}
+                      <Link href={`/don-ban/${o.id}`} className="btn-ghost !px-2 !py-1 !text-xs" title="Xem chi tiết đơn">👁</Link>
                       {canSuaTT && total(o) - (o.paid_amount || 0) > 0 && (
                         <button className="btn-ok !px-2 !py-1 !text-xs" title={`Còn thiếu ${fmtVND(total(o) - (o.paid_amount || 0))} — bấm để thu`}
                           onClick={async () => { await openDetail(o); setPayEdit({ paid: o.paid_amount || 0, note: "", method: "Tiền mặt" }); }}>💵</button>
@@ -321,8 +321,12 @@ export default function DonBan() {
                             📱 Đã kích hoạt app VF eScooter
                           </label>
                         )}
+                        <label className="flex items-center gap-1.5 text-xs font-semibold cursor-pointer bg-white border border-[#D5DBE3] rounded-lg px-2.5 py-2">
+                          <input type="checkbox" className="w-4 h-4" checked={invF.coc} onChange={(e) => setInvF((p) => ({ ...p, coc: e.target.checked }))} />
+                          📄 Đã giao COC cho khách
+                        </label>
                         <button className="btn-ok !py-2 !text-xs" disabled={busy} onClick={() => confirmInv(o)}>Xác nhận hoàn thành</button>
-                        <span className="text-[10.5px] text-[#8A93A0]">Đủ số HĐ + bảo hành{isVF(o) ? " + app VF eScooter" : ""} thì đơn mới chuyển "Hoàn thành". Lưu vết người xác nhận + thời gian.</span>
+                        <span className="text-[10.5px] text-[#8A93A0]">Đủ số HĐ + bảo hành{isVF(o) ? " + app VF eScooter" : ""}. Tích "Đã giao COC" nếu đã trao giấy COC cho khách ngay hôm nay.</span>
                       </div>
                     </td></tr>
                   ),

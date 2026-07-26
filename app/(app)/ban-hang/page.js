@@ -54,7 +54,11 @@ function TaoDonInner() {
   const [newC, setNewC] = useState(null);
 
   // Thông tin bổ sung
-  const [meta, setMeta] = useState({ sale_date: iso(new Date()), location_code: "", document_status: "Đang làm đăng ký", note: "" });
+  const [meta, setMeta] = useState({ sale_date: iso(new Date()), location_code: "", document_status: "Đang làm đăng ký", note: "", seller_id: "", seller_name: "" });
+  const [staff, setStaff] = useState([]);
+  useEffect(() => {
+    supabase.from("profiles").select("id,name,role").eq("status", "Hoạt động").order("name").then(({ data }) => setStaff(data || []));
+  }, []);
 
   // Hàng hóa: xe + bán kèm cùng một bảng
   const [xeRows, setXeRows] = useState([]);   // {frame_number, vehicle_id, ten, unit_price, discount_type, discount_value, coc_amount}
@@ -93,7 +97,7 @@ function TaoDonInner() {
       setSuaId(o.id);
       setKh({ customer_name: o.customer_name, customer_phone: o.customer_phone, customer_cccd: o.customer_cccd || "",
         customer_address: o.customer_address || "", customer_type: o.customer_type, customer_source: o.customer_source });
-      setMeta({ sale_date: o.sale_date, location_code: o.location_code, document_status: o.document_status, note: o.note || "" });
+      setMeta({ sale_date: o.sale_date, location_code: o.location_code, document_status: o.document_status, note: o.note || "", seller_id: o.seller_id || "", seller_name: o.seller_name || "" });
       setExtra(o.extra || {});
       setDTong({ type: o.discount_type || "amount", value: o.discount_value || 0 });
       setPayCu(pays0 || []);
@@ -142,10 +146,13 @@ function TaoDonInner() {
     setCustId(c.id);
     setKh((p) => ({ ...p, customer_name: c.name || "", customer_phone: c.phone || "", customer_cccd: c.cccd || "", customer_address: c.address || "" }));
   };
-  const createCust = async (name) => setNewC({ name: name || "", phone: "", address: "" });
+  const createCust = async (name) => setNewC({ name: name || "", phone: "", address: "", email: "", gender: "", birthday: "" });
   const luuCustMoi = async () => {
     if (!newC.name.trim() || !newC.phone.trim()) return notify("Nhập tên và SĐT.", "err");
-    const { data, error } = await supabase.rpc("fn_luu_khach_hang", { p: { name: newC.name, phone: newC.phone, address: newC.address || "", source: "Bán hàng" } });
+    if (!newC.email?.trim()) return notify("Bắt buộc nhập Email.", "err");
+    if (!newC.gender) return notify("Bắt buộc chọn Giới tính.", "err");
+    if (!newC.birthday) return notify("Bắt buộc nhập Ngày sinh.", "err");
+    const { data, error } = await supabase.rpc("fn_luu_khach_hang_v2", { p: { name: newC.name, phone: newC.phone, address: newC.address || "", email: newC.email, gender: newC.gender, birthday: newC.birthday, source: "Bán hàng" } });
     if (error) return notify(errMsg(error), "err");
     await loadCusts();
     setCustId(data);
@@ -276,10 +283,16 @@ function TaoDonInner() {
     refresh();
   };
 
+  // Dat mac dinh seller = nguoi dang dang nhap (co the doi)
+  useEffect(() => {
+    if (profile && !meta.seller_id) setMeta((p) => ({ ...p, seller_id: profile.id, seller_name: profile.name }));
+  }, [profile]);
+
   const lamMoi = () => {
     setKetQua(null); setXeRows([]); setKemRows([]); setPays([]); setFotos([]);
     setDTong({ type: "amount", value: 0 }); setCustId(""); setNewC(null); setExtra({});
     setKh({ customer_name: "", customer_phone: "", customer_cccd: "", customer_address: "", customer_type: "Khách lẻ", customer_source: "Khách vãng lai" });
+    if (profile) setMeta((p) => ({ ...p, seller_id: profile.id, seller_name: profile.name }));
   };
 
   // ===== ĐÃ LƯU XONG =====
@@ -358,6 +371,14 @@ function TaoDonInner() {
             <div className="grid gap-2 md:grid-cols-3 p-2.5 bg-[#F0FDF6] rounded-xl">
               <input className="inp" placeholder="Họ tên *" value={newC.name} onChange={(e) => setNewC((p) => ({ ...p, name: e.target.value }))} />
               <input className="inp" placeholder="SĐT *" value={newC.phone} onChange={(e) => setNewC((p) => ({ ...p, phone: e.target.value }))} />
+              <input className="inp" placeholder="Email *" type="email" value={newC.email || ""} onChange={(e) => setNewC((p) => ({ ...p, email: e.target.value }))} />
+              <select className="inp" value={newC.gender || ""} onChange={(e) => setNewC((p) => ({ ...p, gender: e.target.value }))}>
+                <option value="">Giới tính * (bắt buộc)</option>
+                <option>Nam</option><option>Nữ</option><option>Khác</option>
+              </select>
+              <div><label className="text-[11px] text-[#5A6572] font-semibold">Ngày sinh *</label>
+                <input type="date" className="inp" value={newC.birthday || ""} onChange={(e) => setNewC((p) => ({ ...p, birthday: e.target.value }))} />
+              </div>
               <input className="inp" placeholder="Địa chỉ" value={newC.address} onChange={(e) => setNewC((p) => ({ ...p, address: e.target.value }))} />
               <div className="md:col-span-3 flex gap-2">
                 <button className="btn-ok !text-xs" onClick={luuCustMoi}>Lưu khách</button>
@@ -386,7 +407,16 @@ function TaoDonInner() {
               <LocSearch locations={locations.filter((l) => l.type === "Cửa hàng")} value={meta.location_code} onChange={(v) => setMeta((p) => ({ ...p, location_code: v }))} placeholder="Bắt buộc chọn cửa hàng" />
               <div className="text-[10.5px] text-[#8A93A0] mt-1">Dùng để hạch toán doanh số theo điểm/khu vực. Xe vẫn trừ tồn ở kho của chính nó.</div>
             </Field>
-            <Field label="Bán bởi"><input className="inp bg-[#F8FAFC]" value={profile.name} disabled /></Field>
+            <Field label="Bán bởi">
+              <input list="staff-list" className="inp" placeholder="Tìm nhân viên…"
+                value={meta.seller_name || ""}
+                onChange={(e) => {
+                  const name = e.target.value;
+                  const found = staff.find((s) => s.name === name);
+                  setMeta((p) => ({ ...p, seller_name: name, seller_id: found ? found.id : "" }));
+                }} />
+              <datalist id="staff-list">{staff.map((s) => <option key={s.id} value={s.name}>{s.name} ({s.role})</option>)}</datalist>
+            </Field>
             <Field label="Ngày bán"><input type="date" className="inp" value={meta.sale_date} onChange={(e) => setMeta((p) => ({ ...p, sale_date: e.target.value }))} /></Field>
 
             {cfields.map((c) => {
