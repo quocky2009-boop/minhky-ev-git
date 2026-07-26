@@ -47,7 +47,6 @@ function TaoDonInner() {
   const [suaCheck, setSuaCheck] = useState(null);  // ket qua kiem tra co sua duoc khong
   const [lyDo, setLyDo] = useState("");
   const [payCu, setPayCu] = useState([]);          // cac khoan da thu (khong sua duoc)
-  const [suaPaidAmount, setSuaPaidAmount] = useState(0); // paid_amount thuc te tren don (sau hoan tien)
 
   // Khách hàng
   const [custId, setCustId] = useState("");
@@ -108,7 +107,6 @@ function TaoDonInner() {
       setExtra(o.extra || {});
       setDTong({ type: o.discount_type || "amount", value: o.discount_value || 0 });
       setPayCu(pays0 || []);
-      setSuaPaidAmount(o.paid_amount || 0);
 
       // Nạp xe của đơn
       const sks = String(o.frame_number || "").split(",").map((x) => x.trim()).filter(Boolean);
@@ -219,10 +217,7 @@ function TaoDonInner() {
   // Tien coc da nhan cho cac xe GIU_CHO (backend tu cong vao paid_amount khi tao don).
   // Chi ap dung khi TAO MOI; khi sua don, coc da nam trong paid_amount cu (payCu) roi.
   const tongCoc = suaId ? 0 : xeRows.reduce((s, r) => s + (Number(r.coc_amount) || 0), 0);
-  // Khi sua don: dung paid_amount thuc te tu DB (da tru hoan tien), khong cong lai tung dong sale_payments
-  const daTra = suaId
-    ? suaPaidAmount + pays.reduce((s, p) => s + (Number(p.amount) || 0), 0)
-    : tongCoc + pays.reduce((s, p) => s + (Number(p.amount) || 0), 0) + payCu.reduce((s, p) => s + p.amount, 0);
+  const daTra = tongCoc + pays.reduce((s, p) => s + (Number(p.amount) || 0), 0) + payCu.reduce((s, p) => s + p.amount, 0);
   const conLai = Math.max(phaiTra - daTra, 0);
 
   // ===== LƯU ĐƠN =====
@@ -353,7 +348,7 @@ function TaoDonInner() {
           <div className="text-[13px]"><b>⚠ Đơn đã thu {fmtVND(suaCheck.da_thu)}</b> — sửa được nhưng tổng đơn mới không được nhỏ hơn số đã thu. Muốn giảm thì hoàn tiền cho khách trước.</div>
         </div>
       )}
-      {suaId && (suaPaidAmount > 0 || payCu.length > 0) && (
+      {suaId && payCu.length > 0 && (
         <div className="card">
           <div className="font-extrabold mb-2">Các khoản đã thu (không sửa được)</div>
           <div className="flex flex-col gap-1.5">
@@ -364,13 +359,6 @@ function TaoDonInner() {
                 <b>{fmtVND(p.amount)}</b>
               </div>
             ))}
-            {/* Neu co hoan tien: sum(payCu) != suaPaidAmount, hien tong thuc te */}
-            {payCu.reduce((s, p) => s + p.amount, 0) !== suaPaidAmount && (
-              <div className="flex items-center gap-2 text-[13px] p-2 rounded-lg bg-[#FFF6E5] border border-[#F0C000]">
-                <span className="text-[#A25F00] mr-auto">↩ Đã hoàn tiền — thực tế khách đã trả</span>
-                <b className="text-[#A25F00]">{fmtVND(suaPaidAmount)}</b>
-              </div>
-            )}
           </div>
           <div className="text-[11px] text-[#8A93A0] mt-2">Thêm khoản thu mới ở khối Thanh toán bên dưới.</div>
         </div>
