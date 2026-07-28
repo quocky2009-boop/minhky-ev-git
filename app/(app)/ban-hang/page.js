@@ -55,7 +55,7 @@ function TaoDonInner() {
   const [newC, setNewC] = useState(null);
 
   // Thông tin bổ sung
-  const [meta, setMeta] = useState({ sale_date: iso(new Date()), location_code: "", document_status: "Đang làm đăng ký", note: "", seller_id: "", seller_name: "" });
+  const [meta, setMeta] = useState({ sale_date: iso(new Date()), location_code: "", document_status: "Đang làm đăng ký", note: "", seller_id: "", seller_name: "", due_date: "" });
   const [staff, setStaff] = useState([]);
   useEffect(() => {
     if (!loading) supabase.from("profiles").select("id,name,role").eq("status", "Hoạt động").order("name").then(({ data }) => setStaff(data || []));
@@ -72,7 +72,7 @@ function TaoDonInner() {
   const [extra, setExtra] = useState({});
 
   const loadCusts = async () => {
-    const { data } = await supabase.from("customers").select("id,code,name,phone,cccd,address,status").order("created_at", { ascending: false }).limit(2000);
+    const { data } = await supabase.from("customers").select("id,code,name,phone,cccd,address,status,customer_type,source,email,gender,birthday").order("created_at", { ascending: false }).limit(2000);
     setCusts(data || []);
   };
   useEffect(() => {
@@ -459,6 +459,7 @@ function TaoDonInner() {
               </select>
             </Field>
             <Field label="Ngày bán"><input type="date" className="inp" value={meta.sale_date} onChange={(e) => setMeta((p) => ({ ...p, sale_date: e.target.value }))} /></Field>
+            <Field label="Hạn thanh toán (nếu nợ)"><input type="date" className="inp" value={meta.due_date || ""} onChange={(e) => setMeta((p) => ({ ...p, due_date: e.target.value }))} placeholder="Để trống nếu trả đủ ngay" /></Field>
 
             {cfields.map((c) => {
               if (c.field_type === "formula") {

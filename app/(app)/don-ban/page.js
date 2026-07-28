@@ -39,7 +39,7 @@ export default function DonBan() {
   const sort = useSortable();
   const sel = useSelection();
   const [invId, setInvId] = useState(null);
-  const [invF, setInvF] = useState({ no: "", date: iso(new Date()), bh: false, app: false, coc: false });
+  const [invF, setInvF] = useState({ no: "", date: iso(new Date()), checklist: {} });
   const [detail, setDetail] = useState(null);
   const [payEdit, setPayEdit] = useState(null);
   const [klEdit, setKlEdit] = useState(null);   // khach le cuoi (don ban buon)
@@ -89,14 +89,22 @@ export default function DonBan() {
   const isVF = (o) => (vOf(o.vehicle_id)?.brand || "").toUpperCase().includes("VINFAST");
   const confirmInv = async (o) => {
     if (!invF.no.trim()) return notify("Bắt buộc nhập số hóa đơn.", "err");
-    if (!invF.bh) return notify("Phải tích xác nhận đã kích hoạt bảo hành cho xe.", "err");
-    if (isVF(o) && !invF.app) return notify("Xe VinFast: phải tích xác nhận đã kích hoạt app VF eScooter.", "err");
+    if (!invF.checklist?.da_thu_du_tien) return notify("Checklist: phải xác nhận đã thu đủ tiền.", "err");
+    if (!invF.checklist?.dung_so_khung) return notify("Checklist: phải xác nhận đúng số khung/số máy.", "err");
+    if (!invF.checklist?.bao_hanh) return notify("Checklist: phải kích hoạt bảo hành.", "err");
+    if (isVF(o) && !invF.checklist?.app_vf) return notify("Xe VinFast: phải kích hoạt app VF eScooter.", "err");
     setBusy(true);
-    const { error } = await supabase.rpc("fn_xac_nhan_hoa_don", { p: { id: o.id, invoice_no: invF.no, invoice_date: invF.date, warranty_activated: invF.bh, app_activated: invF.app, coc_giao: invF.coc } });
+    const { error } = await supabase.rpc("fn_xac_nhan_hoa_don", { p: {
+      id: o.id, invoice_no: invF.no, invoice_date: invF.date,
+      warranty_activated: !!invF.checklist?.bao_hanh,
+      app_activated: !!invF.checklist?.app_vf,
+      coc_giao: !!invF.checklist?.coc_giao,
+    }});
+    if (!error) await supabase.from("sales_orders").update({ checklist_giao_xe: invF.checklist || {} }).eq("id", o.id);
     setBusy(false);
     if (error) return notify(errMsg(error), "err");
-    notify(`Đơn ${o.code} hoàn thành: HĐ ${invF.no}, đã kích hoạt bảo hành${invF.app ? " + app VF eScooter" : ""}.`);
-    setInvId(null); setInvF({ no: "", date: iso(new Date()), bh: false, app: false }); load();
+    notify(`Đơn ${o.code} hoàn thành: HĐ ${invF.no}.`);
+    setInvId(null); setInvF({ no: "", date: iso(new Date()), checklist: {} }); load();
   };
 
   const cancelInv = async (o) => {
@@ -295,46 +303,67 @@ export default function DonBan() {
                       : <Badge tone="amber">Chờ xuất HĐ</Badge>}
                       {!huy && thieuKhachLe(o) && <div className="mt-0.5"><Badge tone="red">⚠ Thiếu khách lẻ</Badge></div>}</td>
                     <td data-label="NV bán" className="td text-xs">{o.seller_name}</td>
-                    <td className="td"><div className="flex gap-1.5">
+                    <td className="td w-36 align-top"><div className="flex flex-col gap-1 items-end">
                       {huy ? (
-                        <>
+                        <div className="flex gap-1 flex-wrap justify-end">
                           <Link href={`/don-ban/${o.id}`} className="btn-ghost !px-2 !py-1 !text-xs" title="Xem chi tiết đơn">👁</Link>
                           {profile.role === "CEO" && !nhanTra && <button className="btn-ghost !px-2 !py-1 !text-xs hover:text-brand" title="Mở lại đơn (đã hủy nhầm)" onClick={() => moLaiDon(o)}>↩ Mở lại</button>}
-                        </>
-                      ) : (<>
-                      {!done && canConfirm && <button className={`!px-2.5 !py-1 !text-xs ${invId === o.id ? "btn-primary" : "btn-ok"}`} onClick={() => { setInvId(invId === o.id ? null : o.id); setInvF({ no: "", date: iso(new Date()), bh: false, app: false, coc: false }); }}>{invId === o.id ? "Đóng" : "✓ Xác nhận HĐ"}</button>}
-                      {thieuKhachLe(o) && <button className="btn-primary !px-2 !py-1 !text-xs !bg-danger !border-danger" title="Nhập thông tin khách lẻ mua sau cùng" onClick={() => openDetail(o)}>👤</button>}
-                      <button className="btn-ghost !px-2 !py-1 !text-xs" title="Xem nhanh đơn" onClick={() => openDetail(o)}>👁</button>
-                      {canSuaTT && total(o) - (o.paid_amount || 0) > 0 && (
-                        <button className="btn-ok !px-2 !py-1 !text-xs" title={`Còn thiếu ${fmtVND(total(o) - (o.paid_amount || 0))} — bấm để thu`}
-                          onClick={async () => { await openDetail(o); setPayEdit({ paid: o.paid_amount || 0, note: "", method: "Tiền mặt" }); }}>💵</button>
+                        </div>
+                      ) : (
+                      <div className="flex flex-col gap-1 items-end">
+                        {!done && canConfirm && <button className={`!px-2.5 !py-1 !text-xs w-full ${invId === o.id ? "btn-primary" : "btn-ok"}`} onClick={() => { setInvId(invId === o.id ? null : o.id); setInvF({ no: "", date: iso(new Date()), checklist: {} }); }}>{invId === o.id ? "Đóng" : "✓ Xác nhận HĐ"}</button>}
+                        <div className="flex gap-1 flex-wrap justify-end">
+                          {thieuKhachLe(o) && <button className="btn-primary !px-2 !py-1 !text-xs !bg-danger !border-danger" title="Nhập thông tin khách lẻ mua sau cùng" onClick={() => openDetail(o)}>👤</button>}
+                          <button className="btn-ghost !px-2 !py-1 !text-xs" title="Xem nhanh đơn" onClick={() => openDetail(o)}>👁</button>
+                          {canSuaTT && total(o) - (o.paid_amount || 0) > 0 && (
+                            <button className="btn-ok !px-2 !py-1 !text-xs" title={`Còn thiếu ${fmtVND(total(o) - (o.paid_amount || 0))} — bấm để thu`}
+                              onClick={async () => { await openDetail(o); setPayEdit({ paid: o.paid_amount || 0, note: "", method: "Tiền mặt" }); }}>💵</button>
+                          )}
+                          <button className="btn-ghost !px-2 !py-1 !text-xs" title="In phiếu xuất" onClick={() => printOrder({ supabase, o, vehicles, locations, settings, notify })}>🖨</button>
+                          {done && canCancel && <button className="btn-ghost !px-2 !py-1 !text-xs hover:text-danger" title="Hủy xác nhận" onClick={() => cancelInv(o)}>↺</button>}
+                        </div>
+                      </div>
                       )}
-                      <button className="btn-ghost !px-2 !py-1 !text-xs" title="In phiếu xuất" onClick={() => printOrder({ supabase, o, vehicles, locations, settings, notify })}>🖨</button>
-                      {done && canCancel && <button className="btn-ghost !px-2 !py-1 !text-xs hover:text-danger" title="Hủy xác nhận" onClick={() => cancelInv(o)}>↺</button>}
-                      </>)}
                     </div></td>
                   </tr>,
                   invId === o.id && (
                     <tr key={o.id + "f"}><td colSpan={11} className="td bg-[#FFFDF5]">
-                      <div className="flex gap-1.5 items-end flex-wrap">
-                        <div><label className="lbl">Số hóa đơn (bắt buộc)</label><input className="inp !py-2 !w-48" autoFocus value={invF.no} onChange={(e) => setInvF((p) => ({ ...p, no: e.target.value }))} placeholder="VD: 00012345" /></div>
-                        <div><label className="lbl">Ngày xuất HĐ</label><input type="date" className="inp !py-2 !w-40" value={invF.date} onChange={(e) => setInvF((p) => ({ ...p, date: e.target.value }))} /></div>
-                        <label className="flex items-center gap-1.5 text-xs font-semibold cursor-pointer bg-white border border-[#D5DBE3] rounded-lg px-2.5 py-2">
-                          <input type="checkbox" className="w-4 h-4" checked={invF.bh} onChange={(e) => setInvF((p) => ({ ...p, bh: e.target.checked }))} />
-                          🛡 Đã kích hoạt bảo hành
-                        </label>
-                        {isVF(o) && (
-                          <label className="flex items-center gap-1.5 text-xs font-semibold cursor-pointer bg-white border border-[#D5DBE3] rounded-lg px-2.5 py-2">
-                            <input type="checkbox" className="w-4 h-4" checked={invF.app} onChange={(e) => setInvF((p) => ({ ...p, app: e.target.checked }))} />
-                            📱 Đã kích hoạt app VF eScooter
-                          </label>
-                        )}
-                        <label className="flex items-center gap-1.5 text-xs font-semibold cursor-pointer bg-white border border-[#D5DBE3] rounded-lg px-2.5 py-2">
-                          <input type="checkbox" className="w-4 h-4" checked={invF.coc} onChange={(e) => setInvF((p) => ({ ...p, coc: e.target.checked }))} />
-                          📄 Đã giao COC cho khách
-                        </label>
-                        <button className="btn-ok !py-2 !text-xs" disabled={busy} onClick={() => confirmInv(o)}>Xác nhận hoàn thành</button>
-                        <span className="text-[10.5px] text-[#8A93A0]">Đủ số HĐ + bảo hành{isVF(o) ? " + app VF eScooter" : ""}. Tích "Đã giao COC" nếu đã trao giấy COC cho khách ngay hôm nay.</span>
+                      <div className="flex flex-col gap-3">
+                        <div className="flex gap-1.5 items-end flex-wrap">
+                          <div><label className="lbl">Số hóa đơn (bắt buộc)</label><input className="inp !py-2 !w-48" autoFocus value={invF.no} onChange={(e) => setInvF((p) => ({ ...p, no: e.target.value }))} placeholder="VD: 00012345" /></div>
+                          <div><label className="lbl">Ngày xuất HĐ</label><input type="date" className="inp !py-2 !w-40" value={invF.date} onChange={(e) => setInvF((p) => ({ ...p, date: e.target.value }))} /></div>
+                        </div>
+                        {/* CHECKLIST GIAO XE */}
+                        <div className="border border-[#D5DBE3] rounded-xl p-3 bg-white">
+                          <div className="font-bold text-[13px] mb-2">✅ Checklist giao xe</div>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5">
+                            {[
+                              ["da_thu_du_tien","💰 Đã thu đủ tiền", true],
+                              ["dung_so_khung","🔢 Đúng số khung/số máy", true],
+                              ["bao_hanh","🛡 Kích hoạt bảo hành", true],
+                              ["app_vf", isVF(o) ? "📱 App VF eScooter" : null, isVF(o)],
+                              ["coc_giao","📄 Giao giấy COC", false],
+                              ["phu_kien","🎁 Bàn giao phụ kiện/sạc/chìa", false],
+                              ["anh_khach","📸 Chụp ảnh khách nhận xe", false],
+                            ].filter(([,label]) => label).map(([key, label, required]) => (
+                              <label key={key} className={`flex items-center gap-1.5 text-xs font-medium cursor-pointer rounded-lg px-2 py-1.5 border ${invF.checklist?.[key] ? "bg-[#E5F6EE] border-[#0E7A4A]" : required ? "border-danger bg-[#FFF6F6]" : "border-[#E3E8EF]"}`}>
+                                <input type="checkbox" className="w-3.5 h-3.5 shrink-0"
+                                  checked={!!invF.checklist?.[key]}
+                                  onChange={(e) => setInvF((p) => ({ ...p, checklist: { ...p.checklist, [key]: e.target.checked } }))} />
+                                {label}{required && <span className="text-danger ml-0.5">*</span>}
+                              </label>
+                            ))}
+                          </div>
+                          {(() => {
+                            const required = ["da_thu_du_tien","dung_so_khung","bao_hanh"];
+                            const done = required.filter(k => invF.checklist?.[k]).length;
+                            return <div className="text-[10.5px] text-[#8A93A0] mt-2">{done}/{required.length} mục bắt buộc · Còn lại là khuyến nghị</div>;
+                          })()}
+                        </div>
+                        <div className="flex gap-2 items-center flex-wrap">
+                          <button className="btn-ok !py-2 !text-xs" disabled={busy} onClick={() => confirmInv(o)}>Xác nhận hoàn thành đơn</button>
+                          <span className="text-[10.5px] text-[#8A93A0]">Bắt buộc: Số HĐ + Thu đủ tiền + Đúng số khung + Bảo hành.</span>
+                        </div>
                       </div>
                     </td></tr>
                   ),

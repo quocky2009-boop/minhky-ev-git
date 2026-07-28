@@ -72,6 +72,15 @@ export default function PhieuThuChi({ dir }) {
   const tong = rows.reduce((a, b) => a + b.amount, 0);
   const tuDong = rows.filter((t) => t.ref_doc).length;
 
+  const duyetPhieu = async (id, chap_nhan) => {
+    const ly_do = chap_nhan ? "" : (prompt("Lý do từ chối:") || "");
+    if (!chap_nhan && !ly_do.trim()) return;
+    const { error } = await supabase.rpc("fn_duyet_phieu_chi", { p_id: id, p_chap_nhan: chap_nhan, p_ly_do: ly_do });
+    if (error) return notify(errMsg(error), "err");
+    notify(chap_nhan ? "Đã duyệt phiếu chi." : "Đã từ chối phiếu chi.");
+    load();
+  };
+
   const ghi = async () => {
     if (!f.account_id) return notify("Chọn quỹ.", "err");
     if (!(Number(f.amount) > 0)) return notify("Nhập số tiền.", "err");
@@ -307,11 +316,27 @@ export default function PhieuThuChi({ dir }) {
                   <TdCheck sel={sel} id={t.id} />
                   <td data-label="Ngày tạo" className="td text-xs whitespace-nowrap">{fmtTime(t.created_at)}</td>
                   <td data-label="Mã phiếu" className="td"><button className="font-bold text-brand hover:underline" onClick={() => setDetail(t)}>{t.code}</button></td>
-                  <td data-label="Danh mục" className="td text-[13px]">{t.ref_doc ? <Badge tone="blue">Tự động</Badge> : null} {t.category}</td>
+                  <td data-label="Danh mục" className="td text-[13px]">{t.ref_doc ? <Badge tone="blue">Tự động</Badge> : null} {t.category}
+                    {!isThu && t.approval_status === "pending" && <span className="ml-1"><Badge tone="amber">⏳ Chờ duyệt</Badge></span>}
+                    {!isThu && t.approval_status === "rejected" && <span className="ml-1"><Badge tone="red">✗ Từ chối</Badge></span>}
+                  </td>
                   <td data-label={`Tên ${nhomNhan}`} className="td text-[13px]">{t.counterparty || <span className="text-[#8A93A0]">—</span>}</td>
                   <td data-label="Số tiền" className="td rt font-bold"><span className={isThu ? "text-[#0E7A4A]" : "text-danger"}>{fmtVND(t.amount)}</span></td>
                   <td data-label="Quỹ" className="td text-xs">{accName(t.account_id)}</td>
                   <td data-label="Chứng từ gốc" className="td text-xs text-brand">{t.ref_doc || "—"}</td>
+                  {!isThu && (
+                    <td className="td">
+                      {t.approval_status === "pending" && can("thu_chi_chot") && (
+                        <div className="flex gap-1">
+                          <button className="btn-ok !px-2 !py-1 !text-xs" onClick={() => duyetPhieu(t.id, true)}>✓</button>
+                          <button className="btn-ghost !px-2 !py-1 !text-xs hover:!text-danger" onClick={() => duyetPhieu(t.id, false)}>✗</button>
+                        </div>
+                      )}
+                      {t.approval_status === "rejected" && t.reject_reason && (
+                        <span className="text-[10px] text-danger" title={t.reject_reason}>Lý do: {t.reject_reason.slice(0, 30)}</span>
+                      )}
+                    </td>
+                  )}
                 </tr>
               ))}
               {sorted.length === 0 && <tr><td className="td" colSpan={8}>Không có {tenPhieu.toLowerCase()} nào trong khoảng ngày này.</td></tr>}
