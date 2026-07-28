@@ -112,6 +112,27 @@ function DieuChuyenInner() {
     notify("Đã xác nhận nhận xe — tồn kho đã cập nhật."); refresh(); load();
   };
 
+  const xoaPhieu = async (t) => {
+    if (!confirm(`Xóa phiếu ${t.code}?\nXe sẽ hoàn về tồn kho kho xuất.`)) return;
+    const { error } = await supabase.rpc("fn_xoa_dieu_chuyen", { p_id: t.id });
+    if (error) return notify(errMsg(error), "err");
+    notify("Đã xóa phiếu điều chuyển, xe hoàn về kho."); refresh(); load();
+  };
+
+  const xoaNhieu = async () => {
+    const rs = sorted.filter((t) => sel.has(t.id) && t.status === "Đang chuyển");
+    if (rs.length === 0) return notify("Chỉ xóa được phiếu đang ở trạng thái Đang chuyển.", "err");
+    if (!confirm(`Xóa ${rs.length} phiếu điều chuyển? Xe sẽ hoàn về tồn kho.`)) return;
+    let ok = 0, fail = 0;
+    for (const t of rs) {
+      const { error } = await supabase.rpc("fn_xoa_dieu_chuyen", { p_id: t.id });
+      if (error) fail++; else ok++;
+    }
+    sel.clear();
+    notify(fail ? `Đã xóa ${ok} phiếu, ${fail} phiếu lỗi.` : `Đã xóa ${ok} phiếu.`, fail ? "err" : "ok");
+    refresh(); load();
+  };
+
   const lamMoi = () => { setKetQua(null); setRows([]); setMeta((p) => ({ ...p, note: "" })); };
 
   if (ketQua) {
@@ -279,6 +300,9 @@ function DieuChuyenInner() {
               ...rs.map((t) => [t.code, vName(t.vehicle_id), t.quantity, locName(t.from_location), locName(t.to_location), t.status, fmtTime(t.requested_at), t.requested_by_name, t.confirmed_at ? fmtTime(t.confirmed_at) : "", t.confirmed_by_name || ""])]);
             notify(`Đã xuất ${rs.length} phiếu.`);
           }}>⬇ Xuất Excel</button>
+          {["CEO","MANAGER","ADMIN"].includes(profile.role) && (
+            <button className="btn-ghost !text-xs !py-1 !text-danger" onClick={xoaNhieu}>🗑 Xóa phiếu đã chọn</button>
+          )}
         </SelectionBar>
         <div className="tbl-scroll"><table className="w-full border-collapse tbl-card">
           <thead><tr>
@@ -316,7 +340,10 @@ function DieuChuyenInner() {
                 {(t.frames || []).length > 0 && <div className="font-mono text-[10px] text-[#8A93A0]">{t.frames.join(", ")}</div>}
               </td>
               <td className="td">{t.status === "Đang chuyển" && ["CEO","MANAGER","ADMIN"].includes(profile.role) && (
-                <button className="btn-ok !px-2 !py-1 !text-xs whitespace-nowrap" onClick={() => nhanXe(t)}>✓ Nhận xe</button>
+                <div className="flex flex-col gap-1">
+                  <button className="btn-ok !px-2 !py-1 !text-xs whitespace-nowrap" onClick={() => nhanXe(t)}>✓ Nhận xe</button>
+                  <button className="btn-ghost !px-2 !py-1 !text-xs !text-danger whitespace-nowrap" onClick={() => xoaPhieu(t)}>🗑 Xóa</button>
+                </div>
               )}</td>
             </tr>
           ))}
