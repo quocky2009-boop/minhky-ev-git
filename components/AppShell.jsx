@@ -45,13 +45,13 @@ export default function AppShell({ profile, children }) {
           .eq("assignee_id", profile.id)
           .not("status", "in", "(completed,cancelled,failed)"),
         supabase.from("v_task_list").select("id", { count: "exact", head: true }).eq("status", "pending_review"),
-        supabase.from("vehicle_units").select("frame_number", { count: "exact", head: true })
-          .eq("coc_status", "CHUA_VE").neq("status", "DA_XOA")
-          .lt("imported_at", new Date(Date.now() - 7 * 86400000).toISOString()),
+        supabase.from("co_hoi").select("id", { count: "exact", head: true })
+          .eq("next_call_date", new Date().toLocaleDateString("sv-SE"))
+          .not("stage", "in", "(Đã bán,Mất khách)"),
       ];
-      const [don, dc, dv, coc, task, taskDuyet, cocTre] = await Promise.all(q.map((x) => x.then((r) => r.count || 0).catch(() => 0)));
+      const [don, dc, dv, coc, task, taskDuyet, coHoi] = await Promise.all(q.map((x) => x.then((r) => r.count || 0).catch(() => 0)));
       if (!huy) setBadges({ "/don-ban": don, "/dieu-chinh": dc, "/dich-vu": dv, "/dat-coc": coc,
-        "/cong-viec": task, "/cong-viec/doi-nhom": taskDuyet, "/giay-coc": cocTre });
+        "/cong-viec": task, "/cong-viec/doi-nhom": taskDuyet, "/co-hoi": coHoi });
     };
     dem();
     const t = setInterval(dem, 60000);
@@ -72,7 +72,14 @@ export default function AppShell({ profile, children }) {
     return () => { huy = true; };
   }, [profile.role]);
   // Item hien khi: role nam trong roles HOAC (co perm gan va user duoc cap perm do)
-  const canSee = (n) => n.roles.includes(profile.role) || (n.perm && perms[n.perm]);
+  const canSee = (n) => {
+    // CEO luon thay tat ca
+    if (profile.role === "CEO") return true;
+    // Neu co perm key: show neu role_perms cho phep (bat ke roles)
+    if (n.perm && perms[n.perm]) return true;
+    // Fallback theo roles co dinh
+    return n.roles.includes(profile.role);
+  };
 
   const ItemLink = ({ n, sub }) => (
     <Link href={n.href} onClick={() => setOpen(false)}

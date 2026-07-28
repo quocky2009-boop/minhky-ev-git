@@ -55,7 +55,7 @@ function TaoDonInner() {
   const [newC, setNewC] = useState(null);
 
   // Thông tin bổ sung
-  const [meta, setMeta] = useState({ sale_date: iso(new Date()), location_code: "", document_status: "Đang làm đăng ký", note: "", seller_id: "", seller_name: "" });
+  const [meta, setMeta] = useState({ sale_date: iso(new Date()), location_code: "", document_status: "Đang làm đăng ký", note: "", seller_id: "", seller_name: "", due_date: "" });
   const [staff, setStaff] = useState([]);
   useEffect(() => {
     if (!loading) supabase.from("profiles").select("id,name,role").eq("status", "Hoạt động").order("name").then(({ data }) => setStaff(data || []));
@@ -63,7 +63,8 @@ function TaoDonInner() {
 
   // Hàng hóa: xe + bán kèm cùng một bảng
   const [xeRows, setXeRows] = useState([]);   // {frame_number, vehicle_id, ten, unit_price, discount_type, discount_value, coc_amount}
-  const [kemRows, setKemRows] = useState([]); // {item_type, name, qty, unit_price, discount_type, discount_value}
+  const [kemRows, setKemRows] = useState([]); // {item_type, name, qty, unit_price, discount_type, discount_value, product_id}
+  const [productList, setProductList] = useState([]);
 
   // Chiết khấu tổng + thanh toán
   const [dTong, setDTong] = useState({ type: "amount", value: 0 });
@@ -72,8 +73,11 @@ function TaoDonInner() {
   const [extra, setExtra] = useState({});
 
   const loadCusts = async () => {
-    const { data } = await supabase.from("customers").select("id,code,name,phone,cccd,address,status").order("created_at", { ascending: false }).limit(2000);
-    setCusts(data || []);
+    const [{ data: c }, { data: prods }] = await Promise.all([
+      supabase.from("customers").select("id,code,name,phone,cccd,address,status,customer_type,source,email,gender,birthday").order("created_at", { ascending: false }).limit(2000),
+      supabase.from("products").select("id,name,group_name,unit,sale_price,stock_qty").eq("status","Hoạt động").order("group_name").order("name"),
+    ]);
+    setCusts(c || []); setProductList(prods || []);
   };
   useEffect(() => {
     if (!loading) {
@@ -459,6 +463,7 @@ function TaoDonInner() {
               </select>
             </Field>
             <Field label="Ngày bán"><input type="date" className="inp" value={meta.sale_date} onChange={(e) => setMeta((p) => ({ ...p, sale_date: e.target.value }))} /></Field>
+            <Field label="Hạn thanh toán (nếu nợ)"><input type="date" className="inp" value={meta.due_date || ""} onChange={(e) => setMeta((p) => ({ ...p, due_date: e.target.value }))} placeholder="Để trống nếu trả đủ ngay" /></Field>
 
             {cfields.map((c) => {
               if (c.field_type === "formula") {
@@ -543,9 +548,19 @@ function TaoDonInner() {
                       {Object.entries(ITEM_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                     </select>
                     <ComboFree value={r.name} placeholder="Gõ tìm hoặc nhập tên…"
-                      options={(DM[r.item_type] || []).map((x) => x.ten)}
+                      options={[
+                        ...(DM[r.item_type] || []).map((x) => x.ten),
+                        ...productList.filter(p => !r.name || p.name.toLowerCase().includes(r.name.toLowerCase())).map(p => p.name),
+                      ].filter((v, i, a) => a.indexOf(v) === i)}
                       onChange={(v) => {
                         setKem(i, "name", v);
+                        // Uu tien tim trong danh muc hang hoa
+                        const prod = productList.find(p => p.name === v);
+                        if (prod) {
+                          setKemRows(rows => rows.map((x, j) => j === i ? { ...x, name: v, unit_price: prod.sale_price, product_id: prod.id } : x));
+                          return;
+                        }
+                        // Fallback: tim trong DM settings
                         const hit = (DM[r.item_type] || []).find((x) => x.ten === v);
                         if (hit && hit.gia > 0) setKem(i, "unit_price", hit.gia);
                       }} />
