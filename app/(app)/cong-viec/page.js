@@ -281,9 +281,15 @@ export default function VievCuaToi() {
   const filtered = sortTasks(rows.filter((t) => {
     if (fSt === "open") return !TASK_CLOSED.includes(t.status);
     if (fSt === "overdue") return t.is_overdue;
+    if (fSt === "today") return !t.is_overdue && new Date(t.due_at).toDateString() === new Date().toDateString() && !TASK_CLOSED.includes(t.status);
+    if (fSt === "upcoming") return !t.is_overdue && new Date(t.due_at) > new Date() && new Date(t.due_at).toDateString() !== new Date().toDateString() && !TASK_CLOSED.includes(t.status);
     if (fSt) return t.status === fSt;
     return !TASK_CLOSED.includes(t.status);
   }));
+  const soanTien = (t) => {
+    const d = new Date(t.due_at);
+    return d.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" });
+  };
 
   return (
     <div className="flex flex-col gap-4">
@@ -314,50 +320,73 @@ export default function VievCuaToi() {
         </div>
       )}
 
-      <div className="card">
-        <div className="flex gap-1.5 flex-wrap mb-3">
-          {[["", "Đang mở"], ["overdue", "Quá hạn"], ["needs_revision", "Cần bổ sung"], ["pending_review", "Chờ duyệt"], ["completed", "Đã xong"]].map(([k, v]) => (
+      <div className="card !p-0 overflow-hidden">
+        {/* TABS THEO THỜI GIAN (kiểu Timeline công việc) */}
+        <div className="flex border-b border-[#EEF1F4]">
+          {[["today", "Hôm nay", homNay], ["overdue", "Quá hạn", quaHan], ["upcoming", "Sắp tới", dem((t) => !t.is_overdue && new Date(t.due_at) > new Date() && new Date(t.due_at).toDateString() !== new Date().toDateString() && !TASK_CLOSED.includes(t.status))]].map(([k, v, cnt]) => (
+            <button key={k} className={`flex-1 py-2.5 text-[13px] font-semibold border-b-2 transition-colors ${fSt === k ? "border-brand text-brand" : "border-transparent text-[#8A93A0] hover:text-[#5A6572]"}`} onClick={() => { setFSt(k); setPage(1); }}>
+              {v} {cnt > 0 && <span className={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] ${fSt === k ? "bg-brand text-white" : "bg-[#EEF1F4]"}`}>{cnt}</span>}
+            </button>
+          ))}
+        </div>
+
+        {/* Filter phụ theo trạng thái */}
+        <div className="flex gap-1.5 flex-wrap p-3 pb-0">
+          {[["", "Đang mở"], ["needs_revision", "Cần bổ sung"], ["pending_review", "Chờ duyệt"], ["completed", "Đã xong"]].map(([k, v]) => (
             <button key={k} className={`btn !px-3 !py-1.5 !text-xs ${fSt === k ? "bg-brand text-white" : "bg-[#EEF1F4]"}`} onClick={() => { setFSt(k); setPage(1); }}>{v}</button>
           ))}
         </div>
+
+        <div className="p-3">
         {busy && rows.length === 0 ? <div className="text-sm text-[#8A93A0]">Đang tải…</div> : (
           <>
             <div className="flex flex-col gap-2">
               {pageSlice(filtered, page, 15).map((t) => {
                 const st = TASK_STATUS[t.status] || { label: t.status, tone: "dark" };
                 const h = hanLabel(t.due_at, t.status);
+                const pct = t.cl_tong > 0 ? Math.round(t.cl_xong / t.cl_tong * 100) : (t.status === "completed" ? 100 : 0);
                 return (
-                  <button key={t.id} className={`p-3 rounded-xl border text-left hover:bg-[#F8FAFC] ${h?.overdue ? "border-[#F5B5B5] bg-[#FFF6F6]" : "border-[#E3E8EF]"}`} onClick={() => openTask(t)}>
-                    <div className="flex items-start gap-2">
-                      <div className="mr-auto min-w-0">
-                        <div className="font-semibold text-[14px]">{t.title}</div>
-                        <div className="text-[11px] text-[#8A93A0]">
-                          {t.code} · {t.category_name || "—"} · hạn {fmtHan(t.due_at)}
+                  <button key={t.id} className={`p-3 rounded-xl border text-left hover:bg-[#F8FAFC] transition-colors ${h?.overdue ? "border-[#F5B5B5] bg-[#FFF6F6]" : "border-[#E3E8EF] bg-white"}`} onClick={() => openTask(t)}>
+                    <div className="flex items-start gap-3">
+                      {/* Icon nhóm/category */}
+                      <div className="w-9 h-9 rounded-lg bg-[#EEF1F4] flex items-center justify-center text-[16px] shrink-0 mt-0.5">
+                        {t.priority === "Khẩn cấp" ? "🚩" : "📁"}
+                      </div>
+                      <div className="mr-auto min-w-0 flex-1">
+                        <div className="text-[10.5px] text-[#8A93A0] mb-0.5">{t.category_name || t.code}</div>
+                        <div className="font-semibold text-[14px] flex items-center gap-1.5">
+                          {t.priority === "Khẩn cấp" && <span className="text-danger">🚩</span>}
+                          {t.title}
+                        </div>
+                        <div className="text-[11px] text-[#8A93A0] mt-0.5">
+                          {soanTien(t)} → {fmtHan(t.due_at)}
                           {t.assignee_id !== profile.id && ` · ${t.assignee_name}`}
                         </div>
-                        {t.cl_tong > 0 && (
-                          <div className="flex items-center gap-1.5 mt-1">
-                            <div className="h-1.5 w-24 rounded-full bg-[#EEF1F4] overflow-hidden">
-                              <div className="h-full bg-[#1f6feb]" style={{ width: (t.cl_xong / t.cl_tong * 100) + "%" }} />
-                            </div>
-                            <span className="text-[10.5px] text-[#8A93A0]">{t.cl_xong}/{t.cl_tong}</span>
+                        <div className="flex items-center gap-1.5 mt-1.5">
+                          <div className="h-1.5 w-28 rounded-full bg-[#EEF1F4] overflow-hidden">
+                            <div className={`h-full ${pct === 100 ? "bg-[#0E7A4A]" : "bg-[#1f6feb]"}`} style={{ width: pct + "%" }} />
                           </div>
-                        )}
+                          <span className="text-[10.5px] text-[#8A93A0]">{pct}%</span>
+                          {t.cl_tong > 0 && <span className="text-[10.5px] text-[#8A93A0]">· {t.cl_xong}/{t.cl_tong} mục</span>}
+                        </div>
                       </div>
                       <div className="flex flex-col items-end gap-1 shrink-0">
+                        <div className="w-8 h-8 rounded-full bg-brand text-white flex items-center justify-center text-[12px] font-bold">
+                          {(t.assignee_name || "?").charAt(0).toUpperCase()}
+                        </div>
                         <Badge tone={st.tone}>{st.short}</Badge>
-                        {t.priority === "Khẩn cấp" && <Badge tone="red">Khẩn</Badge>}
                         {h && <span className={`text-[10.5px] font-bold ${h.tone === "red" ? "text-danger" : h.tone === "amber" ? "text-[#A25F00]" : "text-[#8A93A0]"}`}>{h.text}</span>}
                       </div>
                     </div>
                   </button>
                 );
               })}
-              {filtered.length === 0 && <div className="text-sm text-[#8A93A0]">Không có việc nào. 🎉</div>}
+              {filtered.length === 0 && <div className="text-sm text-[#8A93A0] text-center py-8">Không có việc nào. 🎉</div>}
             </div>
             <Pager total={filtered.length} page={page} setPage={setPage} pageSize={15} setPageSize={() => {}} />
           </>
         )}
+        </div>
       </div>
     </div>
   );

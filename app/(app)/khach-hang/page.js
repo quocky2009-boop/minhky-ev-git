@@ -13,6 +13,10 @@ const CHANNELS = ["Gọi điện", "Zalo", "Facebook", "Nhắn tin", "Gặp tr�
 const TIMELINES = ["Trong tuần này", "Trong tháng này", "1-3 tháng tới", "Trên 3 tháng", "Chưa rõ"];
 const POTENTIALS = ["Cao", "Trung bình", "Thấp"];
 const STATUSES = ["Lead mới", "Đang tư vấn", "Hẹn xem xe", "Đã mua", "Không mua", "Chăm sóc lại"];
+const PIPELINE_STAGES = ["Mới tiếp nhận","Đã liên hệ","Có nhu cầu","Hẹn tới cửa hàng","Đã lái thử","Đang báo giá","Đã cọc","Đã bán","Mất khách"];
+const STAGE_TONE = { "Mới tiếp nhận":"dark","Đã liên hệ":"blue","Có nhu cầu":"blue","Hẹn tới cửa hàng":"amber","Đã lái thử":"amber","Đang báo giá":"amber","Đã cọc":"green","Đã bán":"green","Mất khách":"red" };
+const HEAT_TONE = { "Nóng":"red","Trung bình":"amber","Lạnh":"dark" };
+const LOST_REASONS = ["Giá cao","Chưa đủ tiền","Chưa được gia đình đồng ý","Chọn thương hiệu khác","Không có màu","Không có xe sẵn","Không vay được trả góp","Không liên lạc được","Chưa có nhu cầu ngay","Khác"];
 const emptyForm = {
   id: null, name: "", phone: "", phone2: "", email: "", cccd: "", birthday: "", gender: "",
   address: "", customer_type: "Khách lẻ", note: "",
@@ -32,6 +36,9 @@ function KhachHangInner() {
   const [q, setQ] = useState("");
   const [fType, setFType] = useState("");
   const [fStatus, setFStatus] = useState("");
+  const [fStage, setFStage] = useState("");
+  const [viewMode, setViewMode] = useState("list"); // list | kanban
+  const [stageEdit, setStageEdit] = useState(null); // {id, pipeline_stage, heat, next_call_date, lost_reason, note}
   const [fPotential, setFPotential] = useState("");
   const [page, setPage] = useState(1);
   const sort = useSortable();
@@ -44,6 +51,7 @@ function KhachHangInner() {
   const [phieuDV, setPhieuDV] = useState([]);
   const [careLogs, setCareLogs] = useState([]);
   const [careF, setCareF] = useState(null);
+  const [dupWarn, setDupWarn] = useState([]); // KH trùng SĐT khi tạo mới
 
   const load = async () => {
     setBusy(true);
@@ -64,7 +72,21 @@ function KhachHangInner() {
   const locName = (c) => locations.find((l) => l.code === c)?.name || c;
   const vName = (id) => { const v = vehicles.find((x) => x.id === id); return v ? `${v.name} ${v.color}` : id; };
 
-  const openNew = () => { setF({ ...emptyForm, location_code: profile.store_code || "" }); setTab("chung"); setDonHang([]); setPhieuDV([]); setCareLogs([]); setShow(true); };
+  const openNew = () => { setF({ ...emptyForm, location_code: profile.store_code || "" }); setTab("chung"); setDonHang([]); setPhieuDV([]); setCareLogs([]); setDupWarn([]); setShow(true); };
+
+  const luuStage = async () => {
+    if (!stageEdit.pipeline_stage) return notify("Chọn giai đoạn.", "err");
+    if (stageEdit.pipeline_stage === "Mất khách" && !stageEdit.lost_reason) return notify("Bắt buộc chọn lý do mất khách.", "err");
+    setBusy(true);
+    const { error } = await supabase.rpc("fn_doi_pipeline_khach", { p: {
+      id: stageEdit.id, pipeline_stage: stageEdit.pipeline_stage, heat: stageEdit.heat,
+      next_call_date: stageEdit.next_call_date || null, lost_reason: stageEdit.lost_reason || "",
+      note: stageEdit.note || "",
+    }});
+    setBusy(false);
+    if (error) return notify(errMsg(error), "err");
+    notify("Đã cập nhật giai đoạn."); setStageEdit(null); load();
+  };
 
   const openEdit = async (c) => {
     setF({
@@ -100,6 +122,13 @@ function KhachHangInner() {
     load();
   };
 
+  const checkDup = (phone) => {
+    const p = (phone || "").replace(/\s/g, "");
+    if (!p || p.length < 8 || f.id) { setDupWarn([]); return; }
+    const hits = rows.filter((c) => (c.phone === p || c.phone2 === p) && c.id !== f.id);
+    setDupWarn(hits);
+  };
+
   const luuCare = async () => {
     if (!careF.content?.trim()) return notify("Nhập nội dung trao đổi.", "err");
     setBusy(true);
@@ -120,6 +149,7 @@ function KhachHangInner() {
   const filtered = rows.filter((c) => {
     if (fType && c.customer_type !== fType) return false;
     if (fStatus && c.status !== fStatus) return false;
+    if (fStage && c.pipeline_stage !== fStage) return false;
     if (fPotential && c.potential !== fPotential) return false;
     if (!kw) return true;
     return `${c.code} ${c.name} ${c.phone} ${c.phone2} ${c.email} ${c.address}`.toLowerCase().includes(kw);
@@ -220,9 +250,26 @@ function KhachHangInner() {
             ))}
           </div>
           {tab === "chung" && (
+            <>
+            {dupWarn.length > 0 && (
+              <div className="mb-3 p-3 rounded-xl bg-[#FDEDED] border border-danger">
+                <div className="font-bold text-danger text-[13px] mb-1.5">⚠ Điện thoại đã tồn tại — vui lòng kiểm tra lại</div>
+                <div className="text-[12px] text-[#5A6572] mb-2">Trùng thông tin với {dupWarn.length} khách hàng sau:</div>
+                <div className="flex flex-col gap-1">
+                  {dupWarn.map((c) => (
+                    <div key={c.id} className="flex items-center gap-2 p-1.5 rounded-lg bg-white text-[12px]">
+                      <div className="flex-1"><b className="text-brand">{c.code}</b> · {c.name} · {c.phone}</div>
+                      <span className="text-[#8A93A0]">{c.assigned_name || "—"}</span>
+                      <button className="btn-ghost !px-2 !py-0.5 !text-xs" onClick={() => { setDupWarn([]); openEdit(c); }}>Mở KH này</button>
+                    </div>
+                  ))}
+                </div>
+                <button className="text-[11px] text-[#8A93A0] hover:underline mt-2" onClick={() => setDupWarn([])}>Bỏ qua, vẫn tạo mới</button>
+              </div>
+            )}
             <div className="grid gap-3 md:grid-cols-2">
               <Field label="Họ tên" required><input className="inp" value={f.name} onChange={(e) => setF((p) => ({ ...p, name: e.target.value }))} /></Field>
-              <Field label="Số điện thoại" required><input className="inp" value={f.phone} onChange={(e) => setF((p) => ({ ...p, phone: e.target.value }))} /></Field>
+              <Field label="Số điện thoại" required><input className="inp" value={f.phone} onChange={(e) => setF((p) => ({ ...p, phone: e.target.value }))} onBlur={(e) => checkDup(e.target.value)} /></Field>
               <Field label="Số điện thoại phụ"><input className="inp" value={f.phone2} onChange={(e) => setF((p) => ({ ...p, phone2: e.target.value }))} /></Field>
               <Field label="Email" required><input className="inp" value={f.email} onChange={(e) => setF((p) => ({ ...p, email: e.target.value }))} placeholder="ten@email.com" /></Field>
               <Field label="Số CCCD"><input className="inp" value={f.cccd} onChange={(e) => setF((p) => ({ ...p, cccd: e.target.value }))} /></Field>
@@ -240,6 +287,7 @@ function KhachHangInner() {
               <div className="md:col-span-2"><Field label="Địa chỉ VNeID"><input className="inp" value={f.address} onChange={(e) => setF((p) => ({ ...p, address: e.target.value }))} /></Field></div>
               <div className="md:col-span-2"><Field label="Ghi chú"><textarea className="inp !h-16" value={f.note} onChange={(e) => setF((p) => ({ ...p, note: e.target.value }))} /></Field></div>
             </div>
+            </>
           )}
           {tab === "phanloai" && (
             <div className="grid gap-3 md:grid-cols-2">
@@ -417,22 +465,34 @@ function KhachHangInner() {
                   </div>
                 )}
                 {careLogs.length === 0 ? <div className="text-sm text-[#8A93A0]">Chưa có lần chăm sóc nào.</div> : (
-                  <div className="flex flex-col gap-2">
-                    {careLogs.map((k) => {
+                  <div className="flex flex-col">
+                    {careLogs.map((k, idx) => {
                       const quaHan = k.next_care_date && new Date(k.next_care_date) <= new Date();
+                      const nguoi = k.created_by_name || k.by_name || "—";
+                      const chuCai = nguoi.charAt(0).toUpperCase();
+                      const isPipeline = k.channel === "Cập nhật pipeline";
                       return (
-                        <div key={k.id} className="p-2.5 rounded-xl border border-[#E3E8EF]">
-                          <div className="flex items-center gap-2 flex-wrap mb-1">
-                            <Badge tone="blue">{k.channel || "Liên hệ"}</Badge>
-                            <span className="text-[11px] text-[#8A93A0] mr-auto">
-                              {k.contact_at ? fmtTime(k.contact_at) : fmtDate(k.care_date)} · {k.created_by_name || k.by_name || "—"}
-                            </span>
-                            {k.next_care_date && (
-                              <Badge tone={quaHan ? "red" : "amber"}>Hẹn {fmtDate(k.next_care_date)}{quaHan ? " · quá hạn" : ""}</Badge>
-                            )}
+                        <div key={k.id} className="flex gap-3 relative">
+                          {/* Đường timeline dọc */}
+                          <div className="flex flex-col items-center">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-[13px] font-bold shrink-0 ${isPipeline ? "bg-purple-500" : "bg-brand"}`}>{chuCai}</div>
+                            {idx < careLogs.length - 1 && <div className="w-0.5 flex-1 bg-[#E3E8EF] my-1" />}
                           </div>
-                          <div className="text-[13px] whitespace-pre-wrap">{k.content}</div>
-                          {k.result && <div className="text-[12px] text-[#0E7A4A] mt-1">→ {k.result}</div>}
+                          {/* Nội dung */}
+                          <div className="flex-1 pb-4">
+                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                              <span className="font-bold text-[13px] text-[#1E2B3C]">{nguoi}</span>
+                              <span className="text-[11px] text-[#8A93A0]">{k.contact_at ? fmtTime(k.contact_at) : fmtDate(k.care_date)}</span>
+                              <Badge tone={isPipeline ? "dark" : "blue"}>{k.channel || "Liên hệ"}</Badge>
+                              {k.next_care_date && (
+                                <Badge tone={quaHan ? "red" : "amber"}>📅 Hẹn {fmtDate(k.next_care_date)}{quaHan ? " · quá hạn" : ""}</Badge>
+                              )}
+                            </div>
+                            <div className={`p-2.5 rounded-xl text-[13px] whitespace-pre-wrap ${isPipeline ? "bg-[#F5F0FF]" : "bg-[#F8FAFC]"}`}>
+                              {k.content}
+                              {k.result && <div className="text-[12px] text-[#0E7A4A] mt-1.5 pt-1.5 border-t border-[#E3E8EF]">→ {k.result}</div>}
+                            </div>
+                          </div>
                         </div>
                       );
                     })}
@@ -478,6 +538,24 @@ function KhachHangInner() {
       )}
 
       <div className="card">
+        {/* PIPELINE FILTER TABS như Getfly */}
+        <div className="flex gap-1.5 flex-wrap mb-3 pb-3 border-b border-[#EEF1F4]">
+          <button onClick={() => { setFStage(""); setPage(1); }}
+            className={`btn !px-3 !py-1.5 !text-xs ${fStage === "" ? "bg-brand text-white" : "bg-[#EEF1F4]"}`}>
+            Tất cả <span className="font-bold ml-1">{rows.length}</span>
+          </button>
+          {PIPELINE_STAGES.map((s) => {
+            const cnt = rows.filter((c) => c.pipeline_stage === s).length;
+            if (cnt === 0 && fStage !== s) return null;
+            return (
+              <button key={s} onClick={() => { setFStage(s); setPage(1); }}
+                className={`btn !px-3 !py-1.5 !text-xs ${fStage === s ? "bg-brand text-white" : "bg-[#EEF1F4]"}`}>
+                {s} <span className="font-bold ml-1">{cnt}</span>
+              </button>
+            );
+          })}
+        </div>
+
         <div className="flex gap-2 flex-wrap items-center mb-3">
           <input className="inp !w-64" placeholder="Tìm tên, SĐT, email, mã KH…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
           <select className="inp !w-auto" value={fType} onChange={(e) => { setFType(e.target.value); setPage(1); }}>
@@ -499,6 +577,7 @@ function KhachHangInner() {
             <th className="th w-8">#</th>
             <Th label="Khách hàng" k="ten" sort={sort} /><Th label="Liên hệ" k="sdt" sort={sort} />
             <Th label="Loại" k="loai" sort={sort} /><Th label="Trạng thái" k="tt" sort={sort} />
+            <Th label="Giai đoạn" k="stage" sort={sort} />
             <Th label="Đã mua" k="mua" sort={sort} /><Th label="Còn nợ" k="no" sort={sort} />
             <Th label="Chăm sóc" k="cs" sort={sort} /><th className="th"></th>
           </tr></thead>
@@ -520,6 +599,15 @@ function KhachHangInner() {
                   {c.potential && <div><Badge tone={c.potential === "Cao" ? "red" : c.potential === "Trung bình" ? "amber" : "dark"}>{c.potential}</Badge></div>}
                 </td>
                 <td data-label="Trạng thái" className="td"><Badge tone={c.status === "Đã mua" ? "green" : c.status === "Không mua" ? "red" : "amber"}>{c.status}</Badge></td>
+                <td data-label="Giai đoạn" className="td">
+                  {c.pipeline_stage ? (
+                    <div className="flex flex-col gap-0.5 items-start">
+                      <Badge tone={STAGE_TONE[c.pipeline_stage] || "dark"}>{c.pipeline_stage}</Badge>
+                      {c.heat && <span className="text-[9.5px]">{c.heat === "Nóng" ? "🔥 Nóng" : c.heat === "Lạnh" ? "❄ Lạnh" : "~ TB"}</span>}
+                    </div>
+                  ) : <span className="text-[#C6CDD6] text-xs">—</span>}
+                  <button className="text-brand text-[10px] hover:underline mt-0.5" onClick={() => setStageEdit({ id: c.id, pipeline_stage: c.pipeline_stage || "Mới tiếp nhận", heat: c.heat || "Trung bình", next_call_date: c.next_call_date || "", lost_reason: "", note: "" })}>→ đổi</button>
+                </td>
                 <td data-label="Đã mua" className="td">{t.so_don ? <><b>{fmtVND(t.tong_mua)}</b><div className="text-[10.5px] text-[#8A93A0]">{t.so_don} đơn</div></> : <span className="text-[#C6CDD6]">—</span>}</td>
                 <td data-label="Còn nợ" className="td">{Number(t.con_no) > 0 ? <b className="text-danger">{fmtVND(t.con_no)}</b> : <span className="text-[#C6CDD6]">—</span>}</td>
                 <td data-label="Chăm sóc" className="td text-[11px]">
@@ -535,6 +623,41 @@ function KhachHangInner() {
         </table></div>
         <Pager total={sorted.length} page={page} setPage={setPage} pageSize={20} setPageSize={() => {}} />
       </div>
+
+      {/* MODAL ĐỔI PIPELINE STAGE */}
+      {stageEdit && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-3" onClick={() => setStageEdit(null)}>
+          <div className="bg-white rounded-2xl w-[460px] max-w-full p-4" onClick={(e) => e.stopPropagation()}>
+            <div className="font-extrabold text-base mb-3">Chuyển giai đoạn khách hàng</div>
+            <div className="flex flex-col gap-3">
+              <Field label="Giai đoạn *">
+                <select className="inp" value={stageEdit.pipeline_stage} onChange={(e) => setStageEdit((p) => ({ ...p, pipeline_stage: e.target.value }))}>
+                  {PIPELINE_STAGES.map((s) => <option key={s}>{s}</option>)}
+                </select>
+              </Field>
+              <Field label="Mức độ quan tâm">
+                <div className="flex gap-1.5">{["Nóng", "Trung bình", "Lạnh"].map((h) => (
+                  <button key={h} className={`btn !px-3 !py-2 !text-xs ${stageEdit.heat === h ? "bg-brand text-white" : "bg-[#EEF1F4]"}`} onClick={() => setStageEdit((p) => ({ ...p, heat: h }))}>{h}</button>
+                ))}</div>
+              </Field>
+              <Field label="Ngày gọi lại"><input type="date" className="inp" value={stageEdit.next_call_date} onChange={(e) => setStageEdit((p) => ({ ...p, next_call_date: e.target.value }))} /></Field>
+              {stageEdit.pipeline_stage === "Mất khách" && (
+                <Field label="Lý do mất khách *">
+                  <select className="inp" value={stageEdit.lost_reason} onChange={(e) => setStageEdit((p) => ({ ...p, lost_reason: e.target.value }))}>
+                    <option value="">— Bắt buộc chọn —</option>
+                    {LOST_REASONS.map((l) => <option key={l}>{l}</option>)}
+                  </select>
+                </Field>
+              )}
+              <Field label="Ghi chú"><input className="inp" value={stageEdit.note} onChange={(e) => setStageEdit((p) => ({ ...p, note: e.target.value }))} /></Field>
+            </div>
+            <div className="flex gap-2 mt-4">
+              <button className="btn-ok flex-1" disabled={busy} onClick={luuStage}>{busy ? "Đang lưu…" : "Cập nhật"}</button>
+              <button className="btn-ghost" onClick={() => setStageEdit(null)}>Hủy</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
