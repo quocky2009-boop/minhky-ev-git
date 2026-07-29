@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Badge, Toast, Field, KPI, CustomerSearch, LocSearch, Pager, pageSlice, MoneyInput, FrameSearch } from "@/components/ui";
+import { Badge, Toast, Field, KPI, CustomerSearch, LocSearch, Pager, pageSlice, MoneyInput, FrameSearch, ComboFree } from "@/components/ui";
 import { fmtVND, fmtDate, fmtTime, errMsg } from "@/lib/format";
 import { uploadAnhDon } from "@/lib/img";
 
@@ -22,7 +22,7 @@ const LOG_LABEL = {
   thu_tien: "Thu tiền", duyet_cong_no: "Duyệt công nợ", giao_xe: "Giao xe",
   hoan_tat: "Nghiệm thu & giao xe", huy_phieu: "Hủy phiếu",
 };
-const LINE_TYPES = { CONG: "Tiền công", PHU_TUNG: "Phụ tùng", THUE_NGOAI: "Thuê ngoài", HANG_KHACH: "Hàng khách mang" };
+const LINE_TYPES = { CONG: "Tiền công", PHU_TUNG: "Phụ tùng", HANG_HOA: "Hàng hóa/Phụ kiện", THUE_NGOAI: "Thuê ngoài", HANG_KHACH: "Hàng khách mang" };
 const iso = (d) => d.toLocaleDateString("sv-SE");
 
 function PhotoPick({ fotos, setFotos, label }) {
@@ -54,6 +54,8 @@ export default function DichVu() {
   const [rows, setRows] = useState([]);
   const [custs, setCusts] = useState([]);
   const [services, setServices] = useState([]);
+  const [parts, setParts] = useState([]);
+  const [products, setProducts] = useState([]);
   const [fSt, setFSt] = useState("");
   const [q, setQ] = useState("");
   const _params = useSearchParams();
@@ -74,6 +76,7 @@ export default function DichVu() {
   const [newC, setNewC] = useState(null);
   // chi tiet
   const [detail, setDetail] = useState(null);
+  const [lichSuXe, setLichSuXe] = useState(null);
   const [lines, setLines] = useState([]);
   const [pays, setPays] = useState([]);
   const [tong, setTong] = useState(null);
@@ -90,19 +93,21 @@ export default function DichVu() {
 
   const load = async () => {
     if (!profile) return;
-    const [{ data: t }, { data: pm }, { data: c }, { data: sv }] = await Promise.all([
+    const [{ data: t }, { data: pm }, { data: c }, { data: sv }, { data: pt }, { data: pr }] = await Promise.all([
       supabase.from("dv_tickets").select("*").order("created_at", { ascending: false }).limit(1000),
       supabase.from("role_perms").select("perm,allowed").eq("role", profile.role),
       supabase.from("customers").select("id,code,name,phone,status").order("created_at", { ascending: false }).limit(2000),
       supabase.from("dv_services").select("*").eq("status", "Hoạt động").order("group_name"),
+      supabase.from("parts").select("*").eq("status", "Hoạt động").order("name"),
+      supabase.from("products").select("*").eq("status", "Hoạt động").order("name"),
     ]);
-    setRows(t || []); setCusts(c || []); setServices(sv || []);
+    setRows(t || []); setCusts(c || []); setServices(sv || []); setParts(pt || []); setProducts(pr || []);
     const m = {}; (pm || []).forEach((x) => { m[x.perm] = x.allowed; }); setPerms(m);
   };
   useEffect(() => { if (!loading) load(); }, [loading, profile]);
 
   const openDetail = async (t) => {
-    setDetail(t); setDiscount(t.discount || 0); setPayF({ method: "Chuyển khoản", amount: "" }); setPayFotos([]); setSerialPick({});
+    setDetail(t); setDiscount(t.discount || 0); setPayF({ method: "Chuyển khoản", amount: "" }); setPayFotos([]); setSerialPick({}); setLichSuXe(null);
     const [{ data: l }, { data: p }, { data: v }, { data: lg }] = await Promise.all([
       supabase.from("dv_ticket_lines").select("*").eq("ticket_id", t.id).order("id"),
       supabase.from("dv_payments").select("*").eq("ticket_id", t.id).order("id"),
@@ -181,6 +186,35 @@ export default function DichVu() {
     reloadDetail();
   };
 
+  const xemLichSuXe = async (frame) => {
+    const { data } = await supabase.from("v_dv_lich_su_xe").select("*").eq("frame_number", frame).order("ngay_tiep_nhan", { ascending: false });
+    setLichSuXe({ frame, list: data || [] });
+  };
+
+  const xuatKho = async (l) => {
+    if (l.line_type === "HANG_HOA") {
+      if (!confirm(`Xuất ${l.qty} ${l.name} khỏi kho hàng hóa?`)) return;
+      await rpc("fn_dv_xuat_hang_hoa", { p_line_id: l.id }, "Đã xuất hàng hóa — tồn kho đã cập nhật.");
+      return;
+    }
+    // PHU_TUNG
+    const pp = parts.find((x) => x.id === l.part_id);
+    if (pp?.track_serial) {
+      const { data: units } = await supabase.from("part_units").select("serial")
+        .eq("part_id", l.part_id).eq("location_code", detail.location_code).eq("status", "TON_KHO").limit(l.qty + 5);
+      const available = (units || []).map((u) => u.serial);
+      if (available.length < l.qty) return notify(`Không đủ serial tồn kho (còn ${available.length}, cần ${l.qty}).`, "err");
+      const picked = prompt(`Nhập ${l.qty} serial cách nhau bằng dấu phẩy, chọn từ:\n${available.join(", ")}`, available.slice(0, l.qty).join(", "));
+      if (!picked) return;
+      const serials = picked.split(",").map((s) => s.trim()).filter(Boolean);
+      if (serials.length !== l.qty) return notify(`Cần đúng ${l.qty} serial.`, "err");
+      await rpc("fn_dv_xuat_vat_tu", { p_line_id: l.id, p_serials: serials }, "Đã xuất phụ tùng — tồn kho đã cập nhật.");
+    } else {
+      if (!confirm(`Xuất ${l.qty} ${l.name} khỏi kho phụ tùng?`)) return;
+      await rpc("fn_dv_xuat_vat_tu", { p_line_id: l.id, p_serials: [] }, "Đã xuất phụ tùng — tồn kho đã cập nhật.");
+    }
+  };
+
   const saveBaoGia = async (dtype, dval) => {
     await rpc("fn_dv_luu_bao_gia", { p: {
       id: detail.id, lines: lines.map((l) => ({ ...l })),
@@ -222,8 +256,35 @@ export default function DichVu() {
           <button className="btn-ghost !text-xs" onClick={() => { setDetail(null); load(); }}>← Danh sách</button>
           <div className="font-extrabold text-lg mr-auto">{detail.code}</div>
           <Badge tone={st.tone}>{st.label}</Badge>
+          {detail.frame_number && <button className="btn-ghost !text-xs" onClick={() => xemLichSuXe(detail.frame_number)}>🕓 Lịch sử xe này</button>}
           {editable && can("dv_huy_phieu") && <button className="btn-ghost !px-2.5 !py-1 !text-xs !text-danger" onClick={huyPhieu}>Hủy phiếu</button>}
         </div>
+
+        {lichSuXe && (
+          <div className="card border-l-4 border-l-blue-400">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="font-extrabold">🕓 Lịch sử sửa chữa — SK {lichSuXe.frame}</div>
+              <button className="btn-ghost !text-xs ml-auto" onClick={() => setLichSuXe(null)}>✕ Đóng</button>
+            </div>
+            {lichSuXe.list.length === 0 ? <div className="text-sm text-[#8A93A0]">Chưa có lịch sử nào khác.</div> : (
+              <div className="flex flex-col gap-2">
+                {lichSuXe.list.map((h) => (
+                  <div key={h.id} className={`p-2.5 rounded-xl border text-[13px] ${h.code === detail.code ? "border-brand bg-[#EAF2FF]" : "border-[#E3E8EF]"}`}>
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <b className="text-brand">{h.code}</b>
+                      <span className="text-[11px] text-[#8A93A0]">{fmtDate(h.ngay_tiep_nhan)}</span>
+                      <Badge tone="dark">{h.status}</Badge>
+                      {h.tong_tien > 0 && <b className="ml-auto">{fmtVND(h.tong_tien)}</b>}
+                    </div>
+                    {h.request_note && <div className="text-[#5A6572]">Yêu cầu: {h.request_note}</div>}
+                    {h.cac_hang_muc_cong && <div className="text-[11px] text-[#8A93A0]">Công: {h.cac_hang_muc_cong}</div>}
+                    {h.cac_phu_tung_thay && <div className="text-[11px] text-[#8A93A0]">Phụ tùng: {h.cac_phu_tung_thay}</div>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="card !p-0 overflow-hidden">
           {[
@@ -271,6 +332,9 @@ export default function DichVu() {
                         {l.is_phat_sinh && <Badge tone="amber">Phát sinh</Badge>}
                         {l.approved ? <Badge tone="green">Khách duyệt ✓</Badge> : <Badge tone="amber">Chưa duyệt</Badge>}
                         {l.exported && <Badge tone="green">Đã xuất kho</Badge>}
+                        {!l.exported && l.approved && (l.line_type === "PHU_TUNG" || l.line_type === "HANG_HOA") && can("pt_xuat") && (
+                          <button className="btn-ok !px-2 !py-1 !text-xs" onClick={() => xuatKho(l)}>📦 Xuất kho</button>
+                        )}
                         <b>{fmtVND(l.amount)}</b>
                       </>
                     ) : (
@@ -288,13 +352,26 @@ export default function DichVu() {
                           </select>
                         )}
                         {l.line_type === "PHU_TUNG" && (
-                          <select className="inp !w-auto !py-1.5 !text-xs" value={l.part_id || ""} onChange={(e) => {
-                            const pp = parts.find((x) => x.id == e.target.value);
-                            setLines((p) => p.map((x, j) => j === i ? { ...x, part_id: pp?.id || null, name: pp?.name || x.name, unit_price: pp?.sell_price ?? x.unit_price } : x));
-                          }}>
-                            <option value="">— Chọn phụ tùng kho —</option>
-                            {parts.map((pp) => <option key={pp.id} value={pp.id}>{pp.name}{pp.track_serial ? " (serial)" : ""}</option>)}
-                          </select>
+                          <div className="!w-52">
+                            <ComboFree value={l.name} placeholder="Gõ tìm phụ tùng…"
+                              options={parts.map((pp) => pp.name + (pp.track_serial ? " (serial)" : ""))}
+                              onChange={(v) => {
+                                const cleanName = v.replace(/ \(serial\)$/, "");
+                                const pp = parts.find((x) => x.name === cleanName);
+                                setLines((p) => p.map((x, j) => j === i ? { ...x, part_id: pp?.id || null, name: pp?.name || v, unit_price: pp?.sell_price ?? x.unit_price } : x));
+                              }} />
+                          </div>
+                        )}
+                        {l.line_type === "HANG_HOA" && (
+                          <div className="!w-52">
+                            <ComboFree value={l.name} placeholder="Gõ tìm hàng hóa/phụ kiện…"
+                              options={products.map((pr) => `${pr.name} (còn ${pr.stock_qty} ${pr.unit})`)}
+                              onChange={(v) => {
+                                const cleanName = v.replace(/ \(còn.*\)$/, "");
+                                const pr = products.find((x) => x.name === cleanName);
+                                setLines((p) => p.map((x, j) => j === i ? { ...x, product_id: pr?.id || null, name: pr?.name || v, unit_price: pr?.sale_price ?? x.unit_price } : x));
+                              }} />
+                          </div>
                         )}
                         <input className="inp !py-1.5 !text-xs flex-1 min-w-[120px]" placeholder="Tên hạng mục" value={l.name} onChange={(e) => setLines((p) => p.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} />
                         <input type="number" className="inp !py-1.5 !text-xs !w-16" title="SL" value={l.qty} onChange={(e) => setLines((p) => p.map((x, j) => j === i ? { ...x, qty: +e.target.value || 1 } : x))} />
@@ -478,6 +555,28 @@ export default function DichVu() {
                       <option value="">— Bảng giá —</option>
                       {services.map((sv) => <option key={sv.id} value={sv.id}>{sv.name}</option>)}
                     </select>
+                  )}
+                  {l.line_type === "PHU_TUNG" && (
+                    <div className="!w-52">
+                      <ComboFree value={l.name} placeholder="Gõ tìm phụ tùng…"
+                        options={parts.map((pp) => pp.name + (pp.track_serial ? " (serial)" : ""))}
+                        onChange={(v) => {
+                          const cleanName = v.replace(/ \(serial\)$/, "");
+                          const pp = parts.find((x) => x.name === cleanName);
+                          setNLines((p) => p.map((x, j) => j === i ? { ...x, part_id: pp?.id || null, name: pp?.name || v, unit_price: pp?.sell_price ?? x.unit_price } : x));
+                        }} />
+                    </div>
+                  )}
+                  {l.line_type === "HANG_HOA" && (
+                    <div className="!w-52">
+                      <ComboFree value={l.name} placeholder="Gõ tìm hàng hóa/phụ kiện…"
+                        options={products.map((pr) => `${pr.name} (còn ${pr.stock_qty} ${pr.unit})`)}
+                        onChange={(v) => {
+                          const cleanName = v.replace(/ \(còn.*\)$/, "");
+                          const pr = products.find((x) => x.name === cleanName);
+                          setNLines((p) => p.map((x, j) => j === i ? { ...x, product_id: pr?.id || null, name: pr?.name || v, unit_price: pr?.sale_price ?? x.unit_price } : x));
+                        }} />
+                    </div>
                   )}
                   <input className="inp !py-1.5 !text-xs flex-1 min-w-[130px]" placeholder="Tên hạng mục / phụ tùng" value={l.name}
                     onChange={(e) => setNLines((p) => p.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} />

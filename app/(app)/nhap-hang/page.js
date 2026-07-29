@@ -14,6 +14,13 @@ const emptyLine = { vehicle_id: "", frames: [], cost_price: 0, note: "" };
 function NhapHangInner() {
   const { supabase, vehicles, locations, settings, profile, loading, refresh } = useCatalog();
   const { toast, notify } = useToast();
+  const [perms, setPerms] = useState({});
+  useEffect(() => {
+    if (!profile) return;
+    supabase.from("role_perms").select("perm,allowed").eq("role", profile.role).then(({ data }) => {
+      const m = {}; (data || []).forEach((x) => { m[x.perm] = x.allowed; }); setPerms(m);
+    });
+  }, [profile]);
 
   // ===== DANH SÁCH =====
   const [txns, setTxns] = useState([]);
@@ -50,7 +57,7 @@ function NhapHangInner() {
   useEffect(() => { if (!loading) load(); }, [loading, from, to]);
 
   if (loading || !profile) return <div className="card">Đang tải dữ liệu…</div>;
-  const canNhap = ["CEO", "ADMIN"].includes(profile.role);
+  const canNhap = profile.role === "CEO" || perms["nhap_hang"];
 
   const vName = (id) => { const v = vehicles.find((x) => x.id === id); return v ? `${v.brand} ${v.name} ${v.color}` : id; };
   const vShort = (id) => { const v = vehicles.find((x) => x.id === id); return v ? `${v.name} ${v.color}` : id; };
