@@ -89,16 +89,19 @@ export default function DonBan() {
   const isVF = (o) => (vOf(o.vehicle_id)?.brand || "").toUpperCase().includes("VINFAST");
   const confirmInv = async (o) => {
     if (!invF.no.trim()) return notify("Bắt buộc nhập số hóa đơn.", "err");
-    if (!invF.checklist?.da_thu_du_tien) return notify("Checklist: phải xác nhận đã thu đủ tiền.", "err");
-    if (!invF.checklist?.dung_so_khung) return notify("Checklist: phải xác nhận đúng số khung/số máy.", "err");
     if (!invF.checklist?.bao_hanh) return notify("Checklist: phải kích hoạt bảo hành.", "err");
     if (isVF(o) && !invF.checklist?.app_vf) return notify("Xe VinFast: phải kích hoạt app VF eScooter.", "err");
+    if (!invF.checklist?.coc_giao) return notify("Checklist: phải xác nhận đã bàn giao giấy COC.", "err");
+    if (!invF.checklist?.anh_khach) return notify("Checklist: phải xác nhận đã quay/chụp ảnh khách nhận xe.", "err");
+    if (!invF.checklist?.hoa_don_vat) return notify("Checklist: phải xác nhận đã bàn giao hóa đơn VAT.", "err");
     setBusy(true);
     const { error } = await supabase.rpc("fn_xac_nhan_hoa_don", { p: {
       id: o.id, invoice_no: invF.no, invoice_date: invF.date,
       warranty_activated: !!invF.checklist?.bao_hanh,
       app_activated: !!invF.checklist?.app_vf,
       coc_giao: !!invF.checklist?.coc_giao,
+      anh_khach: !!invF.checklist?.anh_khach,
+      hoa_don_vat: !!invF.checklist?.hoa_don_vat,
     }});
     if (!error) await supabase.from("sales_orders").update({ checklist_giao_xe: invF.checklist || {} }).eq("id", o.id);
     setBusy(false);
@@ -338,13 +341,12 @@ export default function DonBan() {
                           <div className="font-bold text-[13px] mb-2">✅ Checklist giao xe</div>
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5">
                             {[
-                              ["da_thu_du_tien","💰 Đã thu đủ tiền", true],
-                              ["dung_so_khung","🔢 Đúng số khung/số máy", true],
                               ["bao_hanh","🛡 Kích hoạt bảo hành", true],
                               ["app_vf", isVF(o) ? "📱 App VF eScooter" : null, isVF(o)],
-                              ["coc_giao","📄 Giao giấy COC", false],
-                              ["phu_kien","🎁 Bàn giao phụ kiện/sạc/chìa", false],
-                              ["anh_khach","📸 Chụp ảnh khách nhận xe", false],
+                              ["coc_giao","📄 Bàn giao giấy COC", true],
+                              ["anh_khach","📸 Quay/chụp khách nhận xe", true],
+                              ["hoa_don_vat","🧾 Bàn giao hóa đơn VAT", true],
+                              ["khoe_fb","📲 Khách khoe ảnh lên FB/Zalo", false],
                             ].filter(([,label]) => label).map(([key, label, required]) => (
                               <label key={key} className={`flex items-center gap-1.5 text-xs font-medium cursor-pointer rounded-lg px-2 py-1.5 border ${invF.checklist?.[key] ? "bg-[#E5F6EE] border-[#0E7A4A]" : required ? "border-danger bg-[#FFF6F6]" : "border-[#E3E8EF]"}`}>
                                 <input type="checkbox" className="w-3.5 h-3.5 shrink-0"
@@ -355,14 +357,14 @@ export default function DonBan() {
                             ))}
                           </div>
                           {(() => {
-                            const required = ["da_thu_du_tien","dung_so_khung","bao_hanh"];
+                            const required = ["bao_hanh","coc_giao","anh_khach","hoa_don_vat", ...(isVF(o) ? ["app_vf"] : [])];
                             const done = required.filter(k => invF.checklist?.[k]).length;
                             return <div className="text-[10.5px] text-[#8A93A0] mt-2">{done}/{required.length} mục bắt buộc · Còn lại là khuyến nghị</div>;
                           })()}
                         </div>
                         <div className="flex gap-2 items-center flex-wrap">
                           <button className="btn-ok !py-2 !text-xs" disabled={busy} onClick={() => confirmInv(o)}>Xác nhận hoàn thành đơn</button>
-                          <span className="text-[10.5px] text-[#8A93A0]">Bắt buộc: Số HĐ + Thu đủ tiền + Đúng số khung + Bảo hành.</span>
+                          <span className="text-[10.5px] text-[#8A93A0]">Bắt buộc: Số HĐ + Bảo hành + Giấy COC + Ảnh khách nhận xe + Hóa đơn VAT{isVF(o) ? " + App VF eScooter" : ""}.</span>
                         </div>
                       </div>
                     </td></tr>
