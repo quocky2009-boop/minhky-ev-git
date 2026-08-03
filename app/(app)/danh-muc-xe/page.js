@@ -294,7 +294,17 @@ export default function DMXe() {
               </select>
             </Field>
             <Field label="Tên xe (Model)" required>
-              <select className="inp" value={bulkSpecs.name} onChange={(e) => setBulkSpecs((p) => ({ ...p, name: e.target.value }))}>
+              <select className="inp" value={bulkSpecs.name} onChange={(e) => {
+                const ten = e.target.value;
+                const mau = vehicles.find((v) => v.brand === bulkSpecs.brand && v.name === ten);
+                setBulkSpecs((p) => ({ ...p, name: ten,
+                  cong_suat_dong_co_w: mau?.cong_suat_dong_co_w ?? "",
+                  dung_luong_pin: mau?.dung_luong_pin || "",
+                  tam_hoat_dong_km: mau?.tam_hoat_dong_km ?? "",
+                  toc_do_toi_da_kmh: mau?.toc_do_toi_da_kmh ?? "",
+                  so_luong_pin_ac_quy: mau?.so_luong_pin_ac_quy ?? "",
+                  model_pin: mau?.model_pin || "" }));
+              }}>
                 <option value="">— Chọn model —</option>
                 {Array.from(new Set(vehicles.filter((v) => !bulkSpecs.brand || v.brand === bulkSpecs.brand).map((v) => v.name))).sort().map((n) => <option key={n}>{n}</option>)}
               </select>

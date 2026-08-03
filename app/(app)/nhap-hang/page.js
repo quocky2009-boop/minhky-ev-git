@@ -24,6 +24,7 @@ function NhapHangInner() {
 
   // ===== DANH SÁCH =====
   const [txns, setTxns] = useState([]);
+  const [trangThaiMap, setTrangThaiMap] = useState({});
   const [busy, setBusy] = useState(false);
   const [from, setFrom] = useState(firstOfMonth());
   const [to, setTo] = useState(iso(new Date()));
@@ -81,6 +82,14 @@ function NhapHangInner() {
     setBusy(false);
   };
   useEffect(() => { if (!loading) load(); }, [loading, from, to]);
+  useEffect(() => {
+    const docs = [...new Set(txns.map((t) => t.doc_code).filter(Boolean))];
+    if (docs.length === 0) { setTrangThaiMap({}); return; }
+    supabase.rpc("fn_trang_thai_don_nhap", { p_docs: docs }).then(({ data }) => {
+      const m = {}; (data || []).forEach((r) => { m[r.doc] = r.trang_thai; });
+      setTrangThaiMap(m);
+    });
+  }, [txns]);
 
   if (loading || !profile) return <div className="card">Đang tải dữ liệu…</div>;
   const canNhap = profile.role === "CEO" || perms["nhap_hang"];
@@ -431,6 +440,7 @@ function NhapHangInner() {
               <thead><tr>
                 <ThCheck sel={sel} rows={pageSlice(sorted, page, pageSize)} idOf={(d) => d.doc} />
                 <Th label="Mã phiếu" k="doc" sort={sort} />
+                <th className="th">Trạng thái</th>
                 <Th label="Ngày nhập" k="date" sort={sort} />
                 <Th label="Kho" k="kho" sort={sort} />
                 <Th label="Nhà cung cấp" k="ncc" sort={sort} />
@@ -439,9 +449,10 @@ function NhapHangInner() {
                 <th className="th"></th>
               </tr></thead>
               <tbody>{pageSlice(sorted, page, pageSize).map((d) => (
-                <tr key={d.doc} className={`hover:bg-[#F8FAFC] ${sel.has(d.doc) ? "bg-[#EAF2FF]" : ""}`}>
+                <tr key={d.doc} className={`hover:bg-[#F8FAFC] ${trangThaiMap[d.doc] === "Đơn hủy" ? "bg-[#F3F4F6] text-[#8A93A0]" : sel.has(d.doc) ? "bg-[#EAF2FF]" : ""}`}>
                   <TdCheck sel={sel} id={d.doc} />
                   <td data-label="Mã phiếu" className="td font-bold"><Link href={`/nhap-hang/${encodeURIComponent(d.doc)}`} className="text-brand hover:underline">{d.doc}</Link></td>
+                  <td data-label="Trạng thái" className="td">{trangThaiMap[d.doc] === "Đơn hủy" ? <Badge tone="red">Đơn hủy</Badge> : <Badge tone="green">Đã nhập</Badge>}</td>
                   <td data-label="Ngày nhập" className="td text-xs whitespace-nowrap">{fmtTime(d.created_at)}</td>
                   <td data-label="Kho" className="td text-[13px]">{locName(d.location_code)}</td>
                   <td data-label="NCC" className="td text-[13px]">{d.supplier || <span className="text-[#8A93A0]">—</span>}</td>

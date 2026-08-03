@@ -14,6 +14,9 @@ export default function NhapChiTiet() {
   const [txns, setTxns] = useState([]);
   const [units, setUnits] = useState([]);
   const [busy, setBusy] = useState(true);
+  const [suaMode, setSuaMode] = useState(false);
+  const [suaLines, setSuaLines] = useState([]);
+  const [huyBusy, setHuyBusy] = useState(false);
 
   const load = async () => {
     setBusy(true);
@@ -25,6 +28,33 @@ export default function NhapChiTiet() {
     setBusy(false);
   };
   useEffect(() => { if (!loading) load(); }, [loading, docCode]);
+
+  const canSuaHuy = units.every((u) => u.status === "TON_KHO");
+
+  const moSua = () => {
+    const byVehicle = {};
+    units.forEach((u) => { byVehicle[u.vehicle_id] = u.cost_price || 0; });
+    setSuaLines(Object.entries(byVehicle).map(([vehicle_id, cost_price]) => ({ vehicle_id, cost_price })));
+    setSuaMode(true);
+  };
+
+  const luuSua = async () => {
+    const { error } = await supabase.rpc("fn_sua_don_nhap", { p: {
+      doc: docCode, lines: suaLines.map((l) => ({ vehicle_id: l.vehicle_id, cost_price: Number(l.cost_price) || 0 })),
+    } });
+    if (error) return notify(errMsg(error), "err");
+    notify("Đã cập nhật đơn nhập."); setSuaMode(false); load();
+  };
+
+  const huyDon = async () => {
+    if (!confirm(`Hủy đơn nhập ${docCode}? Toàn bộ số khung của đơn sẽ bị xóa khỏi tồn kho. Không thể hoàn tác.`)) return;
+    setHuyBusy(true);
+    const { error } = await supabase.rpc("fn_huy_don_nhap", { p_doc: docCode });
+    setHuyBusy(false);
+    if (error) return notify(errMsg(error), "err");
+    notify("Đã hủy đơn nhập.");
+    router.push("/nhap-hang");
+  };
 
   if (loading || busy) return <div className="card">Đang tải đơn nhập…</div>;
   if (txns.length === 0) return (
@@ -52,11 +82,23 @@ export default function NhapChiTiet() {
       {/* HEADER */}
       <div className="flex items-center gap-2 flex-wrap">
         <button className="btn-ghost !text-xs" onClick={() => router.back()}>← Quay lại danh sách đơn nhập</button>
+        <div className="ml-auto flex gap-2">
+          {canSuaHuy ? (
+            <>
+              <button className="btn-ghost !text-xs !text-danger" disabled={huyBusy} onClick={huyDon}>{huyBusy ? "Đang hủy…" : "Hủy đơn nhập"}</button>
+              <button className="btn-ghost !text-xs" onClick={moSua}>✎ Sửa đơn nhập</button>
+            </>
+          ) : (
+            <span className="text-[11px] text-[#8A93A0]">{units.every((u) => u.status === "DA_XOA") ? "Đơn đã hủy" : "Xe trong đơn đã bán/chuyển"} — không thể sửa/hủy</span>
+          )}
+        </div>
       </div>
 
       <div className="flex items-center gap-3 flex-wrap">
         <span className="text-xl font-extrabold">{docCode}</span>
-        <Badge tone="green">Đã nhập kho</Badge>
+        <Badge tone={units.length > 0 && units.every((u) => u.status === "DA_XOA") ? "red" : "green"}>
+          {units.length > 0 && units.every((u) => u.status === "DA_XOA") ? "Đơn hủy" : "Đã nhập kho"}
+        </Badge>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
@@ -143,6 +185,29 @@ export default function NhapChiTiet() {
           )}
         </div>
       </div>
+
+      {/* MODAL SỬA ĐƠN NHẬP (chỉ đổi giá vốn từng dòng) */}
+      {suaMode && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-3" onClick={() => setSuaMode(false)}>
+          <div className="bg-white rounded-2xl w-[460px] max-w-full p-4" onClick={(e) => e.stopPropagation()}>
+            <div className="font-extrabold mb-3">Sửa đơn nhập {docCode}</div>
+            <div className="text-[12px] text-[#8A93A0] mb-3">Chỉ chỉnh được giá vốn từng mã xe (không đổi kho/NCC/số khung).</div>
+            <div className="flex flex-col gap-2 max-h-[50vh] overflow-y-auto">
+              {suaLines.map((l, i) => (
+                <div key={l.vehicle_id} className="flex items-center gap-2">
+                  <span className="flex-1 text-[13px]">{vName(l.vehicle_id)}</span>
+                  <input type="number" className="inp !w-36" value={l.cost_price}
+                    onChange={(e) => setSuaLines((p) => p.map((x, j) => j === i ? { ...x, cost_price: e.target.value } : x))} />
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2 mt-3">
+              <button className="btn-ghost !text-xs flex-1" onClick={() => setSuaMode(false)}>Hủy</button>
+              <button className="btn-primary !text-xs flex-1" onClick={luuSua}>Lưu</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
