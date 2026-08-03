@@ -19,7 +19,8 @@ export default function DMXe() {
   const [bulk, setBulk] = useState({ brand: "", name: "", list_price: "" });
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
-  const empty = { brand: "VinFast", name: "", color: "", mfr_code: "", list_price: "", min_stock: 2 };
+  const empty = { brand: "VinFast", name: "", color: "", mfr_code: "", list_price: "", min_stock: 2,
+    cong_suat_dong_co_w: "", dung_luong_pin: "", tam_hoat_dong_km: "", toc_do_toi_da_kmh: "" };
   const [f, setF] = useState(empty);
   const [editId, setEditId] = useState(null);
   const sort = useSortable();
@@ -79,13 +80,18 @@ export default function DMXe() {
   const startEdit = (v) => {
     setNewId("");
     setEditId(v.id);
-    setF({ brand: v.brand, name: v.name, color: v.color, mfr_code: v.mfr_code || "", list_price: v.list_price, min_stock: v.min_stock });
+    setF({ brand: v.brand, name: v.name, color: v.color, mfr_code: v.mfr_code || "", list_price: v.list_price, min_stock: v.min_stock,
+      cong_suat_dong_co_w: v.cong_suat_dong_co_w ?? "", dung_luong_pin: v.dung_luong_pin || "",
+      tam_hoat_dong_km: v.tam_hoat_dong_km ?? "", toc_do_toi_da_kmh: v.toc_do_toi_da_kmh ?? "" });
     setShow(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const saveEdit = async () => {
-    const { error } = await supabase.rpc("fn_sua_xe", { p: { id: editId, ...f, list_price: Number(f.list_price) || 0, min_stock: Number(f.min_stock) || 2 } });
+    const { error } = await supabase.rpc("fn_sua_xe", { p: { id: editId, ...f, list_price: Number(f.list_price) || 0, min_stock: Number(f.min_stock) || 2,
+      cong_suat_dong_co_w: f.cong_suat_dong_co_w === "" ? null : Number(f.cong_suat_dong_co_w),
+      tam_hoat_dong_km: f.tam_hoat_dong_km === "" ? null : Number(f.tam_hoat_dong_km),
+      toc_do_toi_da_kmh: f.toc_do_toi_da_kmh === "" ? null : Number(f.toc_do_toi_da_kmh) } });
     if (error) return notify(errMsg(error), "err");
     notify("Đã cập nhật thông tin xe.");
     setF(empty); setEditId(null); setShow(false); refresh();
@@ -94,7 +100,10 @@ export default function DMXe() {
   const add = async (keepOpen) => {
     if (!f.name?.trim() || !f.color?.trim()) return notify("Nhập đủ Tên xe và Màu xe.", "err");
     setBusy(true);
-    const { data, error } = await supabase.rpc("fn_them_xe", { p: { ...f, list_price: Number(f.list_price) || 0, min_stock: Number(f.min_stock) || 2 } });
+    const { data, error } = await supabase.rpc("fn_them_xe", { p: { ...f, list_price: Number(f.list_price) || 0, min_stock: Number(f.min_stock) || 2,
+      cong_suat_dong_co_w: f.cong_suat_dong_co_w === "" ? null : Number(f.cong_suat_dong_co_w),
+      tam_hoat_dong_km: f.tam_hoat_dong_km === "" ? null : Number(f.tam_hoat_dong_km),
+      toc_do_toi_da_kmh: f.toc_do_toi_da_kmh === "" ? null : Number(f.toc_do_toi_da_kmh) } });
     setBusy(false);
     if (error) return notify(errMsg(error), "err");
     notify(`Đã thêm xe với mã chuẩn: ${data}`);
@@ -258,6 +267,13 @@ export default function DMXe() {
             <Field label="Mã hãng"><input className="inp" value={f.mfr_code} onChange={(e) => set("mfr_code", e.target.value)} /></Field>
             <Field label="Giá niêm yết"><MoneyInput value={f.list_price} onChange={(v) => set("list_price", v)} /></Field>
             <Field label="Tồn tối thiểu"><input type="number" className="inp" value={f.min_stock} onChange={(e) => set("min_stock", e.target.value)} /></Field>
+          </div>
+          <div className="font-bold text-xs text-[#5A6572] mt-3 mb-1.5">Thông số kỹ thuật (hiển thị cho Bot Minh Trí tra cứu)</div>
+          <div className="grid gap-x-3.5 md:grid-cols-4 sm:grid-cols-2 mb-3">
+            <Field label="Công suất động cơ (W)"><input type="number" className="inp" value={f.cong_suat_dong_co_w} onChange={(e) => set("cong_suat_dong_co_w", e.target.value)} /></Field>
+            <Field label="Dung lượng pin"><input className="inp" placeholder="VD: 60V-20Ah" value={f.dung_luong_pin} onChange={(e) => set("dung_luong_pin", e.target.value)} /></Field>
+            <Field label="Tầm hoạt động (km)"><input type="number" className="inp" value={f.tam_hoat_dong_km} onChange={(e) => set("tam_hoat_dong_km", e.target.value)} /></Field>
+            <Field label="Tốc độ tối đa (km/h)"><input type="number" className="inp" value={f.toc_do_toi_da_kmh} onChange={(e) => set("toc_do_toi_da_kmh", e.target.value)} /></Field>
           </div>
           {editId && (
             <div className="bg-[#F8FAFC] border border-[#E6EAEF] rounded-xl p-3 mb-3">
