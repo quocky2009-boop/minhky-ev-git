@@ -31,7 +31,26 @@ function NhapHangInner() {
   const [fSup, setFSup] = useState("");
   const [q, setQ] = useState("");
   const searchParams = useSearchParams();
-  useEffect(() => { const d = searchParams.get("doc"); if (d) setQ(d); }, [searchParams]);
+  useEffect(() => {
+    const d = searchParams.get("doc");
+    if (d) { setQ(d); setFrom("2000-01-01"); } // no rong khoang ngay de chac chan tim thay lo nhap thang truoc
+  }, [searchParams]);
+  useEffect(() => {
+    const poId = searchParams.get("po_id");
+    if (!poId || !profile) return;
+    (async () => {
+      const [{ data: o }, { data: ln }] = await Promise.all([
+        supabase.from("purchase_orders").select("*").eq("id", poId).single(),
+        supabase.from("purchase_order_lines").select("*").eq("po_id", poId).order("id"),
+      ]);
+      if (!o) return;
+      setShowForm(true); setKetQua(null);
+      setMeta((p) => ({ ...p, location_code: o.location_code, supplier: o.supplier || "", po_id: o.id, po_code: o.code,
+        nguoi_nhap_id: p.nguoi_nhap_id || profile.id, nguoi_nhap_name: p.nguoi_nhap_name || profile.name }));
+      const conLai = (ln || []).filter((l) => l.qty_ordered > l.qty_received);
+      setLines(conLai.length > 0 ? conLai.map((l) => ({ vehicle_id: l.vehicle_id, frames: [], cost_price: 0, note: "", con_thieu: l.qty_ordered - l.qty_received })) : [{ ...emptyLine }]);
+    })();
+  }, [searchParams, profile]);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const sort = useSortable();
@@ -41,9 +60,16 @@ function NhapHangInner() {
   // ===== FORM =====
   const [showForm, setShowForm] = useState(false);
   const [ketQua, setKetQua] = useState(null);
-  const [meta, setMeta] = useState({ location_code: "", supplier: "", doc: "", note: "", ngay: iso(new Date()) });
+  const [meta, setMeta] = useState({ location_code: "", supplier: "", doc: "", note: "", ngay: iso(new Date()), nguoi_nhap_id: "", nguoi_nhap_name: "", po_id: "", po_code: "" });
   const [lines, setLines] = useState([{ ...emptyLine }]);
   const [scanIdx, setScanIdx] = useState(null);
+  const [staff, setStaff] = useState([]);
+  useEffect(() => {
+    if (!loading) supabase.from("profiles").select("id,name,role").eq("status", "Hoạt động").order("name").then(({ data }) => setStaff(data || []));
+  }, [loading]);
+  useEffect(() => {
+    if (profile && !meta.nguoi_nhap_id) setMeta((p) => ({ ...p, nguoi_nhap_id: profile.id, nguoi_nhap_name: profile.name }));
+  }, [profile]);
 
   const load = async () => {
     setBusy(true);
@@ -121,7 +147,7 @@ function NhapHangInner() {
 
   const moForm = () => {
     setShowForm(true); setKetQua(null); setLines([{ ...emptyLine }]);
-    setMeta({ location_code: "", supplier: "", doc: "", note: "", ngay: iso(new Date()) });
+    setMeta({ location_code: "", supplier: "", doc: "", note: "", ngay: iso(new Date()), nguoi_nhap_id: profile?.id || "", nguoi_nhap_name: profile?.name || "", po_id: "", po_code: "" });
   };
   const dongForm = () => { setShowForm(false); setKetQua(null); load(); };
 
@@ -133,6 +159,8 @@ function NhapHangInner() {
     const { data, error } = await supabase.rpc("fn_nhap_hang_v2", { p: {
       location_code: meta.location_code, supplier: meta.supplier, doc: meta.doc, note: meta.note,
       lines: ok.map((l) => ({ vehicle_id: l.vehicle_id, frames: l.frames, cost_price: Number(l.cost_price) || 0, note: l.note })),
+      nguoi_nhap_id: meta.nguoi_nhap_id,
+      po_id: meta.po_id || null,
     } });
     setBusy(false);
     if (error) return notify(errMsg(error), "err");
@@ -177,7 +205,9 @@ function NhapHangInner() {
         <Toast toast={toast} />
         <div className="flex items-center gap-2 flex-wrap">
           <button className="btn-ghost !text-xs" onClick={dongForm}>← Danh sách đơn nhập</button>
-          <div className="font-extrabold text-lg mr-auto">Tạo đơn nhập mới</div>
+          <div className="font-extrabold text-lg mr-auto">
+            {meta.po_id ? `Nhập hàng từ đơn đặt: ${meta.po_code}` : "Tạo đơn nhập mới"}
+          </div>
         </div>
 
         {/* HÀNG 1: NCC | THÔNG TIN PHIẾU */}
@@ -208,7 +238,16 @@ function NhapHangInner() {
               <Field label="Nhập vào kho" required>
                 <LocSearch locations={locations} value={meta.location_code} onChange={(v) => setMeta((p) => ({ ...p, location_code: v }))} placeholder="Chọn kho / cửa hàng" />
               </Field>
-              <Field label="Người nhập"><input className="inp bg-[#F8FAFC]" value={profile.name} disabled /></Field>
+              <Field label="Người nhập">
+                <select className="inp" value={meta.nguoi_nhap_id || ""}
+                  onChange={(e) => {
+                    const found = staff.find((s) => s.id === e.target.value);
+                    setMeta((p) => ({ ...p, nguoi_nhap_id: e.target.value, nguoi_nhap_name: found?.name || "" }));
+                  }}>
+                  <option value="">— Chọn nhân viên —</option>
+                  {staff.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.role})</option>)}
+                </select>
+              </Field>
               <Field label="Ngày nhập"><input type="date" className="inp" value={meta.ngay} onChange={(e) => setMeta((p) => ({ ...p, ngay: e.target.value }))} /></Field>
             </div>
           </div>
@@ -228,6 +267,7 @@ function NhapHangInner() {
                   <div className="md:col-span-2">
                     <label className="lbl">Mã xe {i + 1}</label>
                     <VehicleSearch vehicles={vehicles} value={l.vehicle_id} onChange={(id) => setLine(i, "vehicle_id", id || "")} />
+                    {l.con_thieu > 0 && <div className="text-[11px] text-[#A25F00] mt-1">Đơn đặt còn thiếu {l.con_thieu} xe</div>}
                   </div>
                   <div>
                     <label className="lbl">💰 Giá vốn / xe</label>
@@ -370,6 +410,22 @@ function NhapHangInner() {
                   ...rs.map((d) => [d.doc, fmtTime(d.created_at), locName(d.location_code), d.supplier, d.so_ma, d.so_xe, d.by])]);
                 notify(`Đã xuất ${rs.length} phiếu đã chọn.`);
               }}>⬇ Xuất Excel</button>
+              <button className="btn-ghost !text-xs !py-1 !text-danger" disabled={busy} onClick={async () => {
+                const rs = sorted.filter((d) => sel.has(d.doc));
+                if (rs.length === 0) return;
+                if (!confirm(`Hủy ${rs.length} đơn nhập đã chọn?\n\nChỉ hủy được đơn mà TOÀN BỘ xe trong đơn vẫn còn tồn kho (chưa bán/chuyển/điều chỉnh). Không thể hoàn tác.`)) return;
+                setBusy(true);
+                let ok = 0; const loi = [];
+                for (const d of rs) {
+                  const { error } = await supabase.rpc("fn_huy_don_nhap", { p_doc: d.doc });
+                  if (error) loi.push(`${d.doc}: ${errMsg(error)}`); else ok++;
+                }
+                setBusy(false);
+                sel.clear?.();
+                if (ok > 0) notify(`Đã hủy ${ok} đơn nhập.`);
+                if (loi.length > 0) notify(`${loi.length} đơn không hủy được:\n${loi.join("\n")}`, "err");
+                load();
+              }}>✕ Hủy đơn đã chọn</button>
             </SelectionBar>
             <div className="tbl-scroll"><table className="w-full border-collapse tbl-card">
               <thead><tr>

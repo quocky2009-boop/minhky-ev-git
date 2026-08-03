@@ -25,7 +25,7 @@ export default function DonBan() {
   const [showHuy, setShowHuy] = useState(false);
   const [q, setQ] = useState("");
   const _params = useSearchParams();
-  useEffect(() => { const v = _params.get("q"); if (v) setQ(v); }, [_params]);
+  useEffect(() => { const v = _params.get("q"); if (v) { setQ(v); setFrom("2000-01-01"); } }, [_params]);
   // Tu mo chi tiet khi den tu o tim kiem toan cuc (khop dung 1 don)
   const [_autoOpened, _setAutoOpened] = useState(false);
   useEffect(() => {
@@ -258,7 +258,7 @@ export default function DonBan() {
           </select>
           <select className="inp !w-auto" value={fType} onChange={(e) => { setFType(e.target.value); setPage(1); }}>
             <option value="">Loại khách: tất cả</option>
-            <option>Khách lẻ</option><option>Khách buôn</option><option>Khách lẻ của Đại lý</option>
+            {Array.from(new Set(rows.map((o) => o.customer_type).filter(Boolean))).sort().map((t) => <option key={t}>{t}</option>)}
           </select>
           <button className={`btn-ghost !text-xs ${showHuy ? "!bg-[#FDEDED] !text-danger" : ""}`} onClick={() => { setShowHuy(!showHuy); setPage(1); }}>
             {showHuy ? "Đang hiện đơn hủy/trả" : `Đơn hủy/trả${nHuy ? ` (${nHuy})` : ""}`}
@@ -294,7 +294,7 @@ export default function DonBan() {
                     <td data-label="Xe" className="td text-[13px]">{v ? `${v.name} ${v.color}` : o.vehicle_id}<div className="font-mono text-[10.5px] text-[#8A93A0]">{o.frame_number}</div><div className="text-[10.5px] text-[#8A93A0]">{locName(o.location_code)}</div></td>
                     <td data-label="Điểm bán" className="td text-xs">{locName(o.location_code)}</td>
                     <td data-label="Khách" className="td text-[13px]">{o.customer_name}<div className="text-[10.5px] text-[#8A93A0]">{o.customer_phone}</div></td>
-                    <td data-label="Loại KH" className="td text-xs">{o.customer_type === "Khách buôn" ? <Badge tone="amber">Buôn</Badge> : o.customer_type === "Khách lẻ của Đại lý" ? <Badge tone="blue">Lẻ ĐL</Badge> : <Badge tone="green">Lẻ</Badge>}</td>
+                    <td data-label="Loại KH" className="td text-xs"><Badge tone={o.customer_type === "Khách buôn" ? "amber" : o.customer_type === "Khách lẻ của Đại lý" ? "blue" : o.customer_type === "Khách lẻ" || !o.customer_type ? "green" : "purple"}>{o.customer_type || "Khách lẻ"}</Badge></td>
                     <td data-label="Tổng đơn" className="td font-bold">{fmtVND(total(o))}</td>
                     <td data-label="Hóa đơn" className="td">{huy
                       ? <><Badge tone="red">{nhanTra ? "Đã trả hàng" : "Đã hủy"}</Badge>{o.cancel_reason && <div className="text-[10.5px] text-[#8A93A0] mt-0.5">{o.cancel_reason}<br/>{o.cancelled_by_name} · {fmtDate(o.cancelled_at)}</div>}</>

@@ -17,10 +17,14 @@ export default function DMXe() {
   // Cap nhat gia hang loat
   const [showBulk, setShowBulk] = useState(false);
   const [bulk, setBulk] = useState({ brand: "", name: "", list_price: "" });
+  const [showBulkSpecs, setShowBulkSpecs] = useState(false);
+  const [bulkSpecs, setBulkSpecs] = useState({ brand: "", name: "", cong_suat_dong_co_w: "", dung_luong_pin: "",
+    tam_hoat_dong_km: "", toc_do_toi_da_kmh: "", so_luong_pin_ac_quy: "", model_pin: "" });
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const empty = { brand: "VinFast", name: "", color: "", mfr_code: "", list_price: "", min_stock: 2,
-    cong_suat_dong_co_w: "", dung_luong_pin: "", tam_hoat_dong_km: "", toc_do_toi_da_kmh: "" };
+    cong_suat_dong_co_w: "", dung_luong_pin: "", tam_hoat_dong_km: "", toc_do_toi_da_kmh: "",
+    so_luong_pin_ac_quy: "", model_pin: "" };
   const [f, setF] = useState(empty);
   const [editId, setEditId] = useState(null);
   const sort = useSortable();
@@ -82,7 +86,8 @@ export default function DMXe() {
     setEditId(v.id);
     setF({ brand: v.brand, name: v.name, color: v.color, mfr_code: v.mfr_code || "", list_price: v.list_price, min_stock: v.min_stock,
       cong_suat_dong_co_w: v.cong_suat_dong_co_w ?? "", dung_luong_pin: v.dung_luong_pin || "",
-      tam_hoat_dong_km: v.tam_hoat_dong_km ?? "", toc_do_toi_da_kmh: v.toc_do_toi_da_kmh ?? "" });
+      tam_hoat_dong_km: v.tam_hoat_dong_km ?? "", toc_do_toi_da_kmh: v.toc_do_toi_da_kmh ?? "",
+      so_luong_pin_ac_quy: v.so_luong_pin_ac_quy ?? "", model_pin: v.model_pin || "" });
     setShow(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -91,7 +96,8 @@ export default function DMXe() {
     const { error } = await supabase.rpc("fn_sua_xe", { p: { id: editId, ...f, list_price: Number(f.list_price) || 0, min_stock: Number(f.min_stock) || 2,
       cong_suat_dong_co_w: f.cong_suat_dong_co_w === "" ? null : Number(f.cong_suat_dong_co_w),
       tam_hoat_dong_km: f.tam_hoat_dong_km === "" ? null : Number(f.tam_hoat_dong_km),
-      toc_do_toi_da_kmh: f.toc_do_toi_da_kmh === "" ? null : Number(f.toc_do_toi_da_kmh) } });
+      toc_do_toi_da_kmh: f.toc_do_toi_da_kmh === "" ? null : Number(f.toc_do_toi_da_kmh),
+      so_luong_pin_ac_quy: f.so_luong_pin_ac_quy === "" ? null : Number(f.so_luong_pin_ac_quy) } });
     if (error) return notify(errMsg(error), "err");
     notify("Đã cập nhật thông tin xe.");
     setF(empty); setEditId(null); setShow(false); refresh();
@@ -103,7 +109,8 @@ export default function DMXe() {
     const { data, error } = await supabase.rpc("fn_them_xe", { p: { ...f, list_price: Number(f.list_price) || 0, min_stock: Number(f.min_stock) || 2,
       cong_suat_dong_co_w: f.cong_suat_dong_co_w === "" ? null : Number(f.cong_suat_dong_co_w),
       tam_hoat_dong_km: f.tam_hoat_dong_km === "" ? null : Number(f.tam_hoat_dong_km),
-      toc_do_toi_da_kmh: f.toc_do_toi_da_kmh === "" ? null : Number(f.toc_do_toi_da_kmh) } });
+      toc_do_toi_da_kmh: f.toc_do_toi_da_kmh === "" ? null : Number(f.toc_do_toi_da_kmh),
+      so_luong_pin_ac_quy: f.so_luong_pin_ac_quy === "" ? null : Number(f.so_luong_pin_ac_quy) } });
     setBusy(false);
     if (error) return notify(errMsg(error), "err");
     notify(`Đã thêm xe với mã chuẩn: ${data}`);
@@ -133,6 +140,32 @@ export default function DMXe() {
     if (error) return notify(errMsg(error), "err");
     notify(`Đã cập nhật giá cho ${data.so_ma_cap_nhat} mã xe.`);
     setBulk({ brand: "", name: "", list_price: "" }); setShowBulk(false); refresh();
+  };
+
+  const capNhatThongSoHangLoat = async () => {
+    if (!bulkSpecs.brand || !bulkSpecs.name) return notify("Chọn cả Hãng và Tên xe (Model) để giới hạn phạm vi.", "err");
+    const coGiTru = ["cong_suat_dong_co_w","dung_luong_pin","tam_hoat_dong_km","toc_do_toi_da_kmh","so_luong_pin_ac_quy","model_pin"]
+      .some((k) => bulkSpecs[k] !== "");
+    if (!coGiTru) return notify("Nhập ít nhất 1 thông số cần cập nhật.", "err");
+    // So sanh chinh xac ten xe (khong dung includes/ilike, tranh khop nham Flazz vao Flazz Max)
+    const soKhop = vehicles.filter((v) => v.brand === bulkSpecs.brand && v.name === bulkSpecs.name).length;
+    if (soKhop === 0) return notify("Không có mã xe nào khớp đúng Hãng + Tên xe đã chọn.", "err");
+    if (!confirm(`Cập nhật thông số kỹ thuật cho ${soKhop} mã xe (mọi màu) của "${bulkSpecs.brand} ${bulkSpecs.name}"?\n\nChỉ áp dụng đúng tên xe này, KHÔNG áp dụng cho biến thể tên khác (VD: không ảnh hưởng "${bulkSpecs.name} Max").`)) return;
+    setBusy(true);
+    const { data, error } = await supabase.rpc("fn_cap_nhat_thong_so_hang_loat", { p: {
+      brand: bulkSpecs.brand, name: bulkSpecs.name,
+      cong_suat_dong_co_w: bulkSpecs.cong_suat_dong_co_w === "" ? null : Number(bulkSpecs.cong_suat_dong_co_w),
+      dung_luong_pin: bulkSpecs.dung_luong_pin || null,
+      tam_hoat_dong_km: bulkSpecs.tam_hoat_dong_km === "" ? null : Number(bulkSpecs.tam_hoat_dong_km),
+      toc_do_toi_da_kmh: bulkSpecs.toc_do_toi_da_kmh === "" ? null : Number(bulkSpecs.toc_do_toi_da_kmh),
+      so_luong_pin_ac_quy: bulkSpecs.so_luong_pin_ac_quy === "" ? null : Number(bulkSpecs.so_luong_pin_ac_quy),
+      model_pin: bulkSpecs.model_pin || null,
+    } });
+    setBusy(false);
+    if (error) return notify(errMsg(error), "err");
+    notify(`Đã cập nhật thông số kỹ thuật cho ${data.so_ma_cap_nhat} mã xe.`);
+    setBulkSpecs({ brand: "", name: "", cong_suat_dong_co_w: "", dung_luong_pin: "", tam_hoat_dong_km: "", toc_do_toi_da_kmh: "", so_luong_pin_ac_quy: "", model_pin: "" });
+    setShowBulkSpecs(false); refresh();
   };
 
   const addBrand = async () => {
@@ -195,6 +228,7 @@ export default function DMXe() {
       <div className="flex gap-2 flex-wrap items-center">
         <button className="btn-primary" onClick={() => { setEditId(null); setF(empty); setShow(!show); }}>+ Thêm xe mới</button>
         <button className="btn-ghost" onClick={() => setShowBulk(!showBulk)}>💲 Sửa giá hàng loạt</button>
+        <button className="btn-ghost" onClick={() => setShowBulkSpecs(!showBulkSpecs)}>⚙ Sửa thông số kỹ thuật hàng loạt</button>
         <button className="btn-ghost" onClick={exportCSV}>⬇ Xuất CSV</button>
         <button className="btn-ghost" onClick={() => fileRef.current?.click()}>⬆ Import CSV</button>
         <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={(e) => { if (e.target.files[0]) importCSV(e.target.files[0]); e.target.value = ""; }} />
@@ -249,6 +283,48 @@ export default function DMXe() {
         </div>
       )}
 
+      {showBulkSpecs && (
+        <div className="card border-l-4 border-l-brand">
+          <div className="font-extrabold mb-1">Cập nhật thông số kỹ thuật hàng loạt</div>
+          <p className="text-xs text-[#8A93A0] mb-3">Bắt buộc chọn <b>Hãng</b> và <b>Tên xe (Model) chính xác</b>. Áp dụng cho mọi màu của đúng tên xe này — KHÔNG ảnh hưởng các model khác dù tên gần giống (VD: chọn "Flazz" sẽ không đổi "Flazz Max"). Chỉ điền thông số nào cần đổi, để trống ô nào thì giữ nguyên giá trị cũ của từng xe ở ô đó.</p>
+          <div className="grid gap-x-3.5 gap-y-2.5 md:grid-cols-4 sm:grid-cols-2 items-end">
+            <Field label="Hãng" required>
+              <select className="inp" value={bulkSpecs.brand} onChange={(e) => setBulkSpecs((p) => ({ ...p, brand: e.target.value, name: "" }))}>
+                <option value="">— Chọn hãng —</option>{brands.map((b) => <option key={b.name}>{b.name}</option>)}
+              </select>
+            </Field>
+            <Field label="Tên xe (Model)" required>
+              <select className="inp" value={bulkSpecs.name} onChange={(e) => setBulkSpecs((p) => ({ ...p, name: e.target.value }))}>
+                <option value="">— Chọn model —</option>
+                {Array.from(new Set(vehicles.filter((v) => !bulkSpecs.brand || v.brand === bulkSpecs.brand).map((v) => v.name))).sort().map((n) => <option key={n}>{n}</option>)}
+              </select>
+            </Field>
+            <Field label="Công suất động cơ (W)"><input type="number" className="inp" value={bulkSpecs.cong_suat_dong_co_w} onChange={(e) => setBulkSpecs((p) => ({ ...p, cong_suat_dong_co_w: e.target.value }))} /></Field>
+            <Field label="Dung lượng pin"><input className="inp" placeholder="VD: 60V-20Ah" value={bulkSpecs.dung_luong_pin} onChange={(e) => setBulkSpecs((p) => ({ ...p, dung_luong_pin: e.target.value }))} /></Field>
+            <Field label="Tầm hoạt động (km)"><input type="number" className="inp" value={bulkSpecs.tam_hoat_dong_km} onChange={(e) => setBulkSpecs((p) => ({ ...p, tam_hoat_dong_km: e.target.value }))} /></Field>
+            <Field label="Tốc độ tối đa (km/h)"><input type="number" className="inp" value={bulkSpecs.toc_do_toi_da_kmh} onChange={(e) => setBulkSpecs((p) => ({ ...p, toc_do_toi_da_kmh: e.target.value }))} /></Field>
+            <Field label="Số lượng pin/AQ"><input type="number" className="inp" value={bulkSpecs.so_luong_pin_ac_quy} onChange={(e) => setBulkSpecs((p) => ({ ...p, so_luong_pin_ac_quy: e.target.value }))} /></Field>
+            <Field label="Model pin">
+              <select className="inp" value={bulkSpecs.model_pin} onChange={(e) => setBulkSpecs((p) => ({ ...p, model_pin: e.target.value }))}>
+                <option value="">— Giữ nguyên —</option>
+                <option>Xe kèm pin</option>
+                <option>Xe đổi pin</option>
+                <option>Xe kèm AQ</option>
+              </select>
+            </Field>
+            <div className="pb-0.5"><button className="btn-ok w-full" disabled={busy} onClick={capNhatThongSoHangLoat}>Áp dụng</button></div>
+          </div>
+          {bulkSpecs.brand && bulkSpecs.name && (() => {
+            const kh = vehicles.filter((v) => v.brand === bulkSpecs.brand && v.name === bulkSpecs.name);
+            return (
+              <div className="mt-2 p-2 rounded-lg bg-[#FDF6E3] text-[12.5px]">
+                Sẽ cập nhật <b>{kh.length}</b> mã xe{kh.length > 0 && kh.length <= 10 ? `: ${kh.map((v) => `${v.name} ${v.color}`).join(", ")}` : ""}.
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
       {show && (
         <div className="card">
           <div className="font-extrabold mb-3">{editId ? `Sửa thông tin xe — ${editId} (mã nội bộ giữ nguyên)` : "Thêm xe — mã tự sinh theo chuẩn HÃNG_TÊN_MÀU"}</div>
@@ -274,6 +350,15 @@ export default function DMXe() {
             <Field label="Dung lượng pin"><input className="inp" placeholder="VD: 60V-20Ah" value={f.dung_luong_pin} onChange={(e) => set("dung_luong_pin", e.target.value)} /></Field>
             <Field label="Tầm hoạt động (km)"><input type="number" className="inp" value={f.tam_hoat_dong_km} onChange={(e) => set("tam_hoat_dong_km", e.target.value)} /></Field>
             <Field label="Tốc độ tối đa (km/h)"><input type="number" className="inp" value={f.toc_do_toi_da_kmh} onChange={(e) => set("toc_do_toi_da_kmh", e.target.value)} /></Field>
+            <Field label="Số lượng pin/AQ"><input type="number" className="inp" value={f.so_luong_pin_ac_quy} onChange={(e) => set("so_luong_pin_ac_quy", e.target.value)} /></Field>
+            <Field label="Model pin">
+              <select className="inp" value={f.model_pin} onChange={(e) => set("model_pin", e.target.value)}>
+                <option value="">— Chọn —</option>
+                <option>Xe kèm pin</option>
+                <option>Xe đổi pin</option>
+                <option>Xe kèm AQ</option>
+              </select>
+            </Field>
           </div>
           {editId && (
             <div className="bg-[#F8FAFC] border border-[#E6EAEF] rounded-xl p-3 mb-3">
