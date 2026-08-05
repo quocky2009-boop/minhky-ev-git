@@ -1,599 +1,277 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
-import { useCatalog, useToast } from "@/lib/useData";
-import { Badge, Toast, KPI, Pager, pageSlice, pageClamp, useSortable, Th, LocSearch, MoneyInput, useSelection, ThCheck, TdCheck, SelectionBar } from "@/components/ui";
-import { fmtVND, fmtDate, fmtTime, errMsg, downloadCSV } from "@/lib/format";
-import { printOrder, printOrderBill } from "@/lib/print";
-import { InfoRows, MoneyRows } from "@/components/detail";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { useCatalog, useToast } from "@/lib/useData";
+import { Badge, Toast, Field } from "@/components/ui";
+import { fmtVND, fmtDate, fmtTime, errMsg } from "@/lib/format";
+import { printOrder, printOrderBill } from "@/lib/print";
 
-const iso = (d) => d.toLocaleDateString("sv-SE");
-const firstOfMonth = () => { const d = new Date(); return iso(new Date(d.getFullYear(), d.getMonth(), 1)); };
-
-export default function DonBan() {
+export default function DonBanChiTiet() {
+  const { id } = useParams();
+  const router = useRouter();
   const { supabase, vehicles, locations, settings, profile, loading } = useCatalog();
   const { toast, notify } = useToast();
-  const [rows, setRows] = useState([]);
-  const [itemSum, setItemSum] = useState({});
-  const [promoMap, setPromoMap] = useState({});
+  const [o, setO] = useState(null);
+  const [items, setItems] = useState([]);
+  const [pays, setPays] = useState([]);
+  const [promoTags, setPromoTags] = useState([]);
   const [busy, setBusy] = useState(false);
-  const [from, setFrom] = useState(firstOfMonth());
-  const [to, setTo] = useState(iso(new Date()));
-  const [fLoc, setFLoc] = useState("");
-  const [fInv, setFInv] = useState("");
-  const [fType, setFType] = useState("");
-  const [showHuy, setShowHuy] = useState(false);
-  const [q, setQ] = useState("");
-  const _params = useSearchParams();
-  useEffect(() => { const v = _params.get("q"); if (v) { setQ(v); setFrom("2000-01-01"); } }, [_params]);
-  // Tu mo chi tiet khi den tu o tim kiem toan cuc (khop dung 1 don)
-  const [_autoOpened, _setAutoOpened] = useState(false);
-  useEffect(() => {
-    const v = _params.get("q");
-    if (!v || _autoOpened || rows.length === 0) return;
-    const hit = rows.filter((o) => o.code.toLowerCase() === v.toLowerCase());
-    if (hit.length === 1) { _setAutoOpened(true); openDetail(hit[0]); }
-  }, [_params, rows]);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
-  const sort = useSortable();
-  const sel = useSelection();
-  const [invId, setInvId] = useState(null);
-  const [invF, setInvF] = useState({ no: "", date: iso(new Date()), checklist: {} });
-  const [detail, setDetail] = useState(null);
-  const [payEdit, setPayEdit] = useState(null);
-  const [klEdit, setKlEdit] = useState(null);   // khach le cuoi (don ban buon)
 
   const load = async () => {
-    setBusy(true);
-    let qy = supabase.from("sales_orders").select("*").gte("sale_date", from).lte("sale_date", to)
-      .order("created_at", { ascending: false }).limit(3000);
-    if (fLoc) qy = qy.eq("location_code", fLoc);
-    const [{ data }, { data: si }, { data: sop }, { data: promoList }] = await Promise.all([
-      qy, supabase.from("sale_items").select("sale_code, amount").limit(10000),
-      supabase.from("sale_order_promotions").select("sale_code, promotion_id").limit(10000),
-      supabase.from("promotions").select("id, name"),
+    const { data: ord } = await supabase.from("sales_orders").select("*").eq("id", id).single();
+    if (!ord) return;
+    const code = ord.code;
+    const [{ data: its }, { data: ps }, { data: sop }] = await Promise.all([
+      supabase.from("sale_items").select("*").eq("sale_code", code),
+      supabase.from("sale_payments").select("*").eq("sale_code", code),
+      supabase.from("sale_order_promotions").select("promotion_id, promotions(name)").eq("sale_code", code),
     ]);
-    setRows(data || []);
-    const m = {};
-    (si || []).forEach((x) => { m[x.sale_code] = (m[x.sale_code] || 0) + x.amount; });
-    setItemSum(m);
-    const pName = {}; (promoList || []).forEach((p) => { pName[p.id] = p.name; });
-    const pm = {}; (sop || []).forEach((x) => { (pm[x.sale_code] = pm[x.sale_code] || []).push(pName[x.promotion_id] || `#${x.promotion_id}`); });
-    setPromoMap(pm);
-    setBusy(false);
+    setO(ord);
+    setItems(its || []);
+    setPays(ps || []);
+    setPromoTags((sop || []).map((x) => x.promotions?.name).filter(Boolean));
   };
-  useEffect(() => { if (!loading) load(); }, [loading, from, to, fLoc]);
+  useEffect(() => { if (!loading) load(); }, [loading, id]);
 
-  if (loading || !profile) return <div className="card">Đang tải dữ liệu…</div>;
+  if (loading || !o) return <div className="card">Đang tải đơn…</div>;
 
-  const vOf = (id) => vehicles.find((x) => x.id === id);
-  const locName = (c) => locations.find((l) => l.code === c)?.name || c;
-  const total = (o) => Math.max(o.sale_price * o.quantity + (itemSum[o.code] || 0) - (o.discount_amount || 0), 0);
-  const canConfirm = ["SALES", "MANAGER", "ADMIN", "CEO"].includes(profile.role);
-  const canCancel = ["ADMIN", "CEO"].includes(profile.role);
+  const v = vehicles.find((x) => x.id === o.vehicle_id);
+  const loc = locations.find((x) => x.code === o.location_code);
+  const locName = (c) => locations.find((l) => l.code === c)?.name || c || "—";
+  const tienXe = (o.sale_price || 0) * (o.quantity || 1);
+  const ckXe = o.vehicle_discount_type === "percent"
+    ? Math.round(tienXe * (o.vehicle_discount_value || 0) / 100)
+    : (o.vehicle_discount_value || 0);
+  const tongKem = items.reduce((s, x) => s + x.amount, 0);
+  const tamTinh = tienXe - ckXe + tongKem;
+  const ckTong = o.discount_type === "percent" ? Math.round(tamTinh * (o.discount_value || 0) / 100) : (o.discount_value || 0);
+  const tongDon = Math.max(tamTinh - ckTong, 0);
+  const daTra = o.paid_amount || 0;
+  const conLai = Math.max(tongDon - daTra, 0);
 
-  const daDong = (o) => o.status === "Đã hủy" || o.status === "Đã trả hàng";
-  const filtered = rows.filter((o) => {
-    if (daDong(o) && !showHuy) return false;
-    if (fInv && (o.invoice_status || "Chờ xuất HĐ") !== fInv) return false;
-    if (fType && (o.customer_type || "") !== fType) return false;
-    if (!q) return true;
-    const kw = q.toLowerCase();
-    const v = vOf(o.vehicle_id);
-    return `${o.code} ${o.customer_name} ${o.customer_phone} ${o.frame_number} ${o.invoice_no || ""} ${v ? v.name : ""} ${o.seller_name}`.toLowerCase().includes(kw);
-  });
-  const sorted = sort.sortFn(filtered, {
-    code: (o) => o.code, date: (o) => o.sale_date, xe: (o) => vOf(o.vehicle_id)?.name || o.vehicle_id,
-    kho: (o) => locName(o.location_code), kh: (o) => o.customer_name, type: (o) => o.customer_type || "", tien: (o) => total(o),
-    hd: (o) => o.invoice_status || "Chờ xuất HĐ", nv: (o) => o.seller_name,
-  });
-  const rowsActive = rows.filter((o) => o.status !== "Đã hủy" && o.status !== "Đã trả hàng");
-  const nCho = rowsActive.filter((o) => (o.invoice_status || "Chờ xuất HĐ") === "Chờ xuất HĐ").length;
-  const nXong = rowsActive.length - nCho;
-  const doanhSo = rowsActive.reduce((s, o) => s + total(o), 0);
-  const nHuy = rows.filter((o) => o.status === "Đã hủy" || o.status === "Đã trả hàng").length;
+  const statusBadge = o.status === "Đã hủy" ? "red" : o.status === "Đã trả hàng" ? "red"
+    : o.invoice_status === "Đã xuất HĐ" ? "green" : "amber";
+  const statusLabel = o.status === "Đã hủy" ? "Đã hủy"
+    : o.status === "Đã trả hàng" ? "Đã trả hàng"
+    : o.invoice_status === "Đã xuất HĐ" ? "Hoàn thành" : "Chờ xuất HĐ";
+  const isDone = o.invoice_status === "Đã xuất HĐ";
+  const isClosed = ["Đã hủy", "Đã trả hàng"].includes(o.status);
 
-  const isVF = (o) => (vOf(o.vehicle_id)?.brand || "").toUpperCase().includes("VINFAST");
-  const confirmInv = async (o) => {
-    if (!invF.no.trim()) return notify("Bắt buộc nhập số hóa đơn.", "err");
-    if (!invF.checklist?.bao_hanh) return notify("Checklist: phải kích hoạt bảo hành.", "err");
-    if (isVF(o) && !invF.checklist?.app_vf) return notify("Xe VinFast: phải kích hoạt app VF eScooter.", "err");
-    if (!invF.checklist?.coc_giao) return notify("Checklist: phải xác nhận đã bàn giao giấy COC.", "err");
-    if (!invF.checklist?.anh_khach) return notify("Checklist: phải xác nhận đã quay/chụp ảnh khách nhận xe.", "err");
-    if (!invF.checklist?.hoa_don_vat) return notify("Checklist: phải xác nhận đã bàn giao hóa đơn VAT.", "err");
-    setBusy(true);
-    const { error } = await supabase.rpc("fn_xac_nhan_hoa_don", { p: {
-      id: o.id, invoice_no: invF.no, invoice_date: invF.date,
-      warranty_activated: !!invF.checklist?.bao_hanh,
-      app_activated: !!invF.checklist?.app_vf,
-      coc_giao: !!invF.checklist?.coc_giao,
-      anh_khach: !!invF.checklist?.anh_khach,
-      hoa_don_vat: !!invF.checklist?.hoa_don_vat,
-    }});
-    if (!error) await supabase.from("sales_orders").update({ checklist_giao_xe: invF.checklist || {} }).eq("id", o.id);
-    setBusy(false);
-    if (error) return notify(errMsg(error), "err");
-    notify(`Đơn ${o.code} hoàn thành: HĐ ${invF.no}.`);
-    setInvId(null); setInvF({ no: "", date: iso(new Date()), checklist: {} }); load();
-  };
-
-  const cancelInv = async (o) => {
-    const ly = prompt(`Hủy xác nhận HĐ ${o.invoice_no} của đơn ${o.code}?\nNhập lý do:`);
+  const huyDon = async () => {
+    if (profile.role !== "CEO") return notify("Chỉ BGĐ được hủy đơn.", "err");
+    const ly = prompt(`Hủy đơn ${o.code}?\nXe sẽ hoàn về tồn kho, tiền cọc/thu đã có sẽ được hoàn quỹ.\n\nNhập LÝ DO hủy (bắt buộc):`);
     if (ly === null) return;
-    const { error } = await supabase.rpc("fn_huy_xac_nhan_hoa_don", { p_id: o.id, p_ly_do: ly });
-    if (error) return notify(errMsg(error), "err");
-    notify(`Đã hủy xác nhận HĐ đơn ${o.code} (có lưu vết).`); load();
-  };
-
-  const openDetail = async (o) => {
-    setDetail({ ...o, _items: null, _promos: null });
-    const [{ data: di }, { data: sop }] = await Promise.all([
-      supabase.from("sale_items").select("*").eq("sale_code", o.code),
-      supabase.from("sale_order_promotions").select("promotion_id, promotions(name)").eq("sale_code", o.code),
-    ]);
-    setDetail((d) => (d && d.id === o.id ? { ...d, _items: di || [], _promos: (sop || []).map((x) => x.promotions?.name).filter(Boolean) } : d));
-  };
-
-  const canSuaTT = ["CEO", "MANAGER", "ADMIN"].includes(profile?.role);
-
-  const canKhachLe = (o) => o.customer_type === "Khách buôn";
-  const thieuKhachLe = (o) => canKhachLe(o) && isVF(o) && !o.end_customer_id;
-
-  const luuKhachLe = async () => {
-    const f = klEdit;
-    if (!f.name?.trim() || !f.phone?.trim() || !f.address?.trim() || !f.email?.trim()) {
-      return notify("Cần đủ 4 thông tin: họ tên, SĐT, địa chỉ VNeID, email.", "err");
-    }
-    setBusy(true);
-    const { error } = await supabase.rpc("fn_luu_khach_le_cuoi", { p: { id: detail.id, ...f } });
-    setBusy(false);
-    if (error) return notify(errMsg(error), "err");
-    notify("Đã lưu khách lẻ cuối — hồ sơ đã vào danh mục khách hàng.");
-    setKlEdit(null);
-    const { data } = await supabase.from("sales_orders").select("*").eq("id", detail.id).single();
-    if (data) setDetail((d) => ({ ...d, ...data }));
-    load();
-  };
-
-  const luuThanhToan = async () => {
-    const paid = Number(payEdit.paid) || 0;
-    if (paid < 0) return notify("Số tiền không hợp lệ.", "err");
-    const themTien = paid - (detail.paid_amount || 0);
-    if (themTien <= 0) return notify("Số tiền mới phải lớn hơn số đã thu. Muốn giảm/hoàn thì dùng nút Hoàn tiền.", "err");
-    setBusy(true);
-    const ghiChu = [payEdit.method, payEdit.note].filter(Boolean).join(" · ");
-    const { error } = await supabase.rpc("fn_cap_nhat_da_tra", {
-      p_id: detail.id, p_paid: paid, p_note: ghiChu,
-    });
-    if (!error && themTien > 0) {
-      await supabase.from("sale_payments").insert({
-        sale_code: detail.code, method: payEdit.method, amount: themTien,
-        note: payEdit.note || "", created_by_name: profile.name,
-      });
-    }
-    setBusy(false);
-    if (error) return notify(errMsg(error), "err");
-    notify("Đã thu thêm — phần thu tự vào sổ quỹ.");
-    setPayEdit(null);
-    const { data } = await supabase.from("sales_orders").select("*").eq("id", detail.id).single();
-    if (data) setDetail((d) => ({ ...d, ...data }));
-    load();
-  };
-
-  const hoanTien = async (o) => {
-    const daTra = o.paid_amount || 0;
-    if (daTra <= 0) return notify("Đơn này chưa thu tiền, không có gì để hoàn.", "err");
-    const raw = prompt(`HOÀN TIỀN cho khách — đơn ${o.code}\nĐã thu: ${fmtVND(daTra)}\n\nNhập SỐ TIỀN cần hoàn (tối đa ${fmtVND(daTra)}):`, String(daTra));
-    if (raw === null) return;
-    const amount = Number(String(raw).replace(/\D/g, "")) || 0;
-    if (amount <= 0 || amount > daTra) return notify(`Số tiền hoàn phải từ 1 đến ${fmtVND(daTra)}.`, "err");
-    const ly = prompt("Lý do hoàn tiền (bắt buộc):");
-    if (ly === null) return;
-    if (!ly.trim()) return notify("Phải nhập lý do hoàn tiền.", "err");
-    if (!confirm(`Xác nhận hoàn ${fmtVND(amount)} cho khách?\n\n- Nếu phiếu thu cùng ngày chưa chốt quỹ: trừ lùi\n- Nếu đã chốt: lập phiếu chi hoàn tại quỹ tiền mặt điểm bán`)) return;
-    setBusy(true);
-    const { error } = await supabase.rpc("fn_hoan_tien_don", { p: { id: o.id, amount, ly_do: ly } });
-    setBusy(false);
-    if (error) return notify(errMsg(error), "err");
-    notify(`Đã hoàn ${fmtVND(amount)} cho khách — hạch toán vào sổ quỹ.`);
-    setPayEdit(null);
-    const { data } = await supabase.from("sales_orders").select("*").eq("id", o.id).single();
-    if (data) setDetail((d) => d ? { ...d, ...data } : d);
-    load();
-  };
-
-  const deleteOrder = async (o) => {
-    const ly = prompt("HỦY đơn " + o.code + "?\n- Đơn được đánh dấu 'Đã hủy' (KHÔNG xóa — vẫn xem lại được)\n- Xe " + o.frame_number + " sẽ HOÀN VỀ TỒN KHO (nếu chưa bán lại)\n- Giữ nguyên thanh toán, bán kèm, ảnh để lưu vết\n\nNhập LÝ DO hủy (bắt buộc):");
-    if (ly === null) return;
-    if (!ly.trim()) return notify("Phải nhập lý do hủy đơn.", "err");
+    if (!ly.trim()) return notify("Phải nhập lý do.", "err");
     setBusy(true);
     const { error } = await supabase.rpc("fn_xoa_don", { p_id: o.id, p_ly_do: ly });
     setBusy(false);
     if (error) return notify(errMsg(error), "err");
-    notify("Đã hủy đơn " + o.code + " — xe hoàn về tồn kho (nếu hợp lệ), có lưu vết.");
-    setDetail(null); load();
+    notify("Đã hủy đơn. Xe hoàn về kho, tiền đã hoàn quỹ.");
+    load();
   };
 
-  const moLaiDon = async (o) => {
-    if (!confirm(`Mở lại đơn ${o.code} (đã hủy trước đó)?\n\nLưu ý: kiểm tra lại tồn xe — nếu xe đã bán cho đơn khác thì cần xử lý thủ công.`)) return;
-    setBusy(true);
-    const { error } = await supabase.rpc("fn_mo_lai_don", { p_id: o.id });
-    setBusy(false);
-    if (error) return notify(errMsg(error), "err");
-    notify(`Đã mở lại đơn ${o.code}.`);
-    setDetail(null); load();
-  };
-
-  const traHang = async (o) => {
-    const ly = prompt("TRẢ LẠI HÀNG BÁN — đơn " + o.code + " (đã giao)?\n- Xe " + o.frame_number + " sẽ NHẬP LẠI KHO\n- Tiền khách đã trả sẽ được HOÀN: nếu phiếu thu cùng ngày chưa chốt quỹ thì trừ lùi, nếu đã chốt thì lập phiếu chi hoàn\n- Đơn đánh dấu 'Đã trả hàng' (giữ lưu vết)\n\nNhập LÝ DO trả hàng (bắt buộc):");
+  const traHang = async () => {
+    if (profile.role !== "CEO") return notify("Chỉ BGĐ được duyệt trả hàng.", "err");
+    const ly = prompt(`Trả lại hàng bán — đơn ${o.code}\nXe nhập lại kho, tiền khách đã trả được hoàn quỹ.\n\nNhập LÝ DO trả hàng:`);
     if (ly === null) return;
-    if (!ly.trim()) return notify("Phải nhập lý do trả hàng.", "err");
+    if (!ly.trim()) return notify("Phải nhập lý do.", "err");
     setBusy(true);
     const { error } = await supabase.rpc("fn_tra_hang_ban", { p: { id: o.id, ly_do: ly, location_code: o.location_code } });
     setBusy(false);
     if (error) return notify(errMsg(error), "err");
-    notify("Đã trả hàng đơn " + o.code + " — xe nhập lại kho, hoàn tiền theo sổ quỹ.");
-    setDetail(null); load();
+    notify("Đã trả hàng, hoàn quỹ thành công.");
+    load();
   };
 
-  const exportCSV = () => {
-    downloadCSV(`don_ban_${from}_den_${to}.csv`,
-      [["Ma_Don","Ngay_Ban","Kho","Xe","Mau","So_Khung","Khach","SDT","Loai_KH","Tong_Don","Da_TT","Trang_Thai_HD","So_HD","Ngay_HD","Nguoi_Xac_Nhan","Kich_Hoat_Bao_Hanh","Kich_Hoat_App","NV_Ban","Chuong_Trinh_Khuyen_Mai"],
-       ...sorted.map((o) => { const v = vOf(o.vehicle_id);
-         return [o.code, o.sale_date, locName(o.location_code), v?.name || o.vehicle_id, v?.color || "", o.frame_number,
-           o.customer_name, o.customer_phone, o.customer_type || "", total(o), o.paid_amount || 0,
-           o.invoice_status || "Chờ xuất HĐ", o.invoice_no || "", o.invoice_date || "", o.invoice_by_name || "", o.warranty_activated ? "Có" : "Chưa", o.app_activated ? "Có" : "Chưa", o.seller_name,
-           (promoMap[o.code] || []).join(" | ")]; })]);
-    notify(`Đã xuất ${sorted.length} đơn.`);
-  };
+  const steps = [
+    { label: "Đặt hàng", done: true, at: o.created_at },
+    { label: "Duyệt", done: true, at: o.created_at },
+    { label: "Đóng gói", done: daTra > 0 || isDone, at: daTra > 0 ? o.updated_at : null },
+    { label: "Xuất kho", done: isDone, at: isDone ? o.invoice_at : null },
+    { label: "Hoàn thành", done: isDone, at: isDone ? o.invoice_at : null },
+  ];
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 pb-8">
       <Toast toast={toast} />
-      <div className="flex gap-3 flex-wrap">
-        <KPI label="Chờ hoàn thiện (HĐ/BH/App)" value={nCho} tone={nCho ? "amber" : "dark"} />
-        {rows.filter((o) => thieuKhachLe(o)).length > 0 && (
-          <KPI label="Chờ thông tin khách lẻ" value={rows.filter((o) => thieuKhachLe(o)).length} tone="red" />
-        )}
-        <KPI label="Đã hoàn thành" value={nXong} tone="green" />
-        <KPI label="Tổng đơn" value={rowsActive.length} tone="dark" />
-        <KPI label="Doanh số" value={fmtVND(doanhSo)} tone="blue" />
+
+      {/* HEADER */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <button className="btn-ghost !text-xs" onClick={() => router.back()}>← Quay lại danh sách đơn hàng</button>
+        <div className="ml-auto flex gap-2">
+          {!isClosed && !isDone && profile.role === "CEO" && (
+            <button className="btn-ghost !text-xs hover:!text-danger" disabled={busy} onClick={huyDon}>Hủy đơn hàng</button>
+          )}
+          {!isClosed && !isDone && (
+            <Link href={`/ban-hang?sua=${o.id}`} className="btn-primary !text-xs">Sửa đơn hàng</Link>
+          )}
+          {isDone && profile.role === "CEO" && (
+            <button className="btn-primary !text-xs bg-danger border-danger" disabled={busy} onClick={traHang}>↩ Đổi trả hàng</button>
+          )}
+        </div>
       </div>
 
-      <div className="card">
-        <div className="flex gap-2 flex-wrap items-center mb-3">
-          <div className="font-extrabold mr-auto">Danh sách đơn bán ({sorted.length})</div>
-          <Link href="/ban-hang?new=1" className="btn-primary !text-xs">+ Tạo đơn bán mới</Link>
-          <input type="date" className="inp !w-auto" value={from} onChange={(e) => setFrom(e.target.value)} />
-          <input type="date" className="inp !w-auto" value={to} onChange={(e) => setTo(e.target.value)} />
-          <div className="!w-52"><LocSearch locations={locations} value={fLoc} onChange={setFLoc} placeholder="Lọc kho…" /></div>
-          <select className="inp !w-auto" value={fInv} onChange={(e) => { setFInv(e.target.value); setPage(1); }}>
-            <option value="">Hóa đơn: tất cả</option><option>Chờ xuất HĐ</option><option>Đã xuất HĐ</option>
-          </select>
-          <select className="inp !w-auto" value={fType} onChange={(e) => { setFType(e.target.value); setPage(1); }}>
-            <option value="">Loại khách: tất cả</option>
-            {Array.from(new Set(rows.map((o) => o.customer_type).filter(Boolean))).sort().map((t) => <option key={t}>{t}</option>)}
-          </select>
-          <button className={`btn-ghost !text-xs ${showHuy ? "!bg-[#FDEDED] !text-danger" : ""}`} onClick={() => { setShowHuy(!showHuy); setPage(1); }}>
-            {showHuy ? "Đang hiện đơn hủy/trả" : `Đơn hủy/trả${nHuy ? ` (${nHuy})` : ""}`}
-          </button>
-          <input className="inp !w-56" placeholder="Tìm mã đơn, khách, số khung, số HĐ…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
-          <button className="btn-ghost !text-xs" onClick={exportCSV}>⬇ CSV</button>
+      {/* MÃ ĐƠN + TRẠNG THÁI */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <span className="text-xl font-extrabold">{o.code}</span>
+        <Badge tone={statusBadge}>{statusLabel}</Badge>
+        {promoTags.map((name) => <Badge key={name} tone="purple">🏷 {name}</Badge>)}
+      </div>
+
+      {/* TIMELINE */}
+      <div className="card !py-4 overflow-hidden">
+        <div className="relative flex items-start justify-between">
+          {/* Đường line nối các bước */}
+          <div className="absolute top-3 left-0 right-0 h-0.5 bg-[#E3E8EF]" style={{ zIndex: 0 }} />
+          <div className="absolute top-3 left-0 h-0.5 bg-brand" style={{ zIndex: 0, width: `${(steps.filter((s) => s.done).length - 1) / (steps.length - 1) * 100}%` }} />
+          {steps.map((s, i) => (
+            <div key={i} className="flex flex-col items-center relative" style={{ zIndex: 1, flex: 1 }}>
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-[11px] font-bold border-2 ${s.done ? "bg-brand border-brand" : "bg-white border-[#D5DBE3]"}`}>
+                {s.done ? "✓" : ""}
+              </div>
+              <div className="text-[10.5px] font-semibold text-center mt-1 px-0.5">{s.label}</div>
+              {s.at && <div className="text-[9.5px] text-[#8A93A0] text-center">{fmtTime(s.at)}</div>}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* CẢnh báo hủy/trả */}
+      {isClosed && (
+        <div className="p-3 rounded-xl bg-[#FDEDED] text-[13px]">
+          <b className="text-danger">{o.status}</b> — {o.cancel_reason}
+          <div className="text-[11px] text-[#8A93A0] mt-0.5">bởi {o.cancelled_by_name} · {fmtDate(o.cancelled_at)}</div>
+        </div>
+      )}
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <div className="lg:col-span-2 flex flex-col gap-4">
+          {/* THÔNG TIN KHÁCH */}
+          <div className="card">
+            <div className="font-extrabold mb-2">Thông tin khách hàng</div>
+            <div className="text-brand font-bold text-[15px]">{o.customer_name} — {o.customer_phone}</div>
+            {o.customer_type && <div className="text-[12px] text-[#5A6572] mt-0.5">{o.customer_type}</div>}
+            <div className="text-[12px] text-[#5A6572] mt-2 uppercase font-semibold tracking-wide">Địa chỉ giao hàng</div>
+            <div className="text-[13px]">{o.customer_phone}</div>
+            {o.customer_address && <div className="text-[13px]">{o.customer_address}</div>}
+          </div>
+
+          {/* THANH TOÁN */}
+          <div className="card">
+            <div className={`flex items-center gap-2 mb-3 font-semibold text-[14px] ${conLai === 0 ? "text-[#0E7A4A]" : "text-danger"}`}>
+              <span>{conLai === 0 ? "✓ Đã thanh toán toàn bộ" : `⚠ Còn phải trả ${fmtVND(conLai)}`}</span>
+            </div>
+            <div className="flex flex-wrap gap-6 mb-3 text-[13px]">
+              <div><span className="text-[#8A93A0]">Khách phải trả: </span><b>{fmtVND(tongDon)}</b></div>
+              <div><span className="text-[#8A93A0]">Đã thanh toán: </span><b>{fmtVND(daTra)}</b></div>
+              <div><span className="text-[#8A93A0]">Còn phải trả: </span><b className={conLai > 0 ? "text-danger" : ""}>{fmtVND(conLai)}</b></div>
+            </div>
+            {pays.map((p, i) => (
+              <div key={i} className="flex items-center gap-2 p-2 rounded-lg bg-[#F8FAFC] text-[13px] mb-1">
+                <div className="w-2 h-2 rounded-full bg-brand shrink-0" />
+                <span className="font-semibold">{p.method} {fmtVND(p.amount)}</span>
+                {p.note && <span className="text-[#8A93A0]">— {p.note}</span>}
+                <span className="text-[10.5px] text-[#8A93A0] ml-auto">{fmtTime(p.created_at)}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* THÔNG TIN SẢN PHẨM */}
+          <div className="card">
+            <div className="font-extrabold mb-3">Thông tin sản phẩm</div>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-[13px]">
+                <thead><tr className="text-[11.5px] text-[#8A93A0] uppercase border-b border-[#E3E8EF]">
+                  <th className="text-left py-2 pl-2">Tên sản phẩm</th>
+                  <th className="text-right py-2">Số lượng</th>
+                  <th className="text-right py-2">Đơn giá</th>
+                  <th className="text-right py-2">Chiết khấu</th>
+                  <th className="text-right py-2 pr-2">Thành tiền</th>
+                </tr></thead>
+                <tbody>
+                  {/* Xe chính */}
+                  <tr className="border-b border-dashed border-[#F0F2F5]">
+                    <td className="py-2.5 pl-2">
+                      <div className="font-semibold">{v ? `${v.brand} ${v.name} ${v.color}` : o.vehicle_id}</div>
+                      <div className="text-[10.5px] text-[#8A93A0] font-mono">SK: {o.frame_number}</div>
+                      <div className="text-[10.5px] text-[#8A93A0]">Kho: {locName(o.location_code)}</div>
+                      {o.coc_giao && <Badge tone="green">COC đã giao</Badge>}
+                    </td>
+                    <td className="py-2.5 text-right">{o.quantity}</td>
+                    <td className="py-2.5 text-right">{fmtVND(o.sale_price)}</td>
+                    <td className="py-2.5 text-right">{ckXe > 0 ? fmtVND(ckXe) : "0"}</td>
+                    <td className="py-2.5 pr-2 text-right font-bold">{fmtVND(tienXe - ckXe)}</td>
+                  </tr>
+                  {/* Bán kèm */}
+                  {items.map((x, i) => (
+                    <tr key={i} className="border-b border-dashed border-[#F0F2F5]">
+                      <td className="py-2 pl-2"><div>{x.name}</div><div className="text-[10.5px] text-[#8A93A0]">{x.item_type}</div></td>
+                      <td className="py-2 text-right">{x.qty}</td>
+                      <td className="py-2 text-right">{fmtVND(x.unit_price)}</td>
+                      <td className="py-2 text-right">{x.discount_value > 0 ? fmtVND(x.discount_value) : "0"}</td>
+                      <td className="py-2 pr-2 text-right font-bold">{fmtVND(x.amount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="text-[13px]"><td colSpan={4} className="py-1.5 pl-2 text-[#5A6572]">Tổng chưa chiết khấu đơn</td><td className="py-1.5 pr-2 text-right">{fmtVND(tamTinh)}</td></tr>
+                  {ckTong > 0 && <tr className="text-[13px] text-[#A25F00]"><td colSpan={4} className="py-1.5 pl-2">Chiết khấu đơn hàng</td><td className="py-1.5 pr-2 text-right">−{fmtVND(ckTong)}</td></tr>}
+                  <tr className="font-extrabold text-[14px] bg-[#EAF2FF]"><td colSpan={4} className="py-2 pl-2">Tổng đơn</td><td className="py-2 pr-2 text-right text-brand">{fmtVND(tongDon)}</td></tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
         </div>
 
-        {busy && rows.length === 0 ? <div className="text-sm text-[#8A93A0] py-4">Đang tải đơn bán…</div> : (
-          <>
-            <SelectionBar sel={sel}>
-              <span className="text-[12px] font-bold text-brand px-1.5 self-center">Tổng đơn: {fmtVND(sorted.filter((o) => sel.has(o.id)).reduce((a, b) => a + total(b), 0))}</span>
-              <button className="btn-ghost !text-xs !py-1" onClick={() => {
-                const rs = sorted.filter((o) => sel.has(o.id));
-                downloadCSV(`don_ban_chon.csv`, [["Mã đơn", "Ngày", "Xe", "Số khung", "Kho", "Khách", "SĐT", "Tổng đơn", "Đã trả", "Hóa đơn", "NV bán"],
-                  ...rs.map((o) => { const v = vOf(o.vehicle_id); return [o.code, fmtDate(o.sale_date), v ? `${v.name} ${v.color}` : o.vehicle_id, o.frame_number, locName(o.location_code), o.customer_name, o.customer_phone, total(o), o.paid_amount || 0, o.invoice_status || "Chờ xuất HĐ", o.seller_name]; })]);
-                notify(`Đã xuất ${rs.length} đơn đã chọn.`);
-              }}>⬇ Xuất Excel</button>
-            </SelectionBar>
-            <div className="tbl-scroll"><table className="w-full border-collapse tbl-card">
-              <thead><tr><ThCheck sel={sel} rows={pageSlice(sorted, page, pageSize)} idOf={(o) => o.id} /><Th label="Mã đơn" k="code" sort={sort} /><Th label="Ngày" k="date" sort={sort} /><Th label="Xe · Số khung · Kho" k="xe" sort={sort} /><Th label="Điểm bán" k="kho" sort={sort} /><Th label="Khách" k="kh" sort={sort} /><Th label="Loại KH" k="type" sort={sort} /><Th label="Tổng đơn" k="tien" sort={sort} /><Th label="Hóa đơn" k="hd" sort={sort} /><Th label="NV bán" k="nv" sort={sort} /><th className="th"></th></tr></thead>
-              <tbody>{pageSlice(sorted, page, pageSize).map((o, i) => {
-                const v = vOf(o.vehicle_id);
-                const st = o.invoice_status || "Chờ xuất HĐ";
-                const done = st === "Đã xuất HĐ";
-                const huy = o.status === "Đã hủy" || o.status === "Đã trả hàng";
-                const nhanTra = o.status === "Đã trả hàng";
-                return [
-                  <tr key={o.id} className={huy ? "bg-[#F3F4F6] text-[#8A93A0]" : sel.has(o.id) ? "bg-[#EAF2FF]" : invId === o.id ? "bg-[#FDF6E3]" : done ? "hover:bg-[#F8FAFC]" : "bg-[#FFFCF5] hover:bg-[#FDF6E3]"}>
-                    <TdCheck sel={sel} id={o.id} />
-                    <td data-label="Mã đơn" className="td font-bold"><Link href={`/don-ban/${o.id}`} className="text-brand hover:underline">{o.code}</Link>{nhanTra ? <Badge tone="red">Đã trả hàng</Badge> : huy && <Badge tone="red">Đã hủy</Badge>}</td>
-                    <td data-label="Ngày" className="td text-xs whitespace-nowrap">{fmtDate(o.sale_date)}</td>
-                    <td data-label="Xe" className="td text-[13px]">{v ? `${v.name} ${v.color}` : o.vehicle_id}<div className="font-mono text-[10.5px] text-[#8A93A0]">{o.frame_number}</div><div className="text-[10.5px] text-[#8A93A0]">{locName(o.location_code)}</div></td>
-                    <td data-label="Điểm bán" className="td text-xs">{locName(o.location_code)}</td>
-                    <td data-label="Khách" className="td text-[13px]">{o.customer_name}<div className="text-[10.5px] text-[#8A93A0]">{o.customer_phone}</div></td>
-                    <td data-label="Loại KH" className="td text-xs"><Badge tone={o.customer_type === "Khách buôn" ? "amber" : o.customer_type === "Khách lẻ của Đại lý" ? "blue" : o.customer_type === "Khách lẻ" || !o.customer_type ? "green" : "purple"}>{o.customer_type || "Khách lẻ"}</Badge></td>
-                    <td data-label="Tổng đơn" className="td font-bold">{fmtVND(total(o))}</td>
-                    <td data-label="Hóa đơn" className="td">{huy
-                      ? <><Badge tone="red">{nhanTra ? "Đã trả hàng" : "Đã hủy"}</Badge>{o.cancel_reason && <div className="text-[10.5px] text-[#8A93A0] mt-0.5">{o.cancel_reason}<br/>{o.cancelled_by_name} · {fmtDate(o.cancelled_at)}</div>}</>
-                      : done
-                      ? <><Badge tone="green">✓ Hoàn thành</Badge><div className="text-[10.5px] text-[#8A93A0] mt-0.5">HĐ {o.invoice_no} · {fmtDate(o.invoice_date)}<br/>{o.invoice_by_name}<br/>BH ✓{o.app_activated ? " · App ✓" : ""}{o.coc_giao ? " · COC ✓" : ""}</div></>
-                      : <Badge tone="amber">Chờ xuất HĐ</Badge>}
-                      {!huy && thieuKhachLe(o) && <div className="mt-0.5"><Badge tone="red">⚠ Thiếu khách lẻ</Badge></div>}</td>
-                    <td data-label="NV bán" className="td text-xs">{o.seller_name}</td>
-                    <td className="td w-36 align-top"><div className="flex flex-col gap-1 items-end">
-                      {huy ? (
-                        <div className="flex gap-1 flex-wrap justify-end">
-                          <Link href={`/don-ban/${o.id}`} className="btn-ghost !px-2 !py-1 !text-xs" title="Xem chi tiết đơn">👁</Link>
-                          {profile.role === "CEO" && !nhanTra && <button className="btn-ghost !px-2 !py-1 !text-xs hover:text-brand" title="Mở lại đơn (đã hủy nhầm)" onClick={() => moLaiDon(o)}>↩ Mở lại</button>}
-                        </div>
-                      ) : (
-                      <div className="flex flex-col gap-1 items-end">
-                        {!done && canConfirm && <button className={`!px-2.5 !py-1 !text-xs w-full ${invId === o.id ? "btn-primary" : "btn-ok"}`} onClick={() => { setInvId(invId === o.id ? null : o.id); setInvF({ no: "", date: iso(new Date()), checklist: {} }); }}>{invId === o.id ? "Đóng" : "✓ Xác nhận HĐ"}</button>}
-                        <div className="flex gap-1 flex-wrap justify-end">
-                          {thieuKhachLe(o) && <button className="btn-primary !px-2 !py-1 !text-xs !bg-danger !border-danger" title="Nhập thông tin khách lẻ mua sau cùng" onClick={() => openDetail(o)}>👤</button>}
-                          <button className="btn-ghost !px-2 !py-1 !text-xs" title="Xem nhanh đơn" onClick={() => openDetail(o)}>👁</button>
-                          {canSuaTT && total(o) - (o.paid_amount || 0) > 0 && (
-                            <button className="btn-ok !px-2 !py-1 !text-xs" title={`Còn thiếu ${fmtVND(total(o) - (o.paid_amount || 0))} — bấm để thu`}
-                              onClick={async () => { await openDetail(o); setPayEdit({ paid: o.paid_amount || 0, note: "", method: "Tiền mặt" }); }}>💵</button>
-                          )}
-                          <button className="btn-ghost !px-2 !py-1 !text-xs" title="In phiếu xuất" onClick={() => printOrder({ supabase, o, vehicles, locations, settings, notify })}>🖨</button>
-                          {done && canCancel && <button className="btn-ghost !px-2 !py-1 !text-xs hover:text-danger" title="Hủy xác nhận" onClick={() => cancelInv(o)}>↺</button>}
-                        </div>
-                      </div>
-                      )}
-                    </div></td>
-                  </tr>,
-                  invId === o.id && (
-                    <tr key={o.id + "f"}><td colSpan={11} className="td bg-[#FFFDF5]">
-                      <div className="flex flex-col gap-3">
-                        <div className="flex gap-1.5 items-end flex-wrap">
-                          <div><label className="lbl">Số hóa đơn (bắt buộc)</label><input className="inp !py-2 !w-48" autoFocus value={invF.no} onChange={(e) => setInvF((p) => ({ ...p, no: e.target.value }))} placeholder="VD: 00012345" /></div>
-                          <div><label className="lbl">Ngày xuất HĐ</label><input type="date" className="inp !py-2 !w-40" value={invF.date} onChange={(e) => setInvF((p) => ({ ...p, date: e.target.value }))} /></div>
-                        </div>
-                        {/* CHECKLIST GIAO XE */}
-                        <div className="border border-[#D5DBE3] rounded-xl p-3 bg-white">
-                          <div className="font-bold text-[13px] mb-2">✅ Checklist giao xe</div>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5">
-                            {[
-                              ["bao_hanh","🛡 Kích hoạt bảo hành", true],
-                              ["app_vf", isVF(o) ? "📱 App VF eScooter" : null, isVF(o)],
-                              ["coc_giao","📄 Bàn giao giấy COC", true],
-                              ["anh_khach","📸 Quay/chụp khách nhận xe", true],
-                              ["hoa_don_vat","🧾 Bàn giao hóa đơn VAT", true],
-                              ["khoe_fb","📲 Khách khoe ảnh lên FB/Zalo", false],
-                            ].filter(([,label]) => label).map(([key, label, required]) => (
-                              <label key={key} className={`flex items-center gap-1.5 text-xs font-medium cursor-pointer rounded-lg px-2 py-1.5 border ${invF.checklist?.[key] ? "bg-[#E5F6EE] border-[#0E7A4A]" : required ? "border-danger bg-[#FFF6F6]" : "border-[#E3E8EF]"}`}>
-                                <input type="checkbox" className="w-3.5 h-3.5 shrink-0"
-                                  checked={!!invF.checklist?.[key]}
-                                  onChange={(e) => setInvF((p) => ({ ...p, checklist: { ...p.checklist, [key]: e.target.checked } }))} />
-                                {label}{required && <span className="text-danger ml-0.5">*</span>}
-                              </label>
-                            ))}
-                          </div>
-                          {(() => {
-                            const required = ["bao_hanh","coc_giao","anh_khach","hoa_don_vat", ...(isVF(o) ? ["app_vf"] : [])];
-                            const done = required.filter(k => invF.checklist?.[k]).length;
-                            return <div className="text-[10.5px] text-[#8A93A0] mt-2">{done}/{required.length} mục bắt buộc · Còn lại là khuyến nghị</div>;
-                          })()}
-                        </div>
-                        <div className="flex gap-2 items-center flex-wrap">
-                          <button className="btn-ok !py-2 !text-xs" disabled={busy} onClick={() => confirmInv(o)}>Xác nhận hoàn thành đơn</button>
-                          <span className="text-[10.5px] text-[#8A93A0]">Bắt buộc: Số HĐ + Bảo hành + Giấy COC + Ảnh khách nhận xe + Hóa đơn VAT{isVF(o) ? " + App VF eScooter" : ""}.</span>
-                        </div>
-                      </div>
-                    </td></tr>
-                  ),
-                ];
-              })}
-              {sorted.length === 0 && <tr><td className="td" colSpan={11}>Không có đơn bán nào khớp bộ lọc.</td></tr>}
-              </tbody>
-            </table></div>
-            <Pager total={sorted.length} page={page} setPage={setPage} pageSize={pageSize} setPageSize={setPageSize} />
-          </>
-        )}
-        {detail && (() => {
-          const v = vOf(detail.vehicle_id);
-          const st = detail.invoice_status || "Chờ xuất HĐ";
-          const kem = (detail._items || []).reduce((sm, it) => sm + it.amount, 0);
-          const tong = Math.max(detail.sale_price * detail.quantity + kem - (detail.discount_amount || 0), 0);
-          return (
-            <div className="fixed inset-0 z-[95] bg-black/50 flex items-center justify-center p-3" onClick={() => setDetail(null)}>
-              <div className="bg-white rounded-2xl w-[600px] max-w-full max-h-[88vh] overflow-y-auto p-4" onClick={(e) => e.stopPropagation()}>
-                <div className="flex items-center gap-1.5 mb-2 flex-wrap">
-                  <div className="font-extrabold text-base mr-auto">Xem nhanh đơn {detail.code}{(detail.status === "Đã hủy" || detail.status === "Đã trả hàng") && <Badge tone="red">{detail.status}</Badge>}</div>
-                  {(detail.status === "Đã hủy" || detail.status === "Đã trả hàng") ? (
-                    <>
-                      <button className="btn-primary !px-3 !py-1.5 !text-xs" onClick={() => printOrder({ supabase, o: detail, vehicles, locations, settings, notify })}>🖨 In phiếu</button>
-                      {profile.role === "CEO" && detail.status === "Đã hủy" && <button className="btn-ghost !px-3 !py-1.5 !text-xs !text-brand" disabled={busy} onClick={() => moLaiDon(detail)}>↩ Mở lại đơn</button>}
-                      <button className="btn-ghost !px-3 !py-1.5 !text-xs" onClick={() => setDetail(null)}>✕</button>
-                    </>
-                  ) : (<>
-                  {canSuaTT && (tong - (detail.paid_amount || 0)) > 0 && <button className="btn-ok !px-3 !py-1.5 !text-xs" onClick={() => setPayEdit({ paid: detail.paid_amount || 0, note: "", method: "Tiền mặt" })}>💵 Thu tiền</button>}
-                  {canSuaTT && (detail.paid_amount || 0) > 0 && <button className="btn-ghost !px-3 !py-1.5 !text-xs !text-danger" disabled={busy} onClick={() => hoanTien(detail)}>↩ Hoàn tiền</button>}
-                  {detail.invoice_status !== "Đã xuất HĐ"
-                    ? <Link href={`/ban-hang?sua=${detail.id}`} className="btn-primary !px-3 !py-1.5 !text-xs">✎ Sửa đơn</Link>
-                    : <span className="text-[10.5px] text-[#8A93A0] px-1">Đã xuất HĐ — hủy xác nhận mới sửa được</span>}
-                  <button className="btn-primary !px-3 !py-1.5 !text-xs" onClick={() => printOrder({ supabase, o: detail, vehicles, locations, settings, notify })}>🖨 In phiếu</button>
-                  <button className="btn-ghost !px-3 !py-1.5 !text-xs" title="In khổ nhiệt 80mm (máy in bill)" onClick={() => printOrderBill({ supabase, o: detail, vehicles, locations, settings, notify })}>🧾 In bill</button>
-                  {profile.role === "CEO" && (detail.invoice_status === "Đã xuất HĐ"
-                    ? <button className="btn-ghost !px-3 !py-1.5 !text-xs !text-danger" disabled={busy} onClick={() => traHang(detail)}>↩ Trả lại hàng bán</button>
-                    : <button className="btn-ghost !px-3 !py-1.5 !text-xs !text-danger" disabled={busy} onClick={() => deleteOrder(detail)}>✕ Hủy đơn</button>
-                  )}
-                  <button className="btn-ghost !px-3 !py-1.5 !text-xs" onClick={() => setDetail(null)}>✕</button>
-                  </>)}
+        {/* CỘT PHẢI */}
+        <div className="flex flex-col gap-4">
+          <div className="card">
+            <div className="font-extrabold mb-3">Thông tin đơn hàng</div>
+            <div className="flex flex-col gap-1 text-[13px]">
+              {[
+                ["Bán tại", locName(o.location_code)],
+                ["Bán bởi", o.seller_name || "—"],
+                ["Ngày bán", fmtTime(o.sale_date)],
+                ["Trạng thái HĐ", o.invoice_status || "Chờ xuất HĐ"],
+                o.invoice_no && ["Số hóa đơn", o.invoice_no],
+                o.invoice_date && ["Ngày xuất HĐ", fmtDate(o.invoice_date)],
+                o.invoice_by_name && ["Người xác nhận HĐ", o.invoice_by_name],
+                ["Bảo hành", o.warranty_activated ? "✓ Đã kích hoạt" : "Chưa"],
+                o.app_activated && ["App VF eScooter", "✓ Đã kích hoạt"],
+                ["Giấy COC", o.coc_giao ? "✓ Đã giao cho khách" : "Chưa giao"],
+                o.document_status && ["Đăng ký xe", o.document_status],
+              ].filter(Boolean).map(([k, val]) => (
+                <div key={k} className="flex gap-2">
+                  <span className="text-[#8A93A0] w-36 shrink-0">{k}</span>
+                  <span className="font-semibold">{val}</span>
                 </div>
-                {detail._promos && detail._promos.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mb-3">
-                    {detail._promos.map((name) => <Badge key={name} tone="purple">🏷 {name}</Badge>)}
+              ))}
+            </div>
+          </div>
+          {o.note && (
+            <div className="card">
+              <div className="font-extrabold mb-1">Ghi chú</div>
+              <div className="text-[13px]">{o.note}</div>
+            </div>
+          )}
+          {o.invoice_status === "Đã xuất HĐ" && o.checklist_giao_xe && Object.keys(o.checklist_giao_xe).length > 0 && (
+            <div className="card">
+              <div className="font-extrabold mb-2 text-[13px]">✅ Checklist giao xe</div>
+              <div className="flex flex-col gap-1">
+                {[["da_thu_du_tien","💰 Thu đủ tiền"],["dung_so_khung","🔢 Đúng số khung"],["bao_hanh","🛡 Bảo hành"],["app_vf","📱 App VF"],["coc_giao","📄 Giấy COC"],["phu_kien","🎁 Phụ kiện/sạc/chìa"],["anh_khach","📸 Ảnh nhận xe"]].map(([k, label]) => (
+                  <div key={k} className={`flex items-center gap-1.5 text-[12px] ${o.checklist_giao_xe[k] ? "text-[#0E7A4A]" : "text-[#C6CDD6]"}`}>
+                    <span>{o.checklist_giao_xe[k] ? "✓" : "○"}</span><span>{label}</span>
                   </div>
-                )}
-                {(detail.status === "Đã hủy" || detail.status === "Đã trả hàng") && detail.cancel_reason && (
-                  <div className="mb-3 p-2.5 rounded-xl bg-[#FDEDED] text-[13px]">
-                    <b className="text-danger">{detail.status}</b> — {detail.cancel_reason}
-                    <div className="text-[11px] text-[#8A93A0] mt-0.5">bởi {detail.cancelled_by_name} · {fmtDate(detail.cancelled_at)}</div>
-                  </div>
-                )}
-                {(() => {
-                  const conLai = Math.max(0, tong - (detail.paid_amount || 0));
-                  const httt = (() => {
-                    if (!detail._items || detail._items.length === 0) return null;
-                    const m = {}; const hx = detail.payment_method || "Chuyển khoản";
-                    m[hx] = (m[hx] || 0) + detail.sale_price * detail.quantity;
-                    detail._items.forEach((it) => { const k = it.payment_method || hx; m[k] = (m[k] || 0) + it.amount; });
-                    return Object.entries(m);
-                  })();
-                  return (
-                    <div className="flex flex-col gap-3">
-                      <InfoRows rows={[
-                        ["Ngày bán", fmtDate(detail.sale_date)],
-                        ["Điểm bán", locName(detail.location_code)],
-                        ["Xe", <span key="x">{v ? `${v.brand} · ${v.name} · ${v.color}` : detail.vehicle_id} × {detail.quantity}
-                          {detail.frame_number && <span className="block text-[11px] text-[#8A93A0] font-mono">SK {detail.frame_number}</span>}</span>],
-                        ["Khách hàng", <span key="k">{detail.customer_name}<span className="block text-[11px] text-[#8A93A0]">{detail.customer_phone}</span></span>],
-                        ["NV bán", detail.seller_name],
-                        ["Trạng thái", st === "Đã xuất HĐ"
-                          ? <span key="s"><Badge tone="green">✓ Hoàn thành</Badge>
-                              <span className="block text-[11px] text-[#8A93A0] font-normal mt-0.5">HĐ {detail.invoice_no} · {fmtDate(detail.invoice_date)} · {detail.invoice_by_name} · BH ✓{detail.app_activated ? " · App ✓" : ""}</span></span>
-                          : <Badge key="s" tone="amber">Chờ xuất HĐ</Badge>],
-                        ["Ghi chú", detail.note],
-                      ]} />
-
-                      {canKhachLe(detail) && (
-                        <div className={`rounded-xl border p-3 ${detail.end_customer_id ? "border-[#BBE3CC] bg-[#F4FBF7]" : thieuKhachLe(detail) ? "border-[#F0C000] bg-[#FFFCF0]" : "border-[#E3E8EF]"}`}>
-                          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                            <span className="font-bold text-[13.5px] mr-auto">👤 Khách lẻ cuối (đứng tên hóa đơn)</span>
-                            {detail.end_customer_id
-                              ? <Badge tone="green">✓ Đã có</Badge>
-                              : thieuKhachLe(detail) ? <Badge tone="amber">Bắt buộc — xe VinFast</Badge> : <Badge tone="dark">Chưa có</Badge>}
-                          </div>
-
-                          {detail.end_customer_id && !klEdit ? (
-                            <div className="text-[13px] flex flex-col gap-0.5">
-                              <div><b>{detail.end_customer_name}</b> · {detail.end_customer_phone}</div>
-                              <div className="text-[#5A6572]">{detail.end_customer_email}</div>
-                              <div className="text-[#5A6572]">{detail.end_customer_address}</div>
-                              <div className="text-[11px] text-[#8A93A0] mt-1">Cập nhật bởi {detail.end_customer_by_name} · {fmtDate(detail.end_customer_at)}</div>
-                              <button className="btn-ghost !text-xs mt-1.5 self-start" onClick={() => setKlEdit({
-                                name: detail.end_customer_name, phone: detail.end_customer_phone,
-                                email: detail.end_customer_email, address: detail.end_customer_address })}>✎ Sửa</button>
-                            </div>
-                          ) : klEdit ? (
-                            <div className="flex flex-col gap-2">
-                              <div className="grid gap-2 md:grid-cols-2">
-                                <div><label className="lbl">Họ tên *</label><input className="inp !py-1.5 !text-[13px]" value={klEdit.name} onChange={(e) => setKlEdit((p) => ({ ...p, name: e.target.value }))} /></div>
-                                <div><label className="lbl">Điện thoại *</label><input className="inp !py-1.5 !text-[13px]" value={klEdit.phone} onChange={(e) => setKlEdit((p) => ({ ...p, phone: e.target.value }))} /></div>
-                                <div><label className="lbl">Email *</label><input className="inp !py-1.5 !text-[13px]" value={klEdit.email} onChange={(e) => setKlEdit((p) => ({ ...p, email: e.target.value }))} placeholder="ten@email.com" /></div>
-                                <div><label className="lbl">Địa chỉ VNeID *</label><input className="inp !py-1.5 !text-[13px]" value={klEdit.address} onChange={(e) => setKlEdit((p) => ({ ...p, address: e.target.value }))} /></div>
-                              </div>
-                              <div className="flex gap-2">
-                                <button className="btn-ok !text-xs" disabled={busy} onClick={luuKhachLe}>{busy ? "Đang lưu…" : "Lưu khách lẻ"}</button>
-                                <button className="btn-ghost !text-xs" onClick={() => setKlEdit(null)}>Hủy</button>
-                              </div>
-                              <div className="text-[11px] text-[#8A93A0]">Hồ sơ sẽ tự vào danh mục khách hàng với loại <b>Khách lẻ của Đại lý</b>.</div>
-                            </div>
-                          ) : (
-                            <div>
-                              <div className="text-[12px] text-[#5A6572] mb-2">
-                                {thieuKhachLe(detail)
-                                  ? "Xe VinFast bán buôn — bắt buộc có thông tin khách lẻ cuối trước khi xuất hóa đơn."
-                                  : "Đại lý bán lại cho khách lẻ thì bổ sung thông tin ở đây."}
-                              </div>
-                              <button className="btn-primary !text-xs" onClick={() => setKlEdit({ name: "", phone: "", email: "", address: "" })}>+ Thông tin khách lẻ cuối</button>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      <MoneyRows
-                        lines={[
-                          ["Giá xe" + (detail.quantity > 1 ? ` × ${detail.quantity}` : ""), fmtVND(detail.sale_price * detail.quantity)],
-                          ...(detail._items && detail._items.length > 0
-                            ? detail._items.map((it) => [`${it.name} × ${it.qty}`, fmtVND(it.amount), "font-semibold text-[#5A6572]"])
-                            : []),
-                          ["Tổng đơn", fmtVND(tong), "font-bold text-brand"],
-                          ["Đã thanh toán", fmtVND(detail.paid_amount || 0), "font-bold text-[#0E7A4A]"],
-                        ]}
-                        total={{ label: "Còn phải trả", value: fmtVND(conLai), done: conLai === 0 }}
-                      />
-
-                      {payEdit && (
-                        <div className="p-3 rounded-xl border-2 border-brand bg-[#F8FAFC] flex flex-col gap-2.5">
-                          <div className="font-bold text-[13.5px]">Thu thêm tiền</div>
-                          <div className="flex gap-1.5 flex-wrap">
-                            {conLai > 0 && (
-                              <button className="btn-ok !px-3 !py-1.5 !text-xs"
-                                onClick={() => setPayEdit((p) => ({ ...p, paid: tong, note: p.note || `Thu nốt ${fmtVND(conLai)}` }))}>
-                                Thu nốt {fmtVND(conLai)}
-                              </button>
-                            )}
-                            {[500000, 1000000, 2000000, 5000000].filter((x) => x <= conLai).map((x) => (
-                              <button key={x} className="btn-ghost !px-2.5 !py-1.5 !text-xs"
-                                onClick={() => setPayEdit((p) => ({ ...p, paid: (detail.paid_amount || 0) + x }))}>
-                                +{(x / 1000000).toFixed(x % 1000000 ? 1 : 0)}tr
-                              </button>
-                            ))}
-                          </div>
-                          <div>
-                            <label className="lbl">Hình thức thanh toán (khoản thu thêm)</label>
-                            <div className="flex gap-1.5 flex-wrap">
-                              {(settings?.payment_methods || "Tiền mặt\nChuyển khoản\nTrả góp")
-                                .split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean).map((m) => (
-                                <button key={m} className={`btn !px-3 !py-1.5 !text-xs ${payEdit.method === m ? "bg-brand text-white" : "bg-[#EEF1F4]"}`}
-                                  onClick={() => setPayEdit((p) => ({ ...p, method: m }))}>{m}</button>
-                              ))}
-                            </div>
-                          </div>
-                          <div>
-                            <label className="lbl">Tổng số tiền khách đã trả (sau khi thu thêm)</label>
-                            <MoneyInput value={payEdit.paid} onChange={(v) => setPayEdit((p) => ({ ...p, paid: v }))} />
-                            {Number(payEdit.paid) > (detail.paid_amount || 0) ? (
-                              <div className="text-[11.5px] mt-1 font-bold text-[#0E7A4A]">
-                                Thu thêm {fmtVND(Number(payEdit.paid) - (detail.paid_amount || 0))} — ghi phiếu thu {payEdit.method} vào sổ quỹ
-                              </div>
-                            ) : Number(payEdit.paid) < (detail.paid_amount || 0) ? (
-                              <div className="text-[11.5px] mt-1 font-bold text-danger">
-                                Không giảm số đã thu ở đây. Muốn trả bớt cho khách, đóng ô này và dùng nút <b>↩ Hoàn tiền</b>.
-                              </div>
-                            ) : null}
-                          </div>
-                          <div>
-                            <label className="lbl">Ghi chú (VD: thu tiền mặt 22/07)</label>
-                            <input className="inp" value={payEdit.note} onChange={(e) => setPayEdit((p) => ({ ...p, note: e.target.value }))} />
-                          </div>
-                          <div className="flex gap-2">
-                            <button className="btn-ok !text-xs" disabled={busy} onClick={luuThanhToan}>{busy ? "Đang lưu…" : "Lưu thanh toán"}</button>
-                            <button className="btn-ghost !text-xs" onClick={() => setPayEdit(null)}>Hủy</button>
-                          </div>
-                        </div>
-                      )}
-
-                      {httt && httt.length > 1 && (
-                        <div className="flex flex-wrap gap-1.5 items-center">
-                          <span className="text-[#8A93A0] text-xs">Thu theo hình thức:</span>
-                          {httt.map(([k, val]) => <span key={k} className="inline-flex items-center gap-1 bg-[#F3F5F8] rounded-lg px-2 py-0.5 text-[11px]"><b>{k}:</b> {fmtVND(val)}</span>)}
-                        </div>
-                      )}
-
-                      {detail._items === null && <div className="text-xs text-[#8A93A0]">Đang tải bán kèm…</div>}
-
-                      {(detail.photos || []).length > 0 && (
-                        <div>
-                          <div className="text-[12px] text-[#5A6572] mb-1.5">Ảnh đính kèm ({detail.photos.length})</div>
-                          <div className="flex gap-2 flex-wrap">
-                            {detail.photos.map((ph, i) => (
-                              <a key={i} href={ph.url} target="_blank" rel="noreferrer"><img src={ph.url} alt="" className="w-20 h-20 object-cover rounded-lg border border-[#E3E8EF]" /></a>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
+                ))}
               </div>
             </div>
-          );
-        })()}
-
-        <p className="text-[11px] text-[#8A93A0] mt-2">Đơn nền vàng = chưa xuất hóa đơn. Sales/Cửa hàng trưởng/Admin/BGĐ xác nhận sau khi đã xuất HĐ trên hệ thống hóa đơn điện tử; Admin/BGĐ hủy xác nhận được nếu ghi nhầm (có lưu vết).</p>
+          )}
+          <div className="card !py-3 flex gap-2 flex-wrap">
+            <button className="btn-ghost !text-xs flex-1" onClick={() => printOrder({ supabase, o, vehicles, locations, settings, notify })}>🖨 In phiếu</button>
+            <button className="btn-ghost !text-xs flex-1" onClick={() => printOrderBill({ supabase, o, vehicles, locations, settings, notify })}>🧾 In bill</button>
+          </div>
+        </div>
       </div>
     </div>
   );
