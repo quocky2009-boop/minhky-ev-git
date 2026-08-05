@@ -16,6 +16,7 @@ export default function DonBan() {
   const { toast, notify } = useToast();
   const [rows, setRows] = useState([]);
   const [itemSum, setItemSum] = useState({});
+  const [promoMap, setPromoMap] = useState({});
   const [busy, setBusy] = useState(false);
   const [from, setFrom] = useState(firstOfMonth());
   const [to, setTo] = useState(iso(new Date()));
@@ -49,11 +50,19 @@ export default function DonBan() {
     let qy = supabase.from("sales_orders").select("*").gte("sale_date", from).lte("sale_date", to)
       .order("created_at", { ascending: false }).limit(3000);
     if (fLoc) qy = qy.eq("location_code", fLoc);
-    const [{ data }, { data: si }] = await Promise.all([qy, supabase.from("sale_items").select("sale_code, amount").limit(10000)]);
+    const [{ data }, { data: si }, { data: sop }, { data: promoList }] = await Promise.all([
+      qy, supabase.from("sale_items").select("sale_code, amount").limit(10000),
+      supabase.from("sale_order_promotions").select("sale_code, promotion_id").limit(10000),
+      supabase.from("promotions").select("id, name"),
+    ]);
     setRows(data || []);
     const m = {};
     (si || []).forEach((x) => { m[x.sale_code] = (m[x.sale_code] || 0) + x.amount; });
-    setItemSum(m); setBusy(false);
+    setItemSum(m);
+    const pName = {}; (promoList || []).forEach((p) => { pName[p.id] = p.name; });
+    const pm = {}; (sop || []).forEach((x) => { (pm[x.sale_code] = pm[x.sale_code] || []).push(pName[x.promotion_id] || `#${x.promotion_id}`); });
+    setPromoMap(pm);
+    setBusy(false);
   };
   useEffect(() => { if (!loading) load(); }, [loading, from, to, fLoc]);
 
@@ -228,11 +237,12 @@ export default function DonBan() {
 
   const exportCSV = () => {
     downloadCSV(`don_ban_${from}_den_${to}.csv`,
-      [["Ma_Don","Ngay_Ban","Kho","Xe","Mau","So_Khung","Khach","SDT","Tong_Don","Da_TT","Trang_Thai_HD","So_HD","Ngay_HD","Nguoi_Xac_Nhan","Kich_Hoat_Bao_Hanh","Kich_Hoat_App","NV_Ban"],
+      [["Ma_Don","Ngay_Ban","Kho","Xe","Mau","So_Khung","Khach","SDT","Loai_KH","Tong_Don","Da_TT","Trang_Thai_HD","So_HD","Ngay_HD","Nguoi_Xac_Nhan","Kich_Hoat_Bao_Hanh","Kich_Hoat_App","NV_Ban","Chuong_Trinh_Khuyen_Mai"],
        ...sorted.map((o) => { const v = vOf(o.vehicle_id);
          return [o.code, o.sale_date, locName(o.location_code), v?.name || o.vehicle_id, v?.color || "", o.frame_number,
-           o.customer_name, o.customer_phone, total(o), o.paid_amount || 0,
-           o.invoice_status || "Chờ xuất HĐ", o.invoice_no || "", o.invoice_date || "", o.invoice_by_name || "", o.warranty_activated ? "Có" : "Chưa", o.app_activated ? "Có" : "Chưa", o.seller_name]; })]);
+           o.customer_name, o.customer_phone, o.customer_type || "", total(o), o.paid_amount || 0,
+           o.invoice_status || "Chờ xuất HĐ", o.invoice_no || "", o.invoice_date || "", o.invoice_by_name || "", o.warranty_activated ? "Có" : "Chưa", o.app_activated ? "Có" : "Chưa", o.seller_name,
+           (promoMap[o.code] || []).join(" | ")]; })]);
     notify(`Đã xuất ${sorted.length} đơn.`);
   };
 

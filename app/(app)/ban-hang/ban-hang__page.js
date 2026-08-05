@@ -47,6 +47,9 @@ function TaoDonInner() {
   const [suaCheck, setSuaCheck] = useState(null);  // ket qua kiem tra co sua duoc khong
   const [lyDo, setLyDo] = useState("");
   const [payCu, setPayCu] = useState([]);          // cac khoan da thu (khong sua duoc)
+  const [daoNguoc, setDaoNguoc] = useState(null);
+  const [promos, setPromos] = useState([]);
+  const [promoChon, setPromoChon] = useState([]);   // mang id khuyen mai da tick
   const [suaPaidAmount, setSuaPaidAmount] = useState(0); // paid_amount thuc te tren don (sau hoan tien)
 
   // Khách hàng
@@ -73,11 +76,12 @@ function TaoDonInner() {
   const [extra, setExtra] = useState({});
 
   const loadCusts = async () => {
-    const [{ data: c }, { data: prods }] = await Promise.all([
+    const [{ data: c }, { data: prods }, { data: kms }] = await Promise.all([
       supabase.from("customers").select("id,code,name,phone,cccd,address,status,customer_type,source,email,gender,birthday").order("created_at", { ascending: false }).limit(2000),
       supabase.from("products").select("id,name,group_name,unit,sale_price,stock_qty").eq("status","Hoạt động").order("group_name").order("name"),
+      supabase.from("promotions").select("*").eq("status","Đang áp dụng"),
     ]);
-    setCusts(c || []); setProductList(prods || []);
+    setCusts(c || []); setProductList(prods || []); setPromos(kms || []);
   };
   useEffect(() => {
     if (!loading) {
@@ -113,6 +117,8 @@ function TaoDonInner() {
       setDTong({ type: o.discount_type || "amount", value: o.discount_value || 0 });
       setPayCu(pays0 || []);
       setSuaPaidAmount(o.paid_amount || 0);
+      const { data: sop } = await supabase.from("sale_order_promotions").select("promotion_id").eq("sale_code", o.code);
+      setPromoChon((sop || []).map((x) => x.promotion_id));
 
       // Nạp xe của đơn
       const sks = String(o.frame_number || "").split(",").map((x) => x.trim()).filter(Boolean);
@@ -245,9 +251,29 @@ function TaoDonInner() {
   const conLai = Math.max(phaiTra - daTra, 0);
 
   // ===== LƯU ĐƠN =====
+  const luuDaoNguoc = async () => {
+    if (!daoNguoc.ly_do?.trim()) return notify("Nhập lý do đảo ngược.", "err");
+    if (!Number(daoNguoc.new_amount) || Number(daoNguoc.new_amount) <= 0) return notify("Số tiền mới phải > 0.", "err");
+    if (daoNguoc.new_method === "Trả góp" && !daoNguoc.new_finance) return notify("Chọn đơn vị trả góp.", "err");
+    setBusy(true);
+    const { error } = await supabase.rpc("fn_dao_nguoc_khoan_thu", { p_payment_id: daoNguoc.id, p_ly_do: daoNguoc.ly_do,
+      p_new_method: daoNguoc.new_method, p_new_amount: Number(daoNguoc.new_amount),
+      p_new_finance_company: daoNguoc.new_method === "Trả góp" ? daoNguoc.new_finance : null });
+    setBusy(false);
+    if (error) return notify(errMsg(error), "err");
+    notify("Đã đảo ngược và ghi lại khoản thu mới.");
+    setDaoNguoc(null);
+    const { data: sc } = await supabase.from("sales_orders").select("code, paid_amount").eq("id", suaId).single();
+    const { data: pays2 } = await supabase.from("sale_payments").select("*").eq("sale_code", sc?.code || "");
+    setPayCu(pays2 || []);
+    setSuaPaidAmount(sc?.paid_amount || 0);
+  };
+
   const luuSua = async () => {
     if (xeRows.length === 0) return notify("Đơn phải có ít nhất 1 xe.", "err");
     if (!meta.location_code) return notify("Chọn điểm bán.", "err");
+    const tgThieuSua = pays.find((p) => p.method === "Trả góp" && Number(p.amount) > 0 && !p.tra_gop_ct);
+    if (tgThieuSua) return notify("Chọn đơn vị trả góp cho khoản thu thêm.", "err");
     setBusy(true);
     const { data, error } = await supabase.rpc("fn_sua_don_ban", { p: {
       id: suaId, ...kh, ...meta, ly_do: lyDo,
@@ -262,6 +288,7 @@ function TaoDonInner() {
     } });
     setBusy(false);
     if (error) return notify(errMsg(error), "err");
+    await supabase.rpc("fn_gan_khuyen_mai_don", { p_sale_code: data.code, p_promotion_ids: promoChon });
     notify(`Đã sửa đơn ${data.code}.`);
     router.push(`/don-ban?q=${encodeURIComponent(data.code)}`);
   };
@@ -299,6 +326,10 @@ function TaoDonInner() {
     } });
     if (error) { setBusy(false); return notify(errMsg(error), "err"); }
 
+    if (promoChon.length > 0 && Array.isArray(data?.codes)) {
+      await Promise.all(data.codes.map((code) => supabase.rpc("fn_gan_khuyen_mai_don", { p_sale_code: code, p_promotion_ids: promoChon })));
+    }
+
     // Ảnh đính kèm -> gắn vào đơn đầu tiên
     if (fotos.length > 0 && data?.first) {
       try {
@@ -314,7 +345,7 @@ function TaoDonInner() {
   };
 
   const lamMoi = () => {
-    setKetQua(null); setXeRows([]); setKemRows([]); setPays([]); setFotos([]);
+    setKetQua(null); setXeRows([]); setKemRows([]); setPays([]); setFotos([]); setPromoChon([]);
     setDTong({ type: "amount", value: 0 }); setCustId(""); setNewC(null); setExtra({});
     setKh({ customer_name: "", customer_phone: "", customer_cccd: "", customer_address: "", customer_type: "Khách lẻ", customer_source: "Khách vãng lai", customer_email: "", customer_gender: "", customer_birthday: "" });
     if (profile) setMeta((p) => ({ ...p, seller_id: profile.id, seller_name: profile.name }));
@@ -378,9 +409,13 @@ function TaoDonInner() {
           <div className="flex flex-col gap-1.5">
             {payCu.map((p) => (
               <div key={p.id} className="flex items-center gap-2 text-[13px] p-2 rounded-lg bg-[#F8FAFC]">
-                <Badge tone="green">{p.method}</Badge>
+                <Badge tone={p.is_reversed ? "dark" : "green"}>{p.method}</Badge>
                 <span className="text-[11px] text-[#8A93A0] mr-auto">{p.created_by_name} · {new Date(p.created_at).toLocaleDateString("vi-VN")}</span>
-                <b>{fmtVND(p.amount)}</b>
+                <b className={p.is_reversed ? "line-through text-[#8A93A0]" : ""}>{fmtVND(p.amount)}</b>
+                {p.is_reversed && <span className="text-[10.5px] text-danger">(đã đảo ngược)</span>}
+                {!p.is_reversed && ["ADMIN","CEO"].includes(profile.role) && (
+                  <button className="btn-ghost !px-2 !py-0.5 !text-[11px]" onClick={() => setDaoNguoc({ id: p.id, method: p.method, amount: p.amount, new_method: p.method, new_amount: p.amount, ly_do: "" })}>🔄 Đảo ngược</button>
+                )}
               </div>
             ))}
             {/* Neu co hoan tien: sum(payCu) != suaPaidAmount, hien tong thuc te */}
@@ -614,6 +649,32 @@ function TaoDonInner() {
           </div>
         </div>
 
+        {(() => {
+          const brandsXe = [...new Set(xeRows.map((r) => vehicles.find((v) => v.id === r.vehicle_id)?.brand).filter(Boolean))];
+          const namesXe = [...new Set(xeRows.map((r) => vehicles.find((v) => v.id === r.vehicle_id)?.name).filter(Boolean))];
+          const hopLe = promos.filter((p) =>
+            brandsXe.includes(p.brand) &&
+            (p.vehicle_names.length === 0 || p.vehicle_names.some((n) => namesXe.includes(n))) &&
+            p.end_date >= iso(new Date()));
+          if (xeRows.length === 0) return null;
+          return (
+            <div className="card">
+              <div className="font-extrabold mb-1">🏷 Chương trình khuyến mại áp dụng</div>
+              <p className="text-[11.5px] text-[#8A93A0] mb-2">Chỉ để đánh dấu/nhận diện, không tính giảm giá. Chọn các chương trình khách hàng này tham gia.</p>
+              {hopLe.length === 0 && <div className="text-xs text-[#8A93A0]">Không có chương trình nào đang áp dụng cho (các) xe này.</div>}
+              <div className="flex flex-wrap gap-1.5">
+                {hopLe.map((p) => (
+                  <label key={p.id} className={`text-xs px-2.5 py-1.5 rounded-lg border cursor-pointer ${promoChon.includes(p.id) ? "bg-[#EAF2FF] border-brand text-brand font-semibold" : "border-[#E3E8EF]"}`}>
+                    <input type="checkbox" className="hidden" checked={promoChon.includes(p.id)}
+                      onChange={(e) => setPromoChon((cur) => e.target.checked ? [...cur, p.id] : cur.filter((x) => x !== p.id))} />
+                    {p.name}
+                  </label>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
         <div className="card">
           <div className="font-extrabold mb-2.5">{suaId ? "Thu thêm (nếu có)" : "Thanh toán"}</div>
           <div className="rounded-xl border border-[#E3E8EF] overflow-hidden mb-3">
@@ -709,6 +770,41 @@ function TaoDonInner() {
           </button>
         </div>
       </div>
+
+      {daoNguoc && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-3" onClick={() => setDaoNguoc(null)}>
+          <div className="bg-white rounded-2xl w-[440px] max-w-full p-4" onClick={(e) => e.stopPropagation()}>
+            <div className="font-extrabold mb-1">🔄 Đảo ngược khoản thu</div>
+            <div className="text-[12px] text-[#8A93A0] mb-3">
+              Khoản cũ ({daoNguoc.method}, {fmtVND(daoNguoc.amount)}) sẽ được giữ nguyên để truy vết (đánh dấu đã đảo ngược),
+              tự động hoàn lại đúng quỹ cũ, và tạo khoản thu mới đúng bên dưới.
+            </div>
+            <div className="flex flex-col gap-2.5">
+              <Field label="Lý do đảo ngược" required>
+                <input className="inp" placeholder="VD: sales chọn nhầm phương thức thanh toán" value={daoNguoc.ly_do} onChange={(e) => setDaoNguoc((p) => ({ ...p, ly_do: e.target.value }))} />
+              </Field>
+              <Field label="Phương thức thanh toán mới" required>
+                <select className="inp" value={daoNguoc.new_method} onChange={(e) => setDaoNguoc((p) => ({ ...p, new_method: e.target.value }))}>
+                  <option>Tiền mặt</option><option>Chuyển khoản</option><option>Trả góp</option>
+                </select>
+              </Field>
+              {daoNguoc.new_method === "Trả góp" && (
+                <Field label="Đơn vị trả góp" required>
+                  <select className="inp" value={daoNguoc.new_finance || ""} onChange={(e) => setDaoNguoc((p) => ({ ...p, new_finance: e.target.value }))}>
+                    <option value="">— Chọn —</option>
+                    {(settings?.cong_ty_tra_gop || "Home Credit\nShinhanbank\nHD Saison\nFE Credit").split("\n").filter(Boolean).map((c) => <option key={c}>{c}</option>)}
+                  </select>
+                </Field>
+              )}
+              <Field label="Số tiền mới" required><MoneyInput value={daoNguoc.new_amount} onChange={(v) => setDaoNguoc((p) => ({ ...p, new_amount: v }))} /></Field>
+            </div>
+            <div className="flex gap-2 mt-3">
+              <button className="btn-ghost !text-xs flex-1" onClick={() => setDaoNguoc(null)}>Hủy</button>
+              <button className="btn-ok !text-xs flex-1" disabled={busy} onClick={luuDaoNguoc}>Xác nhận đảo ngược</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
