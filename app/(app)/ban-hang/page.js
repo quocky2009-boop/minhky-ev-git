@@ -653,8 +653,8 @@ function TaoDonInner() {
           const brandsXe = [...new Set(xeRows.map((r) => vehicles.find((v) => v.id === r.vehicle_id)?.brand).filter(Boolean))];
           const namesXe = [...new Set(xeRows.map((r) => vehicles.find((v) => v.id === r.vehicle_id)?.name).filter(Boolean))];
           const hopLe = promos.filter((p) =>
-            brandsXe.includes(p.brand) &&
-            (p.vehicle_names.length === 0 || p.vehicle_names.some((n) => namesXe.includes(n))) &&
+            brandsXe.some((b) => b.trim().toLowerCase() === p.brand.trim().toLowerCase()) &&
+            (p.vehicle_names.length === 0 || p.vehicle_names.some((n) => namesXe.some((nx) => nx.trim().toLowerCase() === n.trim().toLowerCase()))) &&
             p.end_date >= iso(new Date()));
           if (xeRows.length === 0) return null;
           return (
