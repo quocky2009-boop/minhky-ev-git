@@ -15,19 +15,22 @@ export default function DonBanChiTiet() {
   const [o, setO] = useState(null);
   const [items, setItems] = useState([]);
   const [pays, setPays] = useState([]);
+  const [promoTags, setPromoTags] = useState([]);
   const [busy, setBusy] = useState(false);
 
   const load = async () => {
     const { data: ord } = await supabase.from("sales_orders").select("*").eq("id", id).single();
     if (!ord) return;
     const code = ord.code;
-    const [{ data: its }, { data: ps }] = await Promise.all([
+    const [{ data: its }, { data: ps }, { data: sop }] = await Promise.all([
       supabase.from("sale_items").select("*").eq("sale_code", code),
       supabase.from("sale_payments").select("*").eq("sale_code", code),
+      supabase.from("sale_order_promotions").select("promotion_id, promotions(name)").eq("sale_code", code),
     ]);
     setO(ord);
     setItems(its || []);
     setPays(ps || []);
+    setPromoTags((sop || []).map((x) => x.promotions?.name).filter(Boolean));
   };
   useEffect(() => { if (!loading) load(); }, [loading, id]);
 
@@ -113,6 +116,7 @@ export default function DonBanChiTiet() {
       <div className="flex items-center gap-3 flex-wrap">
         <span className="text-xl font-extrabold">{o.code}</span>
         <Badge tone={statusBadge}>{statusLabel}</Badge>
+        {promoTags.map((name) => <Badge key={name} tone="purple">🏷 {name}</Badge>)}
       </div>
 
       {/* TIMELINE */}
