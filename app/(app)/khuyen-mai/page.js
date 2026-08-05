@@ -102,7 +102,7 @@ export default function KhuyenMai() {
               </div>
             </div>
             <div className="md:col-span-3 sm:col-span-2">
-              <Field label="Ghi chú / điều kiện chương trình"><textarea className="inp" rows={2} value={f.note} onChange={(e) => set("note", e.target.value)} /></Field>
+              <Field label="Ghi chú / điều kiện chương trình"><textarea className="inp" rows={8} value={f.note} onChange={(e) => set("note", e.target.value)} /></Field>
             </div>
           </div>
           <div className="flex gap-2 mt-3">

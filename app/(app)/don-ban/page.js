@@ -128,9 +128,12 @@ export default function DonBan() {
   };
 
   const openDetail = async (o) => {
-    setDetail({ ...o, _items: null });
-    const { data: di } = await supabase.from("sale_items").select("*").eq("sale_code", o.code);
-    setDetail((d) => (d && d.id === o.id ? { ...d, _items: di || [] } : d));
+    setDetail({ ...o, _items: null, _promos: null });
+    const [{ data: di }, { data: sop }] = await Promise.all([
+      supabase.from("sale_items").select("*").eq("sale_code", o.code),
+      supabase.from("sale_order_promotions").select("promotion_id, promotions(name)").eq("sale_code", o.code),
+    ]);
+    setDetail((d) => (d && d.id === o.id ? { ...d, _items: di || [], _promos: (sop || []).map((x) => x.promotions?.name).filter(Boolean) } : d));
   };
 
   const canSuaTT = ["CEO", "MANAGER", "ADMIN"].includes(profile?.role);
@@ -395,7 +398,7 @@ export default function DonBan() {
           return (
             <div className="fixed inset-0 z-[95] bg-black/50 flex items-center justify-center p-3" onClick={() => setDetail(null)}>
               <div className="bg-white rounded-2xl w-[600px] max-w-full max-h-[88vh] overflow-y-auto p-4" onClick={(e) => e.stopPropagation()}>
-                <div className="flex items-center gap-1.5 mb-3 flex-wrap">
+                <div className="flex items-center gap-1.5 mb-2 flex-wrap">
                   <div className="font-extrabold text-base mr-auto">Xem nhanh đơn {detail.code}{(detail.status === "Đã hủy" || detail.status === "Đã trả hàng") && <Badge tone="red">{detail.status}</Badge>}</div>
                   {(detail.status === "Đã hủy" || detail.status === "Đã trả hàng") ? (
                     <>
@@ -418,6 +421,11 @@ export default function DonBan() {
                   <button className="btn-ghost !px-3 !py-1.5 !text-xs" onClick={() => setDetail(null)}>✕</button>
                   </>)}
                 </div>
+                {detail._promos && detail._promos.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mb-3">
+                    {detail._promos.map((name) => <Badge key={name} tone="purple">🏷 {name}</Badge>)}
+                  </div>
+                )}
                 {(detail.status === "Đã hủy" || detail.status === "Đã trả hàng") && detail.cancel_reason && (
                   <div className="mb-3 p-2.5 rounded-xl bg-[#FDEDED] text-[13px]">
                     <b className="text-danger">{detail.status}</b> — {detail.cancel_reason}

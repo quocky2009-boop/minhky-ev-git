@@ -50,6 +50,7 @@ function TaoDonInner() {
   const [daoNguoc, setDaoNguoc] = useState(null);
   const [promos, setPromos] = useState([]);
   const [promoChon, setPromoChon] = useState([]);   // mang id khuyen mai da tick
+  const [promoQ, setPromoQ] = useState("");
   const [suaPaidAmount, setSuaPaidAmount] = useState(0); // paid_amount thuc te tren don (sau hoan tien)
 
   // Khách hàng
@@ -656,14 +657,19 @@ function TaoDonInner() {
             brandsXe.some((b) => b.trim().toLowerCase() === p.brand.trim().toLowerCase()) &&
             (p.vehicle_names.length === 0 || p.vehicle_names.some((n) => namesXe.some((nx) => nx.trim().toLowerCase() === n.trim().toLowerCase()))) &&
             p.end_date >= iso(new Date()));
+          const hopLeLoc = promoQ ? hopLe.filter((p) => `${p.code} ${p.name}`.toLowerCase().includes(promoQ.toLowerCase())) : hopLe;
           if (xeRows.length === 0) return null;
           return (
             <div className="card">
               <div className="font-extrabold mb-1">🏷 Chương trình khuyến mại áp dụng</div>
               <p className="text-[11.5px] text-[#8A93A0] mb-2">Chỉ để đánh dấu/nhận diện, không tính giảm giá. Chọn các chương trình khách hàng này tham gia.</p>
+              {hopLe.length > 5 && (
+                <input className="inp !w-72 mb-2" placeholder="Gõ tìm chương trình…" value={promoQ} onChange={(e) => setPromoQ(e.target.value)} />
+              )}
               {hopLe.length === 0 && <div className="text-xs text-[#8A93A0]">Không có chương trình nào đang áp dụng cho (các) xe này.</div>}
+              {hopLe.length > 0 && hopLeLoc.length === 0 && <div className="text-xs text-[#8A93A0]">Không có chương trình nào khớp tìm kiếm.</div>}
               <div className="flex flex-wrap gap-1.5">
-                {hopLe.map((p) => (
+                {hopLeLoc.map((p) => (
                   <label key={p.id} className={`text-xs px-2.5 py-1.5 rounded-lg border cursor-pointer ${promoChon.includes(p.id) ? "bg-[#EAF2FF] border-brand text-brand font-semibold" : "border-[#E3E8EF]"}`}>
                     <input type="checkbox" className="hidden" checked={promoChon.includes(p.id)}
                       onChange={(e) => setPromoChon((cur) => e.target.checked ? [...cur, p.id] : cur.filter((x) => x !== p.id))} />
