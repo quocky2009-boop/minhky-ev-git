@@ -275,6 +275,7 @@ function TaoDonInner() {
     if (!meta.location_code) return notify("Chọn điểm bán.", "err");
     const tgThieuSua = pays.find((p) => p.method === "Trả góp" && Number(p.amount) > 0 && !p.tra_gop_ct);
     if (tgThieuSua) return notify("Chọn đơn vị trả góp cho khoản thu thêm.", "err");
+    if (!canhBaoMotPTTT()) return;
     setBusy(true);
     const { data, error } = await supabase.rpc("fn_sua_don_ban", { p: {
       id: suaId, ...kh, ...meta, ly_do: lyDo,
@@ -294,6 +295,13 @@ function TaoDonInner() {
     router.push(`/don-ban?q=${encodeURIComponent(data.code)}`);
   };
 
+  const canhBaoMotPTTT = () => {
+    const cacDong = pays.filter((p) => Number(p.amount) > 0);
+    if (cacDong.length !== 1) return true; // 0 dong (khong thu them) hoac >=2 dong (da tach) -> khong can canh bao
+    const d = cacDong[0];
+    return confirm(`⚠️ Đơn này chỉ chọn ĐÚNG 1 phương thức thanh toán duy nhất:\n\n${d.method}: ${Number(d.amount).toLocaleString("vi-VN")}đ\n\nNếu khách thực tế trả bằng NHIỀU phương thức khác nhau (VD: một phần tiền mặt + một phần chuyển khoản), hạch toán thu-chi vào sổ quỹ sẽ SAI theo từng tài khoản.\n\nBấm OK nếu chắc chắn khách CHỈ trả bằng đúng 1 phương thức này.\nBấm Hủy để quay lại sửa cho đúng.`);
+  };
+
   const luuDon = async () => {
     if (xeRows.length === 0) return notify("Chưa chọn xe nào.", "err");
     if (!kh.customer_name || !kh.customer_phone) return notify("Chọn hoặc nhập khách hàng.", "err");
@@ -302,6 +310,7 @@ function TaoDonInner() {
     if (tgThieu) return notify("Chọn đơn vị trả góp.", "err");
     const cfThieu = cfields.find((c) => c.required && c.field_type !== "formula" && !extra[c.field_key]);
     if (cfThieu) return notify(`Nhập "${cfThieu.label}".`, "err");
+    if (!canhBaoMotPTTT()) return;
     setBusy(true);
     const { data, error } = await supabase.rpc("fn_ban_hang_v2", { p: {
       ...kh, ...meta,
@@ -683,6 +692,11 @@ function TaoDonInner() {
 
         <div className="card">
           <div className="font-extrabold mb-2.5">{suaId ? "Thu thêm (nếu có)" : "Thanh toán"}</div>
+          {pays.filter((p) => Number(p.amount) > 0).length === 1 && (
+            <div className="mb-2.5 px-3 py-2 rounded-lg bg-[#FFF8E5] text-[#A25F00] text-[12.5px] flex items-center gap-1.5">
+              ⚠️ Đang chọn đúng 1 phương thức duy nhất — kiểm tra kỹ nếu khách trả bằng nhiều hình thức khác nhau.
+            </div>
+          )}
           <div className="rounded-xl border border-[#E3E8EF] overflow-hidden mb-3">
             <div className="flex items-center justify-between px-3 py-2 border-b border-dashed border-[#E3E8EF] text-[13.5px]">
               <span className="text-[#5A6572]">Tiền xe ({xeRows.length} xe)</span><span className="font-bold">{fmtVND(tongXe)}</span>

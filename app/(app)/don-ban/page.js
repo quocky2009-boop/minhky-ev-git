@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Badge, Toast, KPI, Pager, pageSlice, pageClamp, useSortable, Th, LocSearch, MoneyInput, useSelection, ThCheck, TdCheck, SelectionBar } from "@/components/ui";
-import { fmtVND, fmtDate, fmtTime, errMsg, downloadCSV } from "@/lib/format";
+import { fmtVND, fmtDate, fmtTime, errMsg, downloadCSV, downloadXLSX } from "@/lib/format";
 import { printOrder, printOrderBill } from "@/lib/print";
 import { InfoRows, MoneyRows } from "@/components/detail";
 import Link from "next/link";
@@ -16,6 +16,8 @@ export default function DonBan() {
   const { toast, notify } = useToast();
   const [rows, setRows] = useState([]);
   const [itemSum, setItemSum] = useState({});
+  const [itemSumByType, setItemSumByType] = useState({});
+  const [payByMethodMap, setPayByMethodMap] = useState({});
   const [promoMap, setPromoMap] = useState({});
   const [kmAuditMap, setKmAuditMap] = useState({});
   const [showThuong, setShowThuong] = useState(false);
@@ -53,16 +55,30 @@ export default function DonBan() {
     let qy = supabase.from("sales_orders").select("*").gte("sale_date", from).lte("sale_date", to)
       .order("created_at", { ascending: false }).limit(3000);
     if (fLoc) qy = qy.eq("location_code", fLoc);
-    const [{ data }, { data: si }, { data: sop }, { data: promoList }, { data: kmAudit }] = await Promise.all([
-      qy, supabase.from("sale_items").select("sale_code, amount").limit(10000),
+    const [{ data }, { data: si }, { data: sop }, { data: promoList }, { data: kmAudit }, { data: sp }] = await Promise.all([
+      qy, supabase.from("sale_items").select("sale_code, amount, item_type").limit(10000),
       supabase.from("sale_order_promotions").select("sale_code, promotion_id").limit(10000),
       supabase.from("promotions").select("id, name"),
       supabase.from("v_don_ban_km_audit").select("*").limit(10000),
+      supabase.from("sale_payments").select("sale_code, method, amount, is_reversed").limit(10000),
     ]);
     setRows(data || []);
     const m = {};
-    (si || []).forEach((x) => { m[x.sale_code] = (m[x.sale_code] || 0) + x.amount; });
+    const byType = {};
+    (si || []).forEach((x) => {
+      m[x.sale_code] = (m[x.sale_code] || 0) + x.amount;
+      const t = byType[x.sale_code] = byType[x.sale_code] || { PHU_KIEN: 0, BAO_HIEM: 0, DANG_KY: 0 };
+      if (t[x.item_type] !== undefined) t[x.item_type] += x.amount;
+    });
     setItemSum(m);
+    setItemSumByType(byType);
+    const payByMethod = {};
+    (sp || []).forEach((x) => {
+      if (x.is_reversed) return;
+      const t = payByMethod[x.sale_code] = payByMethod[x.sale_code] || { "Tiền mặt": 0, "Chuyển khoản": 0, "Trả góp": 0 };
+      if (t[x.method] !== undefined) t[x.method] += x.amount;
+    });
+    setPayByMethodMap(payByMethod);
     const pName = {}; (promoList || []).forEach((p) => { pName[p.id] = p.name; });
     const pm = {}; (sop || []).forEach((x) => { (pm[x.sale_code] = pm[x.sale_code] || []).push(pName[x.promotion_id] || `#${x.promotion_id}`); });
     setPromoMap(pm);
@@ -261,7 +277,7 @@ export default function DonBan() {
         o.customer_type || "", o.seller_name, o.invoice_status === "Đã xuất HĐ" ? "Hợp lệ" : "",
         "", "", "", "", "", ""]; // N-S de trong, tu dien sau theo huong dan file mau
     });
-    downloadCSV(`tinh_thuong_${khuVucThuong}_${from}_den_${to}.csv`, [header1, header2, ...data]);
+    downloadXLSX(`tinh_thuong_${khuVucThuong}_${from}_den_${to}.xlsx`, [header1, header2, ...data]);
     notify(`Đã xuất ${data.length} đơn khu vực ${khuVucThuong}.`);
     setShowThuong(false);
   };
@@ -269,14 +285,24 @@ export default function DonBan() {
   const exportCSV = () => {
     const soCotKmToiDa = Math.max(1, ...sorted.map((o) => (promoMap[o.code] || []).length));
     const cotKm = Array.from({ length: soCotKmToiDa }, (_, i) => `Khuyen_Mai_${i + 1}`);
-    downloadCSV(`don_ban_${from}_den_${to}.csv`,
-      [["Ma_Don","Ngay_Ban","Kho","Xe","Mau","So_Khung","Khach","SDT","Loai_KH","Tong_Don","Da_TT","Trang_Thai_HD","So_HD","Ngay_HD","Nguoi_Xac_Nhan","Kich_Hoat_Bao_Hanh","Kich_Hoat_App","NV_Ban",
+    downloadXLSX(`don_ban_${from}_den_${to}.xlsx`,
+      [["Ma_Don","Ngay_Ban","Kho","Xe","Mau","So_Khung","Khach","SDT","Loai_KH",
+        "Don_Gia_Xe","Chiet_Khau_Xe","Thanh_Tien_Xe","Thanh_Tien_Phu_Kien","Thanh_Tien_Bao_Hiem","Thanh_Tien_Dang_Ky",
+        "Tong_Don","Tien_Mat","Chuyen_Khoan","Tra_Gop","Da_TT",
+        "Trang_Thai_HD","So_HD","Ngay_HD","Nguoi_Xac_Nhan","Kich_Hoat_Bao_Hanh","Kich_Hoat_App","NV_Ban",
         ...cotKm, "So_Lan_Sua_KM", "Co_Sua_KM_Sau_Khi_Tao"],
        ...sorted.map((o) => { const v = vOf(o.vehicle_id);
          const tags = promoMap[o.code] || [];
          const audit = kmAuditMap[o.code];
+         const byType = itemSumByType[o.code] || { PHU_KIEN: 0, BAO_HIEM: 0, DANG_KY: 0 };
+         const pay = payByMethodMap[o.code] || { "Tiền mặt": 0, "Chuyển khoản": 0, "Trả góp": 0 };
+         const thanhTienXe = o.sale_price * o.quantity;
+         const donGiaXe = o.list_price * o.quantity;
+         const chietKhauXe = Math.max(donGiaXe - thanhTienXe, 0);
          return [o.code, o.sale_date, locName(o.location_code), v?.name || o.vehicle_id, v?.color || "", o.frame_number,
-           o.customer_name, o.customer_phone, o.customer_type || "", total(o), o.paid_amount || 0,
+           o.customer_name, o.customer_phone, o.customer_type || "",
+           donGiaXe, chietKhauXe, thanhTienXe, byType.PHU_KIEN, byType.BAO_HIEM, byType.DANG_KY,
+           total(o), pay["Tiền mặt"], pay["Chuyển khoản"], pay["Trả góp"], o.paid_amount || 0,
            o.invoice_status || "Chờ xuất HĐ", o.invoice_no || "", o.invoice_date || "", o.invoice_by_name || "", o.warranty_activated ? "Có" : "Chưa", o.app_activated ? "Có" : "Chưa", o.seller_name,
            ...cotKm.map((_, i) => tags[i] || ""),
            audit?.tong_so_lan_thao_tac || 0,
@@ -315,7 +341,7 @@ export default function DonBan() {
             {showHuy ? "Đang hiện đơn hủy/trả" : `Đơn hủy/trả${nHuy ? ` (${nHuy})` : ""}`}
           </button>
           <input className="inp !w-56" placeholder="Tìm mã đơn, khách, số khung, số HĐ…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
-          <button className="btn-ghost !text-xs" onClick={exportCSV}>⬇ CSV</button>
+          <button className="btn-ghost !text-xs" onClick={exportCSV}>⬇ Excel</button>
           <button className="btn-ghost !text-xs" onClick={() => setShowThuong(!showThuong)}>🏆 Tính thưởng tháng</button>
         </div>
 
@@ -337,7 +363,7 @@ export default function DonBan() {
               <span className="text-[12px] font-bold text-brand px-1.5 self-center">Tổng đơn: {fmtVND(sorted.filter((o) => sel.has(o.id)).reduce((a, b) => a + total(b), 0))}</span>
               <button className="btn-ghost !text-xs !py-1" onClick={() => {
                 const rs = sorted.filter((o) => sel.has(o.id));
-                downloadCSV(`don_ban_chon.csv`, [["Mã đơn", "Ngày", "Xe", "Số khung", "Kho", "Khách", "SĐT", "Tổng đơn", "Đã trả", "Hóa đơn", "NV bán"],
+                downloadXLSX(`don_ban_chon.xlsx`, [["Mã đơn", "Ngày", "Xe", "Số khung", "Kho", "Khách", "SĐT", "Tổng đơn", "Đã trả", "Hóa đơn", "NV bán"],
                   ...rs.map((o) => { const v = vOf(o.vehicle_id); return [o.code, fmtDate(o.sale_date), v ? `${v.name} ${v.color}` : o.vehicle_id, o.frame_number, locName(o.location_code), o.customer_name, o.customer_phone, total(o), o.paid_amount || 0, o.invoice_status || "Chờ xuất HĐ", o.seller_name]; })]);
                 notify(`Đã xuất ${rs.length} đơn đã chọn.`);
               }}>⬇ Xuất Excel</button>
