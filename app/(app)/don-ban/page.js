@@ -18,6 +18,8 @@ export default function DonBan() {
   const [itemSum, setItemSum] = useState({});
   const [promoMap, setPromoMap] = useState({});
   const [kmAuditMap, setKmAuditMap] = useState({});
+  const [showThuong, setShowThuong] = useState(false);
+  const [khuVucThuong, setKhuVucThuong] = useState("");
   const [busy, setBusy] = useState(false);
   const [from, setFrom] = useState(firstOfMonth());
   const [to, setTo] = useState(iso(new Date()));
@@ -241,9 +243,6 @@ export default function DonBan() {
     notify("Đã trả hàng đơn " + o.code + " — xe nhập lại kho, hoàn tiền theo sổ quỹ.");
     setDetail(null); load();
   };
-
-  const [showThuong, setShowThuong] = useState(false);
-  const [khuVucThuong, setKhuVucThuong] = useState("");
 
   const exportThuongThang = () => {
     if (!khuVucThuong) return notify("Chọn khu vực trước khi xuất.", "err");
