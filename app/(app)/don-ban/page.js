@@ -17,7 +17,7 @@ export default function DonBan() {
   const [rows, setRows] = useState([]);
   const [itemSum, setItemSum] = useState({});
   const [itemSumByType, setItemSumByType] = useState({});
-  const [payByMethodMap, setPayByMethodMap] = useState({});
+  const [payListMap, setPayListMap] = useState({});
   const [promoMap, setPromoMap] = useState({});
   const [kmAuditMap, setKmAuditMap] = useState({});
   const [showThuong, setShowThuong] = useState(false);
@@ -72,13 +72,12 @@ export default function DonBan() {
     });
     setItemSum(m);
     setItemSumByType(byType);
-    const payByMethod = {};
+    const payList = {}; // sale_code -> [{method, amount}] theo dung tung lan, khong gop
     (sp || []).forEach((x) => {
       if (x.is_reversed) return;
-      const t = payByMethod[x.sale_code] = payByMethod[x.sale_code] || { "Tiền mặt": 0, "Chuyển khoản": 0, "Trả góp": 0 };
-      if (t[x.method] !== undefined) t[x.method] += x.amount;
+      (payList[x.sale_code] = payList[x.sale_code] || []).push({ method: x.method, amount: x.amount });
     });
-    setPayByMethodMap(payByMethod);
+    setPayListMap(payList);
     const pName = {}; (promoList || []).forEach((p) => { pName[p.id] = p.name; });
     const pm = {}; (sop || []).forEach((x) => { (pm[x.sale_code] = pm[x.sale_code] || []).push(pName[x.promotion_id] || `#${x.promotion_id}`); });
     setPromoMap(pm);
@@ -150,12 +149,13 @@ export default function DonBan() {
   };
 
   const openDetail = async (o) => {
-    setDetail({ ...o, _items: null, _promos: null });
-    const [{ data: di }, { data: sop }] = await Promise.all([
+    setDetail({ ...o, _items: null, _promos: null, _pays: null });
+    const [{ data: di }, { data: sop }, { data: pl }] = await Promise.all([
       supabase.from("sale_items").select("*").eq("sale_code", o.code),
       supabase.from("sale_order_promotions").select("promotion_id, promotions(name)").eq("sale_code", o.code),
+      supabase.from("sale_payments").select("*").eq("sale_code", o.code).order("created_at"),
     ]);
-    setDetail((d) => (d && d.id === o.id ? { ...d, _items: di || [], _promos: (sop || []).map((x) => x.promotions?.name).filter(Boolean) } : d));
+    setDetail((d) => (d && d.id === o.id ? { ...d, _items: di || [], _promos: (sop || []).map((x) => x.promotions?.name).filter(Boolean), _pays: pl || [] } : d));
   };
 
   const canSuaTT = ["CEO", "MANAGER", "ADMIN"].includes(profile?.role);
@@ -285,24 +285,42 @@ export default function DonBan() {
   const exportCSV = () => {
     const soCotKmToiDa = Math.max(1, ...sorted.map((o) => (promoMap[o.code] || []).length));
     const cotKm = Array.from({ length: soCotKmToiDa }, (_, i) => `Khuyen_Mai_${i + 1}`);
+
+    const CAC_PT = ["Tiền mặt", "Chuyển khoản", "Trả góp"];
+    const soLanToiDa = {}; // { "Tiền mặt": 2, "Chuyển khoản": 3, ... } = so lan nhieu nhat cua PT do trong toan bo don xuat
+    CAC_PT.forEach((pt) => {
+      soLanToiDa[pt] = Math.max(1, ...sorted.map((o) => (payListMap[o.code] || []).filter((p) => p.method === pt).length));
+    });
+    const cotPT = []; // ten cot theo dung thu tu: Tien_Mat_1, Tien_Mat_2, Chuyen_Khoan_1, ...
+    CAC_PT.forEach((pt) => {
+      const ten = pt === "Tiền mặt" ? "Tien_Mat" : pt === "Chuyển khoản" ? "Chuyen_Khoan" : "Tra_Gop";
+      for (let i = 1; i <= soLanToiDa[pt]; i++) cotPT.push(`${ten}_${i}`);
+    });
+
     downloadXLSX(`don_ban_${from}_den_${to}.xlsx`,
       [["Ma_Don","Ngay_Ban","Kho","Xe","Mau","So_Khung","Khach","SDT","Loai_KH",
         "Don_Gia_Xe","Chiet_Khau_Xe","Thanh_Tien_Xe","Thanh_Tien_Phu_Kien","Thanh_Tien_Bao_Hiem","Thanh_Tien_Dang_Ky",
-        "Tong_Don","Tien_Mat","Chuyen_Khoan","Tra_Gop","Da_TT",
+        "Tong_Don", ...cotPT, "Da_TT",
         "Trang_Thai_HD","So_HD","Ngay_HD","Nguoi_Xac_Nhan","Kich_Hoat_Bao_Hanh","Kich_Hoat_App","NV_Ban",
         ...cotKm, "So_Lan_Sua_KM", "Co_Sua_KM_Sau_Khi_Tao"],
        ...sorted.map((o) => { const v = vOf(o.vehicle_id);
          const tags = promoMap[o.code] || [];
          const audit = kmAuditMap[o.code];
          const byType = itemSumByType[o.code] || { PHU_KIEN: 0, BAO_HIEM: 0, DANG_KY: 0 };
-         const pay = payByMethodMap[o.code] || { "Tiền mặt": 0, "Chuyển khoản": 0, "Trả góp": 0 };
+         const dsThanhToan = payListMap[o.code] || [];
+         // Voi moi phuong thuc, lay dung cac dong khop PT do, dien lan luot vao cac cot Tien_Mat_1/2/3...
+         const giaTriCotPT = [];
+         CAC_PT.forEach((pt) => {
+           const cacDong = dsThanhToan.filter((p) => p.method === pt);
+           for (let i = 0; i < soLanToiDa[pt]; i++) giaTriCotPT.push(cacDong[i]?.amount ?? "");
+         });
          const thanhTienXe = o.sale_price * o.quantity;
          const donGiaXe = o.list_price * o.quantity;
          const chietKhauXe = Math.max(donGiaXe - thanhTienXe, 0);
          return [o.code, o.sale_date, locName(o.location_code), v?.name || o.vehicle_id, v?.color || "", o.frame_number,
            o.customer_name, o.customer_phone, o.customer_type || "",
            donGiaXe, chietKhauXe, thanhTienXe, byType.PHU_KIEN, byType.BAO_HIEM, byType.DANG_KY,
-           total(o), pay["Tiền mặt"], pay["Chuyển khoản"], pay["Trả góp"], o.paid_amount || 0,
+           total(o), ...giaTriCotPT, o.paid_amount || 0,
            o.invoice_status || "Chờ xuất HĐ", o.invoice_no || "", o.invoice_date || "", o.invoice_by_name || "", o.warranty_activated ? "Có" : "Chưa", o.app_activated ? "Có" : "Chưa", o.seller_name,
            ...cotKm.map((_, i) => tags[i] || ""),
            audit?.tong_so_lan_thao_tac || 0,
@@ -644,6 +662,23 @@ export default function DonBan() {
                         <div className="flex flex-wrap gap-1.5 items-center">
                           <span className="text-[#8A93A0] text-xs">Thu theo hình thức:</span>
                           {httt.map(([k, val]) => <span key={k} className="inline-flex items-center gap-1 bg-[#F3F5F8] rounded-lg px-2 py-0.5 text-[11px]"><b>{k}:</b> {fmtVND(val)}</span>)}
+                        </div>
+                      )}
+
+                      {detail._pays && detail._pays.length > 0 && (
+                        <div>
+                          <div className="text-[12px] text-[#5A6572] mb-1">Chi tiết các lần thanh toán ({detail._pays.length} lần):</div>
+                          <div className="flex flex-col gap-1">
+                            {detail._pays.map((p) => (
+                              <div key={p.id} className={`flex items-center gap-2 p-1.5 rounded-lg text-[12.5px] ${p.is_reversed ? "bg-[#F3F4F6] text-[#8A93A0] line-through" : "bg-[#F8FAFC]"}`}>
+                                <div className="w-1.5 h-1.5 rounded-full bg-brand shrink-0" />
+                                <span className="font-semibold">{p.method}</span>
+                                <span className="font-bold ml-auto">{fmtVND(p.amount)}</span>
+                                {p.is_reversed && <Badge tone="dark">Đã đảo ngược</Badge>}
+                                <span className="text-[10.5px] text-[#8A93A0]">{fmtTime(p.created_at)}</span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       )}
 
