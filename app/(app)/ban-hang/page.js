@@ -254,12 +254,13 @@ function TaoDonInner() {
   // ===== LƯU ĐƠN =====
   const luuDaoNguoc = async () => {
     if (!daoNguoc.ly_do?.trim()) return notify("Nhập lý do đảo ngược.", "err");
-    if (!Number(daoNguoc.new_amount) || Number(daoNguoc.new_amount) <= 0) return notify("Số tiền mới phải > 0.", "err");
-    if (daoNguoc.new_method === "Trả góp" && !daoNguoc.new_finance) return notify("Chọn đơn vị trả góp.", "err");
+    const cacDong = (daoNguoc.new_payments || []).filter((p) => Number(p.amount) > 0);
+    if (cacDong.length === 0) return notify("Nhập ít nhất 1 phương thức thanh toán mới.", "err");
+    const tgThieu = cacDong.find((p) => p.method === "Trả góp" && !p.finance_company);
+    if (tgThieu) return notify("Chọn đơn vị trả góp.", "err");
     setBusy(true);
     const { error } = await supabase.rpc("fn_dao_nguoc_khoan_thu", { p_payment_id: daoNguoc.id, p_ly_do: daoNguoc.ly_do,
-      p_new_method: daoNguoc.new_method, p_new_amount: Number(daoNguoc.new_amount),
-      p_new_finance_company: daoNguoc.new_method === "Trả góp" ? daoNguoc.new_finance : null });
+      p_new_payments: cacDong.map((p) => ({ method: p.method, amount: Number(p.amount), finance_company: p.finance_company || null })) });
     setBusy(false);
     if (error) return notify(errMsg(error), "err");
     notify("Đã đảo ngược và ghi lại khoản thu mới.");
@@ -386,8 +387,13 @@ function TaoDonInner() {
     <>
       <td data-label="Chiết khấu" className="td">
         <div className="flex gap-1">
-          <input type="number" className="inp !py-1 !text-xs !w-16" value={r.discount_value || ""} placeholder="0"
-            onChange={(e) => set(i, "discount_value", e.target.value)} />
+          {r.discount_type === "percent" ? (
+            <input type="number" className="inp !py-1 !text-xs !w-20" value={r.discount_value || ""} placeholder="0"
+              onChange={(e) => set(i, "discount_value", e.target.value)} />
+          ) : (
+            <MoneyInput className="!py-1 !text-xs !w-28" value={r.discount_value || ""} placeholder="0"
+              onChange={(v) => set(i, "discount_value", v)} />
+          )}
           <select className="inp !py-1 !text-xs !w-14" value={r.discount_type} onChange={(e) => set(i, "discount_type", e.target.value)}>
             <option value="amount">đ</option><option value="percent">%</option>
           </select>
@@ -424,7 +430,7 @@ function TaoDonInner() {
                 <b className={p.is_reversed ? "line-through text-[#8A93A0]" : ""}>{fmtVND(p.amount)}</b>
                 {p.is_reversed && <span className="text-[10.5px] text-danger">(đã đảo ngược)</span>}
                 {!p.is_reversed && ["ADMIN","CEO"].includes(profile.role) && (
-                  <button className="btn-ghost !px-2 !py-0.5 !text-[11px]" onClick={() => setDaoNguoc({ id: p.id, method: p.method, amount: p.amount, new_method: p.method, new_amount: p.amount, ly_do: "" })}>🔄 Đảo ngược</button>
+                  <button className="btn-ghost !px-2 !py-0.5 !text-[11px]" onClick={() => setDaoNguoc({ id: p.id, method: p.method, amount: p.amount, new_payments: [{ method: p.method, amount: p.amount, finance_company: "" }], ly_do: "" })}>🔄 Đảo ngược</button>
                 )}
               </div>
             ))}
@@ -709,8 +715,13 @@ function TaoDonInner() {
             <div className="flex items-center justify-between px-3 py-2 border-b border-dashed border-[#E3E8EF] text-[13.5px]">
               <span className="text-[#5A6572]">Chiết khấu đơn hàng</span>
               <span className="flex gap-1 items-center">
-                <input type="number" className="inp !py-1 !text-xs !w-20 text-right" value={dTong.value || ""} placeholder="0"
-                  onChange={(e) => setDTong((p) => ({ ...p, value: e.target.value }))} />
+                {dTong.type === "percent" ? (
+                  <input type="number" className="inp !py-1 !text-xs !w-20" value={dTong.value || ""} placeholder="0"
+                    onChange={(e) => setDTong((p) => ({ ...p, value: e.target.value }))} />
+                ) : (
+                  <MoneyInput className="!py-1 !text-xs !w-28" value={dTong.value || ""} placeholder="0"
+                    onChange={(v) => setDTong((p) => ({ ...p, value: v }))} />
+                )}
                 <select className="inp !py-1 !text-xs !w-14" value={dTong.type} onChange={(e) => setDTong((p) => ({ ...p, type: e.target.value }))}>
                   <option value="amount">đ</option><option value="percent">%</option>
                 </select>
@@ -793,31 +804,48 @@ function TaoDonInner() {
 
       {daoNguoc && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-3" onClick={() => setDaoNguoc(null)}>
-          <div className="bg-white rounded-2xl w-[440px] max-w-full p-4" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl w-[480px] max-w-full p-4" onClick={(e) => e.stopPropagation()}>
             <div className="font-extrabold mb-1">🔄 Đảo ngược khoản thu</div>
             <div className="text-[12px] text-[#8A93A0] mb-3">
               Khoản cũ ({daoNguoc.method}, {fmtVND(daoNguoc.amount)}) sẽ được giữ nguyên để truy vết (đánh dấu đã đảo ngược),
-              tự động hoàn lại đúng quỹ cũ, và tạo khoản thu mới đúng bên dưới.
+              tự động hoàn lại đúng quỹ cũ, và tạo (các) khoản thu mới đúng bên dưới — có thể tách thành nhiều phương thức khác nhau.
             </div>
-            <div className="flex flex-col gap-2.5">
-              <Field label="Lý do đảo ngược" required>
-                <input className="inp" placeholder="VD: sales chọn nhầm phương thức thanh toán" value={daoNguoc.ly_do} onChange={(e) => setDaoNguoc((p) => ({ ...p, ly_do: e.target.value }))} />
-              </Field>
-              <Field label="Phương thức thanh toán mới" required>
-                <select className="inp" value={daoNguoc.new_method} onChange={(e) => setDaoNguoc((p) => ({ ...p, new_method: e.target.value }))}>
-                  <option>Tiền mặt</option><option>Chuyển khoản</option><option>Trả góp</option>
-                </select>
-              </Field>
-              {daoNguoc.new_method === "Trả góp" && (
-                <Field label="Đơn vị trả góp" required>
-                  <select className="inp" value={daoNguoc.new_finance || ""} onChange={(e) => setDaoNguoc((p) => ({ ...p, new_finance: e.target.value }))}>
-                    <option value="">— Chọn —</option>
-                    {(settings?.cong_ty_tra_gop || "Home Credit\nShinhanbank\nHD Saison\nFE Credit").split("\n").filter(Boolean).map((c) => <option key={c}>{c}</option>)}
+            <Field label="Lý do đảo ngược" required>
+              <input className="inp" placeholder="VD: sales chọn nhầm phương thức, khách thực trả nhiều hình thức" value={daoNguoc.ly_do} onChange={(e) => setDaoNguoc((p) => ({ ...p, ly_do: e.target.value }))} />
+            </Field>
+
+            <div className="font-semibold text-[13px] mt-3 mb-1.5">Phương thức thanh toán mới (đúng thực tế)</div>
+            <div className="flex flex-col gap-2">
+              {daoNguoc.new_payments.map((p, i) => (
+                <div key={i} className="flex gap-1.5 items-start">
+                  <select className="inp !w-32" value={p.method} onChange={(e) => setDaoNguoc((cur) => ({ ...cur, new_payments: cur.new_payments.map((x, j) => j === i ? { ...x, method: e.target.value, finance_company: "" } : x) }))}>
+                    <option>Tiền mặt</option><option>Chuyển khoản</option><option>Trả góp</option>
                   </select>
-                </Field>
-              )}
-              <Field label="Số tiền mới" required><MoneyInput value={daoNguoc.new_amount} onChange={(v) => setDaoNguoc((p) => ({ ...p, new_amount: v }))} /></Field>
+                  {p.method === "Trả góp" ? (
+                    <select className="inp !flex-1" value={p.finance_company || ""} onChange={(e) => setDaoNguoc((cur) => ({ ...cur, new_payments: cur.new_payments.map((x, j) => j === i ? { ...x, finance_company: e.target.value } : x) }))}>
+                      <option value="">— Chọn đơn vị trả góp —</option>
+                      {(settings?.cong_ty_tra_gop || "Home Credit\nShinhanbank\nHD Saison\nFE Credit").split("\n").filter(Boolean).map((c) => <option key={c}>{c}</option>)}
+                    </select>
+                  ) : <div className="flex-1" />}
+                  <div className="!w-32"><MoneyInput value={p.amount} onChange={(v) => setDaoNguoc((cur) => ({ ...cur, new_payments: cur.new_payments.map((x, j) => j === i ? { ...x, amount: v } : x) }))} /></div>
+                  {daoNguoc.new_payments.length > 1 && (
+                    <button className="btn-ghost !px-2 !text-danger" onClick={() => setDaoNguoc((cur) => ({ ...cur, new_payments: cur.new_payments.filter((_, j) => j !== i) }))}>✕</button>
+                  )}
+                </div>
+              ))}
             </div>
+            <button className="btn-ghost !text-xs mt-2" onClick={() => setDaoNguoc((cur) => ({ ...cur, new_payments: [...cur.new_payments, { method: "Tiền mặt", amount: "", finance_company: "" }] }))}>⊕ Thêm phương thức</button>
+
+            {(() => {
+              const tongMoi = daoNguoc.new_payments.reduce((s, p) => s + (Number(p.amount) || 0), 0);
+              const lech = tongMoi - daoNguoc.amount;
+              return (
+                <div className={`mt-3 px-3 py-2 rounded-lg text-[12.5px] ${lech === 0 ? "bg-[#E5F6EE] text-[#0E7A4A]" : "bg-[#FFF8E5] text-[#A25F00]"}`}>
+                  Tổng phương thức mới: <b>{fmtVND(tongMoi)}</b> {lech !== 0 && <>— chênh <b>{lech > 0 ? "+" : ""}{fmtVND(lech)}</b> so với khoản cũ ({fmtVND(daoNguoc.amount)})</>}
+                </div>
+              );
+            })()}
+
             <div className="flex gap-2 mt-3">
               <button className="btn-ghost !text-xs flex-1" onClick={() => setDaoNguoc(null)}>Hủy</button>
               <button className="btn-ok !text-xs flex-1" disabled={busy} onClick={luuDaoNguoc}>Xác nhận đảo ngược</button>
