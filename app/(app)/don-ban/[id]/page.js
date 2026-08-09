@@ -15,22 +15,37 @@ export default function DonBanChiTiet() {
   const [o, setO] = useState(null);
   const [items, setItems] = useState([]);
   const [pays, setPays] = useState([]);
-  const [promoTags, setPromoTags] = useState([]);
+  const [promoTags, setPromoTags] = useState([]); // [{id, name}]
+  const [editPromo, setEditPromo] = useState(false);
+  const [promoChon, setPromoChon] = useState([]);
+  const [allPromos, setAllPromos] = useState([]);
+  const [canSuaKM, setCanSuaKM] = useState(false);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!profile) return;
+    if (profile.role === "CEO") { setCanSuaKM(true); return; }
+    supabase.from("role_perms").select("allowed").eq("role", profile.role).eq("perm", "sua_khuyen_mai_don").maybeSingle()
+      .then(({ data }) => setCanSuaKM(!!data?.allowed));
+  }, [profile]);
 
   const load = async () => {
     const { data: ord } = await supabase.from("sales_orders").select("*").eq("id", id).single();
     if (!ord) return;
     const code = ord.code;
-    const [{ data: its }, { data: ps }, { data: sop }] = await Promise.all([
+    const [{ data: its }, { data: ps }, { data: sop }, { data: kms }] = await Promise.all([
       supabase.from("sale_items").select("*").eq("sale_code", code),
       supabase.from("sale_payments").select("*").eq("sale_code", code),
-      supabase.from("sale_order_promotions").select("promotion_id, promotions(name)").eq("sale_code", code),
+      supabase.from("sale_order_promotions").select("promotion_id, promotions(id, name)").eq("sale_code", code),
+      supabase.from("promotions").select("*"),
     ]);
     setO(ord);
     setItems(its || []);
     setPays(ps || []);
-    setPromoTags((sop || []).map((x) => x.promotions?.name).filter(Boolean));
+    const tags = (sop || []).map((x) => x.promotions).filter(Boolean);
+    setPromoTags(tags);
+    setPromoChon(tags.map((t) => t.id));
+    setAllPromos(kms || []);
   };
   useEffect(() => { if (!loading) load(); }, [loading, id]);
 
@@ -57,6 +72,19 @@ export default function DonBanChiTiet() {
     : o.invoice_status === "Đã xuất HĐ" ? "Hoàn thành" : "Chờ xuất HĐ";
   const isDone = o.invoice_status === "Đã xuất HĐ";
   const isClosed = ["Đã hủy", "Đã trả hàng"].includes(o.status);
+  const vXe = vehicles.find((v) => v.id === o.vehicle_id);
+  const promosHopLe = allPromos.filter((p) =>
+    vXe && p.brand.trim().toLowerCase() === vXe.brand.trim().toLowerCase() &&
+    (p.vehicle_names.length === 0 || p.vehicle_names.some((n) => n.trim().toLowerCase() === vXe.name.trim().toLowerCase())));
+
+  const luuPromo = async () => {
+    setBusy(true);
+    const { error } = await supabase.rpc("fn_gan_khuyen_mai_don", { p_sale_code: o.code, p_promotion_ids: promoChon });
+    setBusy(false);
+    if (error) return notify(errMsg(error), "err");
+    notify("Đã cập nhật chương trình khuyến mại.");
+    setEditPromo(false); load();
+  };
 
   const huyDon = async () => {
     if (profile.role !== "CEO") return notify("Chỉ BGĐ được hủy đơn.", "err");
@@ -116,8 +144,30 @@ export default function DonBanChiTiet() {
       <div className="flex items-center gap-3 flex-wrap">
         <span className="text-xl font-extrabold">{o.code}</span>
         <Badge tone={statusBadge}>{statusLabel}</Badge>
-        {promoTags.map((name) => <Badge key={name} tone="purple">🏷 {name}</Badge>)}
+        {promoTags.map((t) => <Badge key={t.id} tone="purple">🏷 {t.name}</Badge>)}
+        {canSuaKM && <button className="btn-ghost !px-2 !py-1 !text-xs" onClick={() => setEditPromo(!editPromo)}>✎ Sửa khuyến mại</button>}
       </div>
+
+      {editPromo && canSuaKM && (
+        <div className="card border-l-4 border-l-purple-400 !py-3">
+          <div className="font-extrabold mb-1 text-[13px]">🏷 Chương trình khuyến mại áp dụng</div>
+          <p className="text-[11px] text-[#8A93A0] mb-2">Chỉ để đánh dấu/nhận diện, không tính giảm giá — sửa được bất kể trạng thái đơn.</p>
+          {promosHopLe.length === 0 && <div className="text-xs text-[#8A93A0] mb-2">Không có chương trình nào đang áp dụng cho xe này.</div>}
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {promosHopLe.map((p) => (
+              <label key={p.id} className={`text-xs px-2.5 py-1.5 rounded-lg border cursor-pointer ${promoChon.includes(p.id) ? "bg-[#EAF2FF] border-brand text-brand font-semibold" : "border-[#E3E8EF]"}`}>
+                <input type="checkbox" className="hidden" checked={promoChon.includes(p.id)}
+                  onChange={(e) => setPromoChon((cur) => e.target.checked ? [...cur, p.id] : cur.filter((x) => x !== p.id))} />
+                {p.name}
+              </label>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <button className="btn-ghost !text-xs" onClick={() => { setEditPromo(false); setPromoChon(promoTags.map((t) => t.id)); }}>Hủy</button>
+            <button className="btn-ok !text-xs" disabled={busy} onClick={luuPromo}>Lưu</button>
+          </div>
+        </div>
+      )}
 
       {/* TIMELINE */}
       <div className="card !py-4 overflow-hidden">

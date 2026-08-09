@@ -12,11 +12,12 @@ const iso = (d) => d.toLocaleDateString("sv-SE");
 const firstOfMonth = () => { const d = new Date(); return iso(new Date(d.getFullYear(), d.getMonth(), 1)); };
 
 export default function DonBan() {
-  const { supabase, vehicles, locations, settings, profile, loading } = useCatalog();
+  const { supabase, vehicles, locations, regions, settings, profile, loading } = useCatalog();
   const { toast, notify } = useToast();
   const [rows, setRows] = useState([]);
   const [itemSum, setItemSum] = useState({});
   const [promoMap, setPromoMap] = useState({});
+  const [kmAuditMap, setKmAuditMap] = useState({});
   const [busy, setBusy] = useState(false);
   const [from, setFrom] = useState(firstOfMonth());
   const [to, setTo] = useState(iso(new Date()));
@@ -50,10 +51,11 @@ export default function DonBan() {
     let qy = supabase.from("sales_orders").select("*").gte("sale_date", from).lte("sale_date", to)
       .order("created_at", { ascending: false }).limit(3000);
     if (fLoc) qy = qy.eq("location_code", fLoc);
-    const [{ data }, { data: si }, { data: sop }, { data: promoList }] = await Promise.all([
+    const [{ data }, { data: si }, { data: sop }, { data: promoList }, { data: kmAudit }] = await Promise.all([
       qy, supabase.from("sale_items").select("sale_code, amount").limit(10000),
       supabase.from("sale_order_promotions").select("sale_code, promotion_id").limit(10000),
       supabase.from("promotions").select("id, name"),
+      supabase.from("v_don_ban_km_audit").select("*").limit(10000),
     ]);
     setRows(data || []);
     const m = {};
@@ -62,6 +64,8 @@ export default function DonBan() {
     const pName = {}; (promoList || []).forEach((p) => { pName[p.id] = p.name; });
     const pm = {}; (sop || []).forEach((x) => { (pm[x.sale_code] = pm[x.sale_code] || []).push(pName[x.promotion_id] || `#${x.promotion_id}`); });
     setPromoMap(pm);
+    const km = {}; (kmAudit || []).forEach((x) => { km[x.sale_code] = x; });
+    setKmAuditMap(km);
     setBusy(false);
   };
   useEffect(() => { if (!loading) load(); }, [loading, from, to, fLoc]);
@@ -238,14 +242,46 @@ export default function DonBan() {
     setDetail(null); load();
   };
 
+  const [showThuong, setShowThuong] = useState(false);
+  const [khuVucThuong, setKhuVucThuong] = useState("");
+
+  const exportThuongThang = () => {
+    if (!khuVucThuong) return notify("Chọn khu vực trước khi xuất.", "err");
+    const rowsKhuVuc = sorted.filter((o) => locations.find((l) => l.code === o.location_code)?.region === khuVucThuong);
+    if (rowsKhuVuc.length === 0) return notify("Không có đơn nào thuộc khu vực này trong khoảng ngày đã chọn.", "err");
+    const header1 = ["Khu vực: ", "", "", khuVucThuong];
+    const header2 = ["STT","Điểm bán","Ngày đơn bán","Tên Khách hàng","Hãng xe","Tên xe","Màu xe","Số khung",
+      "Giá gồm VAT","Giá chưa VAT","Loại khách hàng (Bán lẻ/Bán buôn)","Nhân viên bán","Hợp lệ (x)",
+      "Thưởng 20% lợi nhuận phụ kiện (chưa VAT)","20% lợi nhuận Bảo hiểm TNDS (chưa VAT)",
+      "Sales tư vấn Dịch vụ đăng ký xe","Sales kiêm Dịch vụ đăng ký xe","20% lợi nhuận hoa hồng trả góp chưa VAT","Ghi chú"];
+    const data = rowsKhuVuc.map((o, i) => {
+      const v = vOf(o.vehicle_id);
+      const giaGomVAT = (o.sale_price || 0) * (o.quantity || 1); // TRUOC chiet khau, theo xac nhan
+      return [i + 1, locName(o.location_code), o.sale_date, o.customer_name, v?.brand || "", v?.name || "",
+        v?.color || "", o.frame_number, giaGomVAT, Math.round(giaGomVAT / 1.08),
+        o.customer_type || "", o.seller_name, o.invoice_status === "Đã xuất HĐ" ? "Hợp lệ" : "",
+        "", "", "", "", "", ""]; // N-S de trong, tu dien sau theo huong dan file mau
+    });
+    downloadCSV(`tinh_thuong_${khuVucThuong}_${from}_den_${to}.csv`, [header1, header2, ...data]);
+    notify(`Đã xuất ${data.length} đơn khu vực ${khuVucThuong}.`);
+    setShowThuong(false);
+  };
+
   const exportCSV = () => {
+    const soCotKmToiDa = Math.max(1, ...sorted.map((o) => (promoMap[o.code] || []).length));
+    const cotKm = Array.from({ length: soCotKmToiDa }, (_, i) => `Khuyen_Mai_${i + 1}`);
     downloadCSV(`don_ban_${from}_den_${to}.csv`,
-      [["Ma_Don","Ngay_Ban","Kho","Xe","Mau","So_Khung","Khach","SDT","Loai_KH","Tong_Don","Da_TT","Trang_Thai_HD","So_HD","Ngay_HD","Nguoi_Xac_Nhan","Kich_Hoat_Bao_Hanh","Kich_Hoat_App","NV_Ban","Chuong_Trinh_Khuyen_Mai"],
+      [["Ma_Don","Ngay_Ban","Kho","Xe","Mau","So_Khung","Khach","SDT","Loai_KH","Tong_Don","Da_TT","Trang_Thai_HD","So_HD","Ngay_HD","Nguoi_Xac_Nhan","Kich_Hoat_Bao_Hanh","Kich_Hoat_App","NV_Ban",
+        ...cotKm, "So_Lan_Sua_KM", "Co_Sua_KM_Sau_Khi_Tao"],
        ...sorted.map((o) => { const v = vOf(o.vehicle_id);
+         const tags = promoMap[o.code] || [];
+         const audit = kmAuditMap[o.code];
          return [o.code, o.sale_date, locName(o.location_code), v?.name || o.vehicle_id, v?.color || "", o.frame_number,
            o.customer_name, o.customer_phone, o.customer_type || "", total(o), o.paid_amount || 0,
            o.invoice_status || "Chờ xuất HĐ", o.invoice_no || "", o.invoice_date || "", o.invoice_by_name || "", o.warranty_activated ? "Có" : "Chưa", o.app_activated ? "Có" : "Chưa", o.seller_name,
-           (promoMap[o.code] || []).join(" | ")]; })]);
+           ...cotKm.map((_, i) => tags[i] || ""),
+           audit?.tong_so_lan_thao_tac || 0,
+           audit?.co_sua_doi_sau_khi_tao ? "Có" : "Không"]; })]);
     notify(`Đã xuất ${sorted.length} đơn.`);
   };
 
@@ -281,7 +317,20 @@ export default function DonBan() {
           </button>
           <input className="inp !w-56" placeholder="Tìm mã đơn, khách, số khung, số HĐ…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
           <button className="btn-ghost !text-xs" onClick={exportCSV}>⬇ CSV</button>
+          <button className="btn-ghost !text-xs" onClick={() => setShowThuong(!showThuong)}>🏆 Tính thưởng tháng</button>
         </div>
+
+        {showThuong && (
+          <div className="p-3 mb-3 rounded-xl bg-[#FDF6E3] flex items-center gap-2 flex-wrap">
+            <span className="text-[13px] font-semibold text-[#A25F00]">Xuất theo khu vực (dùng đúng khoảng ngày Từ/Đến đang chọn ở trên):</span>
+            <select className="inp !w-auto" value={khuVucThuong} onChange={(e) => setKhuVucThuong(e.target.value)}>
+              <option value="">— Chọn khu vực —</option>
+              {regions.map((r) => <option key={r}>{r}</option>)}
+            </select>
+            <button className="btn-ok !text-xs" onClick={exportThuongThang}>⬇ Xuất file tính thưởng</button>
+            <button className="btn-ghost !text-xs" onClick={() => setShowThuong(false)}>Đóng</button>
+          </div>
+        )}
 
         {busy && rows.length === 0 ? <div className="text-sm text-[#8A93A0] py-4">Đang tải đơn bán…</div> : (
           <>

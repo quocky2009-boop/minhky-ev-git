@@ -24,6 +24,7 @@ const PERM_GROUPS = [
     { key: "xac_nhan_hd", label: "Xác nhận đã xuất hóa đơn", desc: "Hoàn thành đơn bán" },
     { key: "sua_thanh_toan", label: "Cập nhật số tiền đã thanh toán", desc: "Thu tiền thêm hoặc hoàn tiền" },
     { key: "duyet_sua_don", label: "Duyệt điều chỉnh giá đơn", desc: "Phê duyệt yêu cầu sửa giá" },
+    { key: "sua_khuyen_mai_don", label: "Sửa tag chương trình khuyến mại", desc: "Thêm/xóa tag khuyến mại trên đơn đã tạo, kể cả đơn đã xuất HĐ" },
   ]},
   { group: "Sổ quỹ", icon: "💰", items: [
     { key: "thu_chi_chot", label: "Xem/tạo phiếu thu chi & duyệt", desc: "Truy cập Sổ quỹ, duyệt phiếu chi" },
