@@ -37,7 +37,7 @@ const lineTotal = (qty, price, dtype, dval) => {
 function TaoDonInner() {
   const params = useSearchParams();
   const router = useRouter();
-  const { supabase, vehicles, locations, profile, loading, refresh, settings, customFields, taxRate } = useCatalog();
+  const { supabase, vehicles, locations, profile, loading, refresh, settings, customFields, taxRate, paymentMethods } = useCatalog();
   const { toast, notify } = useToast();
 
   const [custs, setCusts] = useState([]);
@@ -154,8 +154,8 @@ function TaoDonInner() {
   if (loading || !profile) return <div className="card">Đang tải dữ liệu…</div>;
 
   const cfields = (customFields || []).filter((c) => c.entity === "sales_order");
-  const PTTT = (settings?.payment_methods || "Tiền mặt\nChuyển khoản\nTrả góp")
-    .split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean);
+  const PTTT = (paymentMethods.length > 0 ? paymentMethods.map((m) => m.code) : ["Tiền mặt", "Chuyển khoản", "Trả góp"]);
+  const traGopPT = paymentMethods.find((m) => m.code === "Trả góp");
 
   const vName = (id) => { const v = vehicles.find((x) => x.id === id); return v ? `${v.name} · ${v.color}` : id; };
 
@@ -819,7 +819,7 @@ function TaoDonInner() {
               {daoNguoc.new_payments.map((p, i) => (
                 <div key={i} className="flex gap-1.5 items-start">
                   <select className="inp !w-32" value={p.method} onChange={(e) => setDaoNguoc((cur) => ({ ...cur, new_payments: cur.new_payments.map((x, j) => j === i ? { ...x, method: e.target.value, finance_company: "" } : x) }))}>
-                    <option>Tiền mặt</option><option>Chuyển khoản</option><option>Trả góp</option>
+                    {PTTT.map((m) => <option key={m}>{m}</option>)}
                   </select>
                   {p.method === "Trả góp" ? (
                     <select className="inp !flex-1" value={p.finance_company || ""} onChange={(e) => setDaoNguoc((cur) => ({ ...cur, new_payments: cur.new_payments.map((x, j) => j === i ? { ...x, finance_company: e.target.value } : x) }))}>

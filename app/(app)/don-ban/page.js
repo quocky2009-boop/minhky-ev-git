@@ -216,7 +216,7 @@ export default function DonBan() {
     if (!ly.trim()) return notify("Phải nhập lý do hoàn tiền.", "err");
     if (!confirm(`Xác nhận hoàn ${fmtVND(amount)} cho khách?\n\n- Nếu phiếu thu cùng ngày chưa chốt quỹ: trừ lùi\n- Nếu đã chốt: lập phiếu chi hoàn tại quỹ tiền mặt điểm bán`)) return;
     setBusy(true);
-    const { error } = await supabase.rpc("fn_hoan_tien_don", { p: { id: o.id, amount, ly_do: ly } });
+    const { error } = await supabase.rpc("fn_hoan_tien_don_v2", { p: { id: o.id, amount, ly_do: ly } });
     setBusy(false);
     if (error) return notify(errMsg(error), "err");
     notify(`Đã hoàn ${fmtVND(amount)} cho khách — hạch toán vào sổ quỹ.`);
