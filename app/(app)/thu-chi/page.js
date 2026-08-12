@@ -28,7 +28,8 @@ export default function SoQuy() {
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState("so"); // so | quy | chot
   const [detail, setDetail] = useState(null);
-  const [af, setAf] = useState({ id: null, name: "", type: "Tiền mặt", location_code: "", bank_info: "", opening_balance: 0 });
+  const [af, setAf] = useState({ id: null, name: "", type: "Tiền mặt", location_code: "", company_id: "", bank_info: "", opening_balance: 0 });
+  const [companies, setCompanies] = useState([]);
   const [showAcc, setShowAcc] = useState(false);
 
   const can = (p) => profile?.role === "CEO" || !!perms[p];
@@ -39,13 +40,14 @@ export default function SoQuy() {
     let qy = supabase.from("cash_txns").select("*").gte("txn_date", from).lte("txn_date", to)
       .order("txn_date", { ascending: false }).order("id", { ascending: false }).limit(3000);
     if (fAcc) qy = qy.eq("account_id", fAcc);
-    const [{ data: a }, { data: t }, { data: c }, { data: pm }] = await Promise.all([
+    const [{ data: a }, { data: t }, { data: c }, { data: pm }, { data: cos }] = await Promise.all([
       supabase.from("v_quy_so_du").select("*").order("type").order("name"),
       qy,
       supabase.from("cash_closings").select("*").order("close_date", { ascending: false }).limit(60),
       supabase.from("role_perms").select("perm,allowed").eq("role", profile.role),
+      supabase.from("companies").select("*").eq("status","Hoạt động").order("name"),
     ]);
-    setAccs(a || []); setTxns(t || []); setClosings(c || []);
+    setAccs(a || []); setTxns(t || []); setClosings(c || []); setCompanies(cos || []);
     const m = {}; (pm || []).forEach((x) => { m[x.perm] = x.allowed; }); setPerms(m);
 
     // So du dau ky = tong so du moi quy den het ngay truoc 'from'
@@ -70,7 +72,7 @@ export default function SoQuy() {
     if (!af.name.trim()) return notify("Nhập tên quỹ.", "err");
     const { error } = await supabase.rpc("fn_them_quy", { p: af });
     if (error) return notify(errMsg(error), "err");
-    notify("Đã lưu quỹ."); setAf({ id: null, name: "", type: "Tiền mặt", location_code: "", bank_info: "", opening_balance: 0 }); setShowAcc(false); load();
+    notify("Đã lưu quỹ."); setAf({ id: null, name: "", type: "Tiền mặt", location_code: "", company_id: "", bank_info: "", opening_balance: 0 }); setShowAcc(false); load();
   };
 
   const chotQuy = async (acc) => {
@@ -215,7 +217,7 @@ export default function SoQuy() {
         <div className="card">
           <div className="flex items-center gap-2 mb-3">
             <div className="font-extrabold mr-auto">Quỹ tiền · tổng số dư {fmtVND(tongQuy)}</div>
-            {can("thu_chi_chot") && <button className="btn-primary !text-xs" onClick={() => { setAf({ id: null, name: "", type: "Tiền mặt", location_code: "", bank_info: "", opening_balance: 0 }); setShowAcc(!showAcc); }}>{showAcc ? "Đóng" : "+ Quỹ mới"}</button>}
+            {can("thu_chi_chot") && <button className="btn-primary !text-xs" onClick={() => { setAf({ id: null, name: "", type: "Tiền mặt", location_code: "", company_id: "", bank_info: "", opening_balance: 0 }); setShowAcc(!showAcc); }}>{showAcc ? "Đóng" : "+ Quỹ mới"}</button>}
           </div>
 
           {showAcc && (
@@ -223,8 +225,17 @@ export default function SoQuy() {
               <div className="font-extrabold mb-3">{af.id ? "Sửa quỹ" : "Tạo quỹ mới"}</div>
               <div className="grid gap-3 md:grid-cols-3">
                 <Field label="Tên quỹ" required><input className="inp" value={af.name} onChange={(e) => setAf((p) => ({ ...p, name: e.target.value }))} placeholder="VD: Tiền mặt Km40" /></Field>
-                <Field label="Loại"><select className="inp" value={af.type} onChange={(e) => setAf((p) => ({ ...p, type: e.target.value }))}><option>Tiền mặt</option><option>Ngân hàng</option></select></Field>
-                <Field label="Gắn với điểm"><LocSearch locations={locations} value={af.location_code} onChange={(v) => setAf((p) => ({ ...p, location_code: v }))} placeholder="Không bắt buộc" /></Field>
+                <Field label="Loại"><select className="inp" value={af.type} onChange={(e) => setAf((p) => ({ ...p, type: e.target.value, location_code: e.target.value === "Ngân hàng" ? "" : p.location_code, company_id: e.target.value === "Tiền mặt" ? "" : p.company_id }))}><option>Tiền mặt</option><option>Ngân hàng</option></select></Field>
+                {af.type === "Ngân hàng" ? (
+                  <Field label="Pháp nhân sở hữu" required>
+                    <select className="inp" value={af.company_id || ""} onChange={(e) => setAf((p) => ({ ...p, company_id: e.target.value }))}>
+                      <option value="">— Chọn pháp nhân —</option>
+                      {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                  </Field>
+                ) : (
+                  <Field label="Gắn với điểm"><LocSearch locations={locations} value={af.location_code} onChange={(v) => setAf((p) => ({ ...p, location_code: v }))} placeholder="Không bắt buộc" /></Field>
+                )}
                 <Field label="Thông tin ngân hàng"><input className="inp" value={af.bank_info} onChange={(e) => setAf((p) => ({ ...p, bank_info: e.target.value }))} /></Field>
                 <Field label="Số dư đầu kỳ"><input type="number" className="inp" value={af.opening_balance} onChange={(e) => setAf((p) => ({ ...p, opening_balance: +e.target.value || 0 }))} /></Field>
               </div>
@@ -241,7 +252,7 @@ export default function SoQuy() {
                   <div className="flex items-center gap-2">
                     <div className="mr-auto">
                       <div className="font-bold text-sm">{a.name}</div>
-                      <div className="text-[11px] text-[#8A93A0]">{a.type}{a.location_code ? " · " + locName(a.location_code) : ""}</div>
+                      <div className="text-[11px] text-[#8A93A0]">{a.type}{a.location_code ? " · " + locName(a.location_code) : ""}{a.company_name ? " · " + a.company_name : ""}</div>
                     </div>
                     <Badge tone={a.type === "Tiền mặt" ? "amber" : "blue"}>{a.type}</Badge>
                   </div>
