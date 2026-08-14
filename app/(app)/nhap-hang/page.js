@@ -164,6 +164,23 @@ function NhapHangInner() {
     if (!meta.location_code) return notify("Chọn kho nhập.", "err");
     const ok = lines.filter((l) => l.vehicle_id && l.frames.length > 0);
     if (ok.length === 0) return notify("Chưa có dòng hàng hợp lệ (cần chọn mã xe và nhập số khung).", "err");
+
+    // CANH BAO 1: dong dien do do (co mot trong hai: ma xe HOAC so khung, nhung khong ca hai)
+    // se bi AM THAM bo qua khi luu — nhac truoc de tranh mat du lieu ngoai y muon.
+    const boQua = lines.filter((l) => (l.vehicle_id && l.frames.length === 0) || (!l.vehicle_id && l.frames.length > 0));
+    if (boQua.length > 0) {
+      const chiTiet = boQua.map((l) => l.vehicle_id ? `"${vName(l.vehicle_id)}" (chưa nhập số khung)` : `${l.frames.length} số khung chưa chọn mã xe`).join("\n- ");
+      if (!confirm(`⚠️ Có ${boQua.length} dòng ĐIỀN DỞ sẽ KHÔNG được lưu (thiếu mã xe hoặc thiếu số khung):\n- ${chiTiet}\n\nBấm OK nếu chắc chắn bỏ qua các dòng này. Bấm Hủy để quay lại điền đủ.`)) return;
+    }
+
+    // CANH BAO 2: 1 dong co so luong xe lon bat thuong — de phong dan nham toan bo
+    // so khung cua nhieu model vao chung 1 o (nguyen nhan da gap trong thuc te).
+    const dongNhieu = ok.filter((l) => l.frames.length > 15);
+    if (dongNhieu.length > 0) {
+      const chiTiet = dongNhieu.map((l) => `"${vName(l.vehicle_id)}": ${l.frames.length} xe`).join("\n- ");
+      if (!confirm(`⚠️ Có dòng số lượng xe LỚN BẤT THƯỜNG trong 1 lần nhập:\n- ${chiTiet}\n\nKIỂM TRA LẠI: có phải đã lỡ dán nhầm số khung của NHIỀU MODEL/MÀU khác nhau vào chung 1 dòng này không?\n\nBấm OK nếu chắc chắn đúng cả ${dongNhieu.reduce((s,l)=>s+l.frames.length,0)} xe này CÙNG 1 model/màu. Bấm Hủy để kiểm tra lại.`)) return;
+    }
+
     setBusy(true);
     const { data, error } = await supabase.rpc("fn_nhap_hang_v2", { p: {
       location_code: meta.location_code, supplier: meta.supplier, doc: meta.doc, note: meta.note,
@@ -270,8 +287,14 @@ function NhapHangInner() {
           </div>
 
           <div className="flex flex-col gap-3">
-            {lines.map((l, i) => (
-              <div key={i} className="rounded-xl border border-[#E3E8EF] p-3">
+            {lines.map((l, i) => {
+              const dienDo = (l.vehicle_id && l.frames.length === 0) || (!l.vehicle_id && l.frames.length > 0);
+              const soLuongLon = l.vehicle_id && l.frames.length > 15;
+              return (
+              <div key={i} className={`rounded-xl border p-3 ${dienDo ? "border-[#F0B429] bg-[#FFFBEB]" : soLuongLon ? "border-danger bg-[#FFF6F6]" : "border-[#E3E8EF]"}`}>
+                {soLuongLon && (
+                  <div className="text-[11px] text-danger font-bold mb-1.5">⚠️ {l.frames.length} xe trong 1 dòng — số lượng lớn bất thường, kiểm tra kỹ có bị dán nhầm số khung của model/màu khác vào đây không.</div>
+                )}
                 <div className="grid gap-2.5 md:grid-cols-4 mb-2.5">
                   <div className="md:col-span-2">
                     <label className="lbl">Mã xe {i + 1}</label>
@@ -319,7 +342,8 @@ function NhapHangInner() {
                   </div>
                 )}
               </div>
-            ))}
+              );
+            })}
           </div>
 
           <button className="btn-ghost !text-xs mt-2.5" onClick={() => setLines((p) => [...p, { ...emptyLine }])}>⊕ Thêm mã xe khác</button>
