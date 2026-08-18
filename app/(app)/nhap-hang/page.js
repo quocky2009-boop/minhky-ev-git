@@ -94,6 +94,15 @@ function NhapHangInner() {
   if (loading || !profile) return <div className="card">Đang tải dữ liệu…</div>;
   const canNhap = profile.role === "CEO" || perms["nhap_hang"];
 
+  const xoaHanDon = async (doc) => {
+    if (!confirm(`⚠️ XÓA HẲN đơn nhập ${doc} khỏi database?\n\nHành động này KHÔNG THỂ HOÀN TÁC — toàn bộ số khung và lịch sử giao dịch của đơn này sẽ bị xóa vĩnh viễn (khác với "Hủy đơn" chỉ ẩn khỏi tồn kho).\n\nChỉ nên dùng cho đơn TEST/nhập nhầm hoàn toàn — KHÔNG dùng cho đơn thật đã hủy vì lý do nghiệp vụ (đổi hàng, sai giá...), vì sẽ mất luôn dấu vết lịch sử.\n\nBấm OK để tiếp tục.`)) return;
+    if (prompt(`Để xác nhận lần cuối, gõ đúng mã phiếu "${doc}" vào đây:`) !== doc) return notify("Gõ không đúng mã phiếu — đã hủy thao tác xóa.", "err");
+    const { data, error } = await supabase.rpc("fn_xoa_han_don_nhap_huy", { p_doc: doc });
+    if (error) return notify(errMsg(error), "err");
+    notify(`Đã xóa hẳn ${data.so_xe_xoa} số khung + ${data.so_dong_log_xoa} dòng lịch sử của đơn ${doc}.`);
+    load();
+  };
+
   const vName = (id) => { const v = vehicles.find((x) => x.id === id); return v ? `${v.brand} ${v.name} ${v.color}` : id; };
   const vShort = (id) => { const v = vehicles.find((x) => x.id === id); return v ? `${v.name} ${v.color}` : id; };
   const locName = (c) => locations.find((l) => l.code === c)?.name || c;
@@ -482,7 +491,14 @@ function NhapHangInner() {
                   <td data-label="NCC" className="td text-[13px]">{d.supplier || <span className="text-[#8A93A0]">—</span>}</td>
                   <td data-label="Xe" className="td text-[13px]">{d.so_ma} mã · <b>{d.so_xe} chiếc</b></td>
                   <td data-label="Người nhập" className="td text-xs">{d.by}</td>
-                  <td className="td"><Link href={`/nhap-hang/${encodeURIComponent(d.doc)}`} className="btn-ghost !px-2 !py-1 !text-xs" title="Xem chi tiết phiếu">👁</Link></td>
+                  <td className="td">
+                    <div className="flex gap-1">
+                      <Link href={`/nhap-hang/${encodeURIComponent(d.doc)}`} className="btn-ghost !px-2 !py-1 !text-xs" title="Xem chi tiết phiếu">👁</Link>
+                      {trangThaiMap[d.doc] === "Đơn hủy" && ["ADMIN","CEO"].includes(profile.role) && (
+                        <button className="btn-ghost !px-2 !py-1 !text-xs !text-danger" title="Xóa hẳn khỏi database (không thể hoàn tác)" onClick={() => xoaHanDon(d.doc)}>🗑</button>
+                      )}
+                    </div>
+                  </td>
                 </tr>
               ))}
               {sorted.length === 0 && <tr><td className="td" colSpan={8}>Không có đơn nhập nào khớp bộ lọc.</td></tr>}
