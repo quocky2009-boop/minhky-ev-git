@@ -7,6 +7,7 @@ import { fmtVND, fmtDate, fmtTime, errMsg, downloadCSV, downloadXLSX } from "@/l
 import { printOrder, printOrderBill } from "@/lib/print";
 import { InfoRows, MoneyRows } from "@/components/detail";
 import Link from "next/link";
+import { CUSTOMER_TYPES } from "@/lib/const";
 
 const iso = (d) => d.toLocaleDateString("sv-SE");
 const firstOfMonth = () => { const d = new Date(); return iso(new Date(d.getFullYear(), d.getMonth(), 1)); };
@@ -47,6 +48,10 @@ export default function DonBan() {
   const [invId, setInvId] = useState(null);
   const [invF, setInvF] = useState({ no: "", date: iso(new Date()), checklist: {} });
   const [detail, setDetail] = useState(null);
+  const [editPromo, setEditPromo] = useState(false);
+  const [promoChon, setPromoChon] = useState([]);
+  const [allPromos, setAllPromos] = useState([]);
+  const [canSuaKM, setCanSuaKM] = useState(false);
   const [payEdit, setPayEdit] = useState(null);
   const [klEdit, setKlEdit] = useState(null);   // khach le cuoi (don ban buon)
 
@@ -86,6 +91,12 @@ export default function DonBan() {
     setBusy(false);
   };
   useEffect(() => { if (!loading) load(); }, [loading, from, to, fLoc]);
+  useEffect(() => {
+    if (!profile) return;
+    if (profile.role === "CEO") { setCanSuaKM(true); return; }
+    supabase.from("role_perms").select("allowed").eq("role", profile.role).eq("perm", "sua_khuyen_mai_don").maybeSingle()
+      .then(({ data }) => setCanSuaKM(!!data?.allowed));
+  }, [profile]);
 
   if (loading || !profile) return <div className="card">Đang tải dữ liệu…</div>;
 
@@ -122,16 +133,12 @@ export default function DonBan() {
     if (!invF.checklist?.bao_hanh) return notify("Checklist: phải kích hoạt bảo hành.", "err");
     if (isVF(o) && !invF.checklist?.app_vf) return notify("Xe VinFast: phải kích hoạt app VF eScooter.", "err");
     if (!invF.checklist?.coc_giao) return notify("Checklist: phải xác nhận đã bàn giao giấy COC.", "err");
-    if (!invF.checklist?.anh_khach) return notify("Checklist: phải xác nhận đã quay/chụp ảnh khách nhận xe.", "err");
-    if (!invF.checklist?.hoa_don_vat) return notify("Checklist: phải xác nhận đã bàn giao hóa đơn VAT.", "err");
     setBusy(true);
     const { error } = await supabase.rpc("fn_xac_nhan_hoa_don", { p: {
       id: o.id, invoice_no: invF.no, invoice_date: invF.date,
       warranty_activated: !!invF.checklist?.bao_hanh,
       app_activated: !!invF.checklist?.app_vf,
       coc_giao: !!invF.checklist?.coc_giao,
-      anh_khach: !!invF.checklist?.anh_khach,
-      hoa_don_vat: !!invF.checklist?.hoa_don_vat,
     }});
     if (!error) await supabase.from("sales_orders").update({ checklist_giao_xe: invF.checklist || {} }).eq("id", o.id);
     setBusy(false);
@@ -150,12 +157,17 @@ export default function DonBan() {
 
   const openDetail = async (o) => {
     setDetail({ ...o, _items: null, _promos: null, _pays: null });
-    const [{ data: di }, { data: sop }, { data: pl }] = await Promise.all([
+    setEditPromo(false);
+    const [{ data: di }, { data: sop }, { data: pl }, { data: kms }] = await Promise.all([
       supabase.from("sale_items").select("*").eq("sale_code", o.code),
-      supabase.from("sale_order_promotions").select("promotion_id, promotions(name)").eq("sale_code", o.code),
+      supabase.from("sale_order_promotions").select("promotion_id, promotions(id, name)").eq("sale_code", o.code),
       supabase.from("sale_payments").select("*").eq("sale_code", o.code).order("created_at"),
+      supabase.from("promotions").select("*"),
     ]);
-    setDetail((d) => (d && d.id === o.id ? { ...d, _items: di || [], _promos: (sop || []).map((x) => x.promotions?.name).filter(Boolean), _pays: pl || [] } : d));
+    const tags = (sop || []).map((x) => x.promotions).filter(Boolean);
+    setDetail((d) => (d && d.id === o.id ? { ...d, _items: di || [], _promos: tags, _pays: pl || [] } : d));
+    setPromoChon(tags.map((t) => t.id));
+    setAllPromos(kms || []);
   };
 
   const canSuaTT = ["CEO", "MANAGER", "ADMIN"].includes(profile?.role);
@@ -163,10 +175,26 @@ export default function DonBan() {
   const canKhachLe = (o) => o.customer_type === "Khách buôn";
   const thieuKhachLe = (o) => canKhachLe(o) && isVF(o) && !o.end_customer_id;
 
+  const luuPromo = async () => {
+    setBusy(true);
+    const { error } = await supabase.rpc("fn_gan_khuyen_mai_don", { p_sale_code: detail.code, p_promotion_ids: promoChon });
+    setBusy(false);
+    if (error) return notify(errMsg(error), "err");
+    notify("Đã cập nhật chương trình khuyến mại.");
+    setEditPromo(false);
+    const { data: sop } = await supabase.from("sale_order_promotions").select("promotion_id, promotions(id, name)").eq("sale_code", detail.code);
+    const tags = (sop || []).map((x) => x.promotions).filter(Boolean);
+    setDetail((d) => (d ? { ...d, _promos: tags } : d));
+    load();
+  };
+
   const luuKhachLe = async () => {
     const f = klEdit;
     if (!f.name?.trim() || !f.phone?.trim() || !f.address?.trim() || !f.email?.trim()) {
       return notify("Cần đủ 4 thông tin: họ tên, SĐT, địa chỉ VNeID, email.", "err");
+    }
+    if (vOf(detail.vehicle_id)?.model_pin === "Xe đổi pin" && !f.battery_option) {
+      return notify("Xe Đổi pin bắt buộc chọn Hình thức kinh doanh pin.", "err");
     }
     setBusy(true);
     const { error } = await supabase.rpc("fn_luu_khach_le_cuoi", { p: { id: detail.id, ...f } });
@@ -301,13 +329,17 @@ export default function DonBan() {
       [["Ma_Don","Ngay_Ban","Kho","Xe","Mau","So_Khung","Khach","SDT","Loai_KH",
         "Don_Gia_Xe","Chiet_Khau_Xe","Thanh_Tien_Xe","Thanh_Tien_Phu_Kien","Thanh_Tien_Bao_Hiem","Thanh_Tien_Dang_Ky",
         "Tong_Don", ...cotPT, "Da_TT",
-        "Trang_Thai_HD","So_HD","Ngay_HD","Nguoi_Xac_Nhan","Kich_Hoat_Bao_Hanh","Kich_Hoat_App","NV_Ban",
+        "Trang_Thai_HD","So_HD","Ngay_HD","Nguoi_Xac_Nhan",
+        "CL_Kich_Hoat_Bao_Hanh","CL_App_VF","CL_Ban_Giao_COC","CL_Anh_Khach_Nhan_Xe","CL_Khoe_FB",
+        "NV_Ban",
+        "KhachLe_Ten","KhachLe_SDT","KhachLe_Loai_KH","KhachLe_So_Tien_HD","KhachLe_Hinh_Thuc_Pin",
         ...cotKm, "So_Lan_Sua_KM", "Co_Sua_KM_Sau_Khi_Tao"],
        ...sorted.map((o) => { const v = vOf(o.vehicle_id);
          const tags = promoMap[o.code] || [];
          const audit = kmAuditMap[o.code];
          const byType = itemSumByType[o.code] || { PHU_KIEN: 0, BAO_HIEM: 0, DANG_KY: 0 };
          const dsThanhToan = payListMap[o.code] || [];
+         const cl = o.checklist_giao_xe || {};
          // Voi moi phuong thuc, lay dung cac dong khop PT do, dien lan luot vao cac cot Tien_Mat_1/2/3...
          const giaTriCotPT = [];
          CAC_PT.forEach((pt) => {
@@ -321,7 +353,11 @@ export default function DonBan() {
            o.customer_name, o.customer_phone, o.customer_type || "",
            donGiaXe, chietKhauXe, thanhTienXe, byType.PHU_KIEN, byType.BAO_HIEM, byType.DANG_KY,
            total(o), ...giaTriCotPT, o.paid_amount || 0,
-           o.invoice_status || "Chờ xuất HĐ", o.invoice_no || "", o.invoice_date || "", o.invoice_by_name || "", o.warranty_activated ? "Có" : "Chưa", o.app_activated ? "Có" : "Chưa", o.seller_name,
+           o.invoice_status || "Chờ xuất HĐ", o.invoice_no || "", o.invoice_date || "", o.invoice_by_name || "",
+           o.warranty_activated ? "Có" : "Chưa", o.app_activated ? "Có" : "Chưa", o.coc_giao ? "Có" : "Chưa",
+           cl.anh_khach ? "Có" : "Chưa", cl.khoe_fb ? "Có" : "Chưa",
+           o.seller_name,
+           o.end_customer_name || "", o.end_customer_phone || "", o.end_customer_type || "", o.end_customer_invoice_amount || "", o.end_customer_battery_option || "",
            ...cotKm.map((_, i) => tags[i] || ""),
            audit?.tong_so_lan_thao_tac || 0,
            audit?.co_sua_doi_sau_khi_tao ? "Có" : "Không"]; })]);
@@ -407,7 +443,7 @@ export default function DonBan() {
                     <td data-label="Hóa đơn" className="td">{huy
                       ? <><Badge tone="red">{nhanTra ? "Đã trả hàng" : "Đã hủy"}</Badge>{o.cancel_reason && <div className="text-[10.5px] text-[#8A93A0] mt-0.5">{o.cancel_reason}<br/>{o.cancelled_by_name} · {fmtDate(o.cancelled_at)}</div>}</>
                       : done
-                      ? <><Badge tone="green">✓ Hoàn thành</Badge><div className="text-[10.5px] text-[#8A93A0] mt-0.5">HĐ {o.invoice_no} · {fmtDate(o.invoice_date)}<br/>{o.invoice_by_name}<br/>BH ✓{o.app_activated ? " · App ✓" : ""}{o.coc_giao ? " · COC ✓" : ""}</div></>
+                      ? <><Badge tone="green">✓ Hoàn thành</Badge><div className="text-[10.5px] text-[#8A93A0] mt-0.5">HĐ {o.invoice_no} · {fmtDate(o.invoice_date)}<br/>{o.invoice_by_name}<br/>BH ✓{o.app_activated ? " · App ✓" : ""}{o.coc_giao ? " · COC ✓" : ""}{o.checklist_giao_xe?.anh_khach ? " · Ảnh ✓" : ""}{o.checklist_giao_xe?.khoe_fb ? " · FB ✓" : ""}</div></>
                       : <Badge tone="amber">Chờ xuất HĐ</Badge>}
                       {!huy && thieuKhachLe(o) && <div className="mt-0.5"><Badge tone="red">⚠ Thiếu khách lẻ</Badge></div>}</td>
                     <td data-label="NV bán" className="td text-xs">{o.seller_name}</td>
@@ -449,8 +485,7 @@ export default function DonBan() {
                               ["bao_hanh","🛡 Kích hoạt bảo hành", true],
                               ["app_vf", isVF(o) ? "📱 App VF eScooter" : null, isVF(o)],
                               ["coc_giao","📄 Bàn giao giấy COC", true],
-                              ["anh_khach","📸 Quay/chụp khách nhận xe", true],
-                              ["hoa_don_vat","🧾 Bàn giao hóa đơn VAT", true],
+                              ["anh_khach","📸 Quay/chụp khách nhận xe", false],
                               ["khoe_fb","📲 Khách khoe ảnh lên FB/Zalo", false],
                             ].filter(([,label]) => label).map(([key, label, required]) => (
                               <label key={key} className={`flex items-center gap-1.5 text-xs font-medium cursor-pointer rounded-lg px-2 py-1.5 border ${invF.checklist?.[key] ? "bg-[#E5F6EE] border-[#0E7A4A]" : required ? "border-danger bg-[#FFF6F6]" : "border-[#E3E8EF]"}`}>
@@ -462,7 +497,7 @@ export default function DonBan() {
                             ))}
                           </div>
                           {(() => {
-                            const required = ["bao_hanh","coc_giao","anh_khach","hoa_don_vat", ...(isVF(o) ? ["app_vf"] : [])];
+                            const required = ["bao_hanh","coc_giao", ...(isVF(o) ? ["app_vf"] : [])];
                             const done = required.filter(k => invF.checklist?.[k]).length;
                             return <div className="text-[10.5px] text-[#8A93A0] mt-2">{done}/{required.length} mục bắt buộc · Còn lại là khuyến nghị</div>;
                           })()}
@@ -513,11 +548,38 @@ export default function DonBan() {
                   <button className="btn-ghost !px-3 !py-1.5 !text-xs" onClick={() => setDetail(null)}>✕</button>
                   </>)}
                 </div>
-                {detail._promos && detail._promos.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mb-3">
-                    {detail._promos.map((name) => <Badge key={name} tone="purple">🏷 {name}</Badge>)}
+                {(detail._promos && detail._promos.length > 0) || canSuaKM ? (
+                  <div className="flex flex-wrap gap-1.5 items-center mb-3">
+                    {(detail._promos || []).map((t) => <Badge key={t.id} tone="purple">🏷 {t.name}</Badge>)}
+                    {canSuaKM && <button className="btn-ghost !px-2 !py-1 !text-xs" onClick={() => setEditPromo(!editPromo)}>✎ Sửa khuyến mại</button>}
                   </div>
-                )}
+                ) : null}
+                {editPromo && canSuaKM && (() => {
+                  const vXe = vehicles.find((v) => v.id === detail.vehicle_id);
+                  const promosHopLe = allPromos.filter((p) =>
+                    vXe && p.brand.trim().toLowerCase() === vXe.brand.trim().toLowerCase() &&
+                    (p.vehicle_names.length === 0 || p.vehicle_names.some((n) => n.trim().toLowerCase() === vXe.name.trim().toLowerCase())));
+                  return (
+                    <div className="card border-l-4 border-l-purple-400 !py-3 mb-3">
+                      <div className="font-extrabold mb-1 text-[13px]">🏷 Chương trình khuyến mại áp dụng</div>
+                      <p className="text-[11px] text-[#8A93A0] mb-2">Chỉ để đánh dấu/nhận diện, không tính giảm giá — sửa được bất kể trạng thái đơn.</p>
+                      {promosHopLe.length === 0 && <div className="text-xs text-[#8A93A0] mb-2">Không có chương trình nào đang áp dụng cho xe này.</div>}
+                      <div className="flex flex-wrap gap-1.5 mb-3">
+                        {promosHopLe.map((p) => (
+                          <label key={p.id} className={`text-xs px-2.5 py-1.5 rounded-lg border cursor-pointer ${promoChon.includes(p.id) ? "bg-[#EAF2FF] border-brand text-brand font-semibold" : "border-[#E3E8EF]"}`}>
+                            <input type="checkbox" className="hidden" checked={promoChon.includes(p.id)}
+                              onChange={(e) => setPromoChon((cur) => e.target.checked ? [...cur, p.id] : cur.filter((x) => x !== p.id))} />
+                            {p.name}
+                          </label>
+                        ))}
+                      </div>
+                      <div className="flex gap-2">
+                        <button className="btn-ghost !text-xs" onClick={() => { setEditPromo(false); setPromoChon((detail._promos || []).map((t) => t.id)); }}>Hủy</button>
+                        <button className="btn-ok !text-xs" disabled={busy} onClick={luuPromo}>Lưu</button>
+                      </div>
+                    </div>
+                  );
+                })()}
                 {(detail.status === "Đã hủy" || detail.status === "Đã trả hàng") && detail.cancel_reason && (
                   <div className="mb-3 p-2.5 rounded-xl bg-[#FDEDED] text-[13px]">
                     <b className="text-danger">{detail.status}</b> — {detail.cancel_reason}
@@ -563,10 +625,17 @@ export default function DonBan() {
                               <div><b>{detail.end_customer_name}</b> · {detail.end_customer_phone}</div>
                               <div className="text-[#5A6572]">{detail.end_customer_email}</div>
                               <div className="text-[#5A6572]">{detail.end_customer_address}</div>
+                              <div className="flex gap-1.5 items-center mt-0.5">
+                                {detail.end_customer_type && <Badge tone="purple">{detail.end_customer_type}</Badge>}
+                                {detail.end_customer_battery_option && <Badge tone="amber">🔋 {detail.end_customer_battery_option}</Badge>}
+                                {detail.end_customer_invoice_amount > 0 && <span className="text-[12px] text-brand font-bold">HĐ: {fmtVND(detail.end_customer_invoice_amount)}</span>}
+                              </div>
                               <div className="text-[11px] text-[#8A93A0] mt-1">Cập nhật bởi {detail.end_customer_by_name} · {fmtDate(detail.end_customer_at)}</div>
                               <button className="btn-ghost !text-xs mt-1.5 self-start" onClick={() => setKlEdit({
                                 name: detail.end_customer_name, phone: detail.end_customer_phone,
-                                email: detail.end_customer_email, address: detail.end_customer_address })}>✎ Sửa</button>
+                                email: detail.end_customer_email, address: detail.end_customer_address,
+                                customer_type: detail.end_customer_type || "", invoice_amount: detail.end_customer_invoice_amount || "",
+                                battery_option: detail.end_customer_battery_option || "" })}>✎ Sửa</button>
                             </div>
                           ) : klEdit ? (
                             <div className="flex flex-col gap-2">
@@ -575,12 +644,28 @@ export default function DonBan() {
                                 <div><label className="lbl">Điện thoại *</label><input className="inp !py-1.5 !text-[13px]" value={klEdit.phone} onChange={(e) => setKlEdit((p) => ({ ...p, phone: e.target.value }))} /></div>
                                 <div><label className="lbl">Email *</label><input className="inp !py-1.5 !text-[13px]" value={klEdit.email} onChange={(e) => setKlEdit((p) => ({ ...p, email: e.target.value }))} placeholder="ten@email.com" /></div>
                                 <div><label className="lbl">Địa chỉ VNeID *</label><input className="inp !py-1.5 !text-[13px]" value={klEdit.address} onChange={(e) => setKlEdit((p) => ({ ...p, address: e.target.value }))} /></div>
+                                <div><label className="lbl">Loại khách hàng</label>
+                                  <select className="inp !py-1.5 !text-[13px]" value={klEdit.customer_type} onChange={(e) => setKlEdit((p) => ({ ...p, customer_type: e.target.value }))}>
+                                    <option value="">Khách lẻ của Đại lý (mặc định)</option>
+                                    {CUSTOMER_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                                  </select>
+                                </div>
+                                <div><label className="lbl">Số tiền hóa đơn</label><MoneyInput className="!py-1.5 !text-[13px]" value={klEdit.invoice_amount} onChange={(v) => setKlEdit((p) => ({ ...p, invoice_amount: v }))} placeholder="Để trống nếu bằng giá bán buôn" /></div>
+                                {vOf(detail.vehicle_id)?.model_pin === "Xe đổi pin" && (
+                                  <div><label className="lbl">Hình thức kinh doanh pin *</label>
+                                    <select className="inp !py-1.5 !text-[13px]" value={klEdit.battery_option} onChange={(e) => setKlEdit((p) => ({ ...p, battery_option: e.target.value }))}>
+                                      <option value="">— Chọn —</option>
+                                      <option value="Kèm pin">Kèm pin</option>
+                                      <option value="Thuê pin">Thuê pin</option>
+                                    </select>
+                                  </div>
+                                )}
                               </div>
                               <div className="flex gap-2">
                                 <button className="btn-ok !text-xs" disabled={busy} onClick={luuKhachLe}>{busy ? "Đang lưu…" : "Lưu khách lẻ"}</button>
                                 <button className="btn-ghost !text-xs" onClick={() => setKlEdit(null)}>Hủy</button>
                               </div>
-                              <div className="text-[11px] text-[#8A93A0]">Hồ sơ sẽ tự vào danh mục khách hàng với loại <b>Khách lẻ của Đại lý</b>.</div>
+                              <div className="text-[11px] text-[#8A93A0]">Hồ sơ sẽ tự vào danh mục khách hàng đúng loại khách hàng đã chọn ở trên.</div>
                             </div>
                           ) : (
                             <div>
@@ -589,7 +674,7 @@ export default function DonBan() {
                                   ? "Xe VinFast bán buôn — bắt buộc có thông tin khách lẻ cuối trước khi xuất hóa đơn."
                                   : "Đại lý bán lại cho khách lẻ thì bổ sung thông tin ở đây."}
                               </div>
-                              <button className="btn-primary !text-xs" onClick={() => setKlEdit({ name: "", phone: "", email: "", address: "" })}>+ Thông tin khách lẻ cuối</button>
+                              <button className="btn-primary !text-xs" onClick={() => setKlEdit({ name: "", phone: "", email: "", address: "", customer_type: "", invoice_amount: "", battery_option: "" })}>+ Thông tin khách lẻ cuối</button>
                             </div>
                           )}
                         </div>
