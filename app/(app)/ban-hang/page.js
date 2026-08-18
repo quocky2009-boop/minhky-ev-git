@@ -37,7 +37,7 @@ const lineTotal = (qty, price, dtype, dval) => {
 function TaoDonInner() {
   const params = useSearchParams();
   const router = useRouter();
-  const { supabase, vehicles, locations, profile, loading, refresh, settings, customFields, taxRate, paymentMethods } = useCatalog();
+  const { supabase, vehicles, locations, profile, loading, refresh, settings, customFields, taxRate, paymentMethods, brands } = useCatalog();
   const { toast, notify } = useToast();
 
   const [custs, setCusts] = useState([]);
@@ -51,6 +51,7 @@ function TaoDonInner() {
   const [promos, setPromos] = useState([]);
   const [promoChon, setPromoChon] = useState([]);   // mang id khuyen mai da tick
   const [promoQ, setPromoQ] = useState("");
+  const [bankAccounts, setBankAccounts] = useState([]);
   const [suaPaidAmount, setSuaPaidAmount] = useState(0); // paid_amount thuc te tren don (sau hoan tien)
 
   // Khách hàng
@@ -77,12 +78,13 @@ function TaoDonInner() {
   const [extra, setExtra] = useState({});
 
   const loadCusts = async () => {
-    const [{ data: c }, { data: prods }, { data: kms }] = await Promise.all([
+    const [{ data: c }, { data: prods }, { data: kms }, { data: banks }] = await Promise.all([
       supabase.from("customers").select("id,code,name,phone,cccd,address,status,customer_type,source,email,gender,birthday").order("created_at", { ascending: false }).limit(2000),
       supabase.from("products").select("id,name,group_name,unit,sale_price,stock_qty").eq("status","Hoạt động").order("group_name").order("name"),
       supabase.from("promotions").select("*").eq("status","Đang áp dụng"),
+      supabase.from("cash_accounts").select("id, name, company_id, bank_info").eq("status","Hoạt động").eq("type","Ngân hàng"),
     ]);
-    setCusts(c || []); setProductList(prods || []); setPromos(kms || []);
+    setCusts(c || []); setProductList(prods || []); setPromos(kms || []); setBankAccounts(banks || []);
   };
   useEffect(() => {
     if (!loading) {
@@ -156,6 +158,16 @@ function TaoDonInner() {
   const cfields = (customFields || []).filter((c) => c.entity === "sales_order");
   const PTTT = (paymentMethods.length > 0 ? paymentMethods.map((m) => m.code) : ["Tiền mặt", "Chuyển khoản", "Trả góp"]);
   const traGopPT = paymentMethods.find((m) => m.code === "Trả góp");
+  const quyTypeOf = (method) => paymentMethods.find((m) => m.code === method)?.quy_type;
+
+  // Xac dinh phap nhan (company_id) theo hang xe DAU TIEN trong don — dung de loc dung
+  // danh sach tai khoan Ngan hang cho nhan vien chon (Ngan hang gan theo phap nhan, khong theo cua hang)
+  const companyIdCuaDon = (() => {
+    const v0 = vehicles.find((v) => v.id === xeRows[0]?.vehicle_id);
+    if (!v0) return null;
+    return brands.find((b) => b.name === v0.brand)?.company_id || null;
+  })();
+  const banksHopLe = companyIdCuaDon ? bankAccounts.filter((a) => a.company_id === companyIdCuaDon) : [];
 
   const vName = (id) => { const v = vehicles.find((x) => x.id === id); return v ? `${v.name} · ${v.color}` : id; };
 
@@ -258,9 +270,11 @@ function TaoDonInner() {
     if (cacDong.length === 0) return notify("Nhập ít nhất 1 phương thức thanh toán mới.", "err");
     const tgThieu = cacDong.find((p) => p.method === "Trả góp" && !p.finance_company);
     if (tgThieu) return notify("Chọn đơn vị trả góp.", "err");
+    const nhThieu = cacDong.find((p) => quyTypeOf(p.method) === "Ngân hàng" && !p.account_id);
+    if (nhThieu) return notify(`Chọn tài khoản Ngân hàng nhận tiền cho phương thức "${nhThieu.method}".`, "err");
     setBusy(true);
     const { error } = await supabase.rpc("fn_dao_nguoc_khoan_thu", { p_payment_id: daoNguoc.id, p_ly_do: daoNguoc.ly_do,
-      p_new_payments: cacDong.map((p) => ({ method: p.method, amount: Number(p.amount), finance_company: p.finance_company || null })) });
+      p_new_payments: cacDong.map((p) => ({ method: p.method, amount: Number(p.amount), finance_company: p.finance_company || null, account_id: p.account_id || null })) });
     setBusy(false);
     if (error) return notify(errMsg(error), "err");
     notify("Đã đảo ngược và ghi lại khoản thu mới.");
@@ -276,6 +290,8 @@ function TaoDonInner() {
     if (!meta.location_code) return notify("Chọn điểm bán.", "err");
     const tgThieuSua = pays.find((p) => p.method === "Trả góp" && Number(p.amount) > 0 && !p.tra_gop_ct);
     if (tgThieuSua) return notify("Chọn đơn vị trả góp cho khoản thu thêm.", "err");
+    const nhThieuSua = pays.find((p) => Number(p.amount) > 0 && quyTypeOf(p.method) === "Ngân hàng" && !p.account_id);
+    if (nhThieuSua) return notify(`Chọn tài khoản Ngân hàng nhận tiền cho phương thức "${nhThieuSua.method}".`, "err");
     if (!canhBaoMotPTTT()) return;
     setBusy(true);
     const { data, error } = await supabase.rpc("fn_sua_don_ban", { p: {
@@ -309,6 +325,12 @@ function TaoDonInner() {
     if (!meta.location_code) return notify("Chọn điểm bán để hạch toán doanh số.", "err");
     const tgThieu = pays.find((p) => p.method === "Trả góp" && Number(p.amount) > 0 && !p.tra_gop_ct);
     if (tgThieu) return notify("Chọn đơn vị trả góp.", "err");
+    const nhThieu = pays.find((p) => Number(p.amount) > 0 && quyTypeOf(p.method) === "Ngân hàng" && !p.account_id);
+    if (nhThieu) return notify(`Chọn tài khoản Ngân hàng nhận tiền cho phương thức "${nhThieu.method}".`, "err");
+    const v0ForBattery = vehicles.find((v) => v.id === xeRows[0]?.vehicle_id);
+    if (v0ForBattery?.model_pin === "Xe đổi pin" && !meta.battery_option) {
+      return notify("Xe Đổi pin bắt buộc chọn Hình thức kinh doanh pin.", "err");
+    }
     const cfThieu = cfields.find((c) => c.required && c.field_type !== "formula" && !extra[c.field_key]);
     if (cfThieu) return notify(`Nhập "${cfThieu.label}".`, "err");
     if (!canhBaoMotPTTT()) return;
@@ -321,7 +343,7 @@ function TaoDonInner() {
         qty: Number(r.qty) || 1, unit_price: Number(r.unit_price) || 0,
         discount_type: r.discount_type, discount_value: Number(r.discount_value) || 0 })),
       payments: pays.filter((p) => Number(p.amount) > 0).map((p) => ({
-        method: p.method, amount: Number(p.amount),
+        method: p.method, amount: Number(p.amount), account_id: p.account_id || null,
         note: p.method === "Trả góp" && p.tra_gop_ct ? `Trả góp qua ${p.tra_gop_ct}` : (p.note || ""),
       })),
       discount_type: dTong.type, discount_value: Number(dTong.value) || 0,
@@ -515,6 +537,19 @@ function TaoDonInner() {
             </Field>
             <Field label="Ngày bán"><input type="date" className="inp" value={meta.sale_date} onChange={(e) => setMeta((p) => ({ ...p, sale_date: e.target.value }))} /></Field>
             <Field label="Hạn thanh toán (nếu nợ)"><input type="date" className="inp" value={meta.due_date || ""} onChange={(e) => setMeta((p) => ({ ...p, due_date: e.target.value }))} placeholder="Để trống nếu trả đủ ngay" /></Field>
+            {(() => {
+              const v0 = vehicles.find((v) => v.id === xeRows[0]?.vehicle_id);
+              if (v0?.model_pin !== "Xe đổi pin") return null;
+              return (
+                <Field label="Hình thức kinh doanh pin" required>
+                  <select className="inp" value={meta.battery_option || ""} onChange={(e) => setMeta((p) => ({ ...p, battery_option: e.target.value }))}>
+                    <option value="">— Chọn —</option>
+                    <option value="Kèm pin">Kèm pin</option>
+                    <option value="Thuê pin">Thuê pin</option>
+                  </select>
+                </Field>
+              );
+            })()}
 
             {cfields.map((c) => {
               if (c.field_type === "formula") {
@@ -760,6 +795,16 @@ function TaoDonInner() {
                     .split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean).map((x) => <option key={x}>{x}</option>)}
                 </select>
               </div>
+            ) : quyTypeOf(p.method) === "Ngân hàng" ? (
+              <div key={"nh" + i} className="flex items-center gap-2 flex-wrap bg-[#EAF2FF] rounded-lg px-2.5 py-2 -mt-0.5">
+                <span className="text-[11px] font-bold text-brand">Tài khoản nhận tiền:</span>
+                <select className="inp !w-auto !py-1 !text-xs" value={p.account_id || ""}
+                  onChange={(e) => setPays((x) => x.map((y, j) => j === i ? { ...y, account_id: e.target.value } : y))}>
+                  <option value="">— Chọn đúng tài khoản khách đã chuyển vào —</option>
+                  {banksHopLe.map((a) => <option key={a.id} value={a.id}>{a.name}{a.bank_info ? ` (${a.bank_info})` : ""}</option>)}
+                </select>
+                {banksHopLe.length === 0 && <span className="text-[10.5px] text-danger">Chưa có tài khoản Ngân hàng nào cho đúng pháp nhân của hãng xe này — vào Sổ quỹ tạo trước.</span>}
+              </div>
             ) : null)}
           </div>
           <div className="flex gap-1.5 flex-wrap mb-3">
@@ -826,6 +871,11 @@ function TaoDonInner() {
                       <option value="">— Chọn đơn vị trả góp —</option>
                       {(settings?.cong_ty_tra_gop || "Home Credit\nShinhanbank\nHD Saison\nFE Credit").split("\n").filter(Boolean).map((c) => <option key={c}>{c}</option>)}
                     </select>
+                  ) : quyTypeOf(p.method) === "Ngân hàng" ? (
+                    <select className="inp !flex-1" value={p.account_id || ""} onChange={(e) => setDaoNguoc((cur) => ({ ...cur, new_payments: cur.new_payments.map((x, j) => j === i ? { ...x, account_id: e.target.value } : x) }))}>
+                      <option value="">— Chọn tài khoản —</option>
+                      {banksHopLe.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                    </select>
                   ) : <div className="flex-1" />}
                   <div className="!w-32"><MoneyInput value={p.amount} onChange={(v) => setDaoNguoc((cur) => ({ ...cur, new_payments: cur.new_payments.map((x, j) => j === i ? { ...x, amount: v } : x) }))} /></div>
                   {daoNguoc.new_payments.length > 1 && (
@@ -835,6 +885,17 @@ function TaoDonInner() {
               ))}
             </div>
             <button className="btn-ghost !text-xs mt-2" onClick={() => setDaoNguoc((cur) => ({ ...cur, new_payments: [...cur.new_payments, { method: "Tiền mặt", amount: "", finance_company: "" }] }))}>⊕ Thêm phương thức</button>
+
+            {(() => {
+              const tongMoi = daoNguoc.new_payments.reduce((s, p) => s + (Number(p.amount) || 0), 0);
+              const conThieu = daoNguoc.amount - tongMoi;
+              if (conThieu <= 0) return null;
+              return (
+                <button className="btn-ghost !text-xs mt-1.5 ml-2" onClick={() => setDaoNguoc((cur) => ({ ...cur, new_payments: cur.new_payments.map((x, j) => j === cur.new_payments.length - 1 ? { ...x, amount: (Number(x.amount) || 0) + conThieu } : x) }))}>
+                  Điền nốt {fmtVND(conThieu)} vào dòng cuối
+                </button>
+              );
+            })()}
 
             {(() => {
               const tongMoi = daoNguoc.new_payments.reduce((s, p) => s + (Number(p.amount) || 0), 0);

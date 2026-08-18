@@ -135,7 +135,7 @@ export default function DonBan() {
     if (!invF.checklist?.coc_giao) return notify("Checklist: phải xác nhận đã bàn giao giấy COC.", "err");
     setBusy(true);
     const { error } = await supabase.rpc("fn_xac_nhan_hoa_don", { p: {
-      id: o.id, invoice_no: invF.no, invoice_date: invF.date,
+      id: o.id, invoice_no: invF.no, invoice_date: invF.date, dms_code: invF.dms || "",
       warranty_activated: !!invF.checklist?.bao_hanh,
       app_activated: !!invF.checklist?.app_vf,
       coc_giao: !!invF.checklist?.coc_giao,
@@ -144,7 +144,7 @@ export default function DonBan() {
     setBusy(false);
     if (error) return notify(errMsg(error), "err");
     notify(`Đơn ${o.code} hoàn thành: HĐ ${invF.no}.`);
-    setInvId(null); setInvF({ no: "", date: iso(new Date()), checklist: {} }); load();
+    setInvId(null); setInvF({ no: "", date: iso(new Date()), checklist: {}, dms: "" }); load();
   };
 
   const cancelInv = async (o) => {
@@ -329,9 +329,9 @@ export default function DonBan() {
       [["Ma_Don","Ngay_Ban","Kho","Xe","Mau","So_Khung","Khach","SDT","Loai_KH",
         "Don_Gia_Xe","Chiet_Khau_Xe","Thanh_Tien_Xe","Thanh_Tien_Phu_Kien","Thanh_Tien_Bao_Hiem","Thanh_Tien_Dang_Ky",
         "Tong_Don", ...cotPT, "Da_TT",
-        "Trang_Thai_HD","So_HD","Ngay_HD","Nguoi_Xac_Nhan",
+        "Trang_Thai_HD","So_HD","Ngay_HD","Ma_Don_DMS","Nguoi_Xac_Nhan",
         "CL_Kich_Hoat_Bao_Hanh","CL_App_VF","CL_Ban_Giao_COC","CL_Anh_Khach_Nhan_Xe","CL_Khoe_FB",
-        "NV_Ban",
+        "NV_Ban","Hinh_Thuc_Pin_Luc_Ban",
         "KhachLe_Ten","KhachLe_SDT","KhachLe_Loai_KH","KhachLe_So_Tien_HD","KhachLe_Hinh_Thuc_Pin",
         ...cotKm, "So_Lan_Sua_KM", "Co_Sua_KM_Sau_Khi_Tao"],
        ...sorted.map((o) => { const v = vOf(o.vehicle_id);
@@ -353,10 +353,10 @@ export default function DonBan() {
            o.customer_name, o.customer_phone, o.customer_type || "",
            donGiaXe, chietKhauXe, thanhTienXe, byType.PHU_KIEN, byType.BAO_HIEM, byType.DANG_KY,
            total(o), ...giaTriCotPT, o.paid_amount || 0,
-           o.invoice_status || "Chờ xuất HĐ", o.invoice_no || "", o.invoice_date || "", o.invoice_by_name || "",
+           o.invoice_status || "Chờ xuất HĐ", o.invoice_no || "", o.invoice_date || "", o.dms_code || "", o.invoice_by_name || "",
            o.warranty_activated ? "Có" : "Chưa", o.app_activated ? "Có" : "Chưa", o.coc_giao ? "Có" : "Chưa",
            cl.anh_khach ? "Có" : "Chưa", cl.khoe_fb ? "Có" : "Chưa",
-           o.seller_name,
+           o.seller_name, o.battery_option || "",
            o.end_customer_name || "", o.end_customer_phone || "", o.end_customer_type || "", o.end_customer_invoice_amount || "", o.end_customer_battery_option || "",
            ...cotKm.map((_, i) => tags[i] || ""),
            audit?.tong_so_lan_thao_tac || 0,
@@ -455,7 +455,7 @@ export default function DonBan() {
                         </div>
                       ) : (
                       <div className="flex flex-col gap-1 items-end">
-                        {!done && canConfirm && <button className={`!px-2.5 !py-1 !text-xs w-full ${invId === o.id ? "btn-primary" : "btn-ok"}`} onClick={() => { setInvId(invId === o.id ? null : o.id); setInvF({ no: "", date: iso(new Date()), checklist: {} }); }}>{invId === o.id ? "Đóng" : "✓ Xác nhận HĐ"}</button>}
+                        {!done && canConfirm && <button className={`!px-2.5 !py-1 !text-xs w-full ${invId === o.id ? "btn-primary" : "btn-ok"}`} onClick={() => { setInvId(invId === o.id ? null : o.id); setInvF({ no: "", date: iso(new Date()), checklist: {}, dms: "" }); }}>{invId === o.id ? "Đóng" : "✓ Xác nhận HĐ"}</button>}
                         <div className="flex gap-1 flex-wrap justify-end">
                           {thieuKhachLe(o) && <button className="btn-primary !px-2 !py-1 !text-xs !bg-danger !border-danger" title="Nhập thông tin khách lẻ mua sau cùng" onClick={() => openDetail(o)}>👤</button>}
                           <button className="btn-ghost !px-2 !py-1 !text-xs" title="Xem nhanh đơn" onClick={() => openDetail(o)}>👁</button>
@@ -476,6 +476,7 @@ export default function DonBan() {
                         <div className="flex gap-1.5 items-end flex-wrap">
                           <div><label className="lbl">Số hóa đơn (bắt buộc)</label><input className="inp !py-2 !w-48" autoFocus value={invF.no} onChange={(e) => setInvF((p) => ({ ...p, no: e.target.value }))} placeholder="VD: 00012345" /></div>
                           <div><label className="lbl">Ngày xuất HĐ</label><input type="date" className="inp !py-2 !w-40" value={invF.date} onChange={(e) => setInvF((p) => ({ ...p, date: e.target.value }))} /></div>
+                          <div><label className="lbl">Mã đơn DMS</label><input className="inp !py-2 !w-44" value={invF.dms || ""} onChange={(e) => setInvF((p) => ({ ...p, dms: e.target.value }))} placeholder="Điền khi giao xe (nếu có)" /></div>
                         </div>
                         {/* CHECKLIST GIAO XE */}
                         <div className="border border-[#D5DBE3] rounded-xl p-3 bg-white">

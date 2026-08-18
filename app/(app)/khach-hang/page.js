@@ -98,12 +98,19 @@ function KhachHangInner() {
       buy_timeline: c.buy_timeline || "", potential: c.potential || "", status: c.status || "Lead mới",
     });
     setTab("muahang"); setShow(true); setCareF(null);
-    const [{ data: o }, { data: dv }, { data: care }] = await Promise.all([
+    const [{ data: o1 }, { data: o2 }, { data: dv }, { data: care }] = await Promise.all([
       supabase.from("sales_orders").select("*").eq("customer_id", c.id).order("sale_date", { ascending: false }),
+      supabase.from("sales_orders").select("*").eq("end_customer_id", c.id).order("sale_date", { ascending: false }),
       supabase.from("dv_tickets").select("*").eq("customer_id", c.id).order("created_at", { ascending: false }).limit(50),
       supabase.from("customer_care_logs").select("*").eq("customer_id", c.id).order("care_date", { ascending: false }).limit(100),
     ]);
-    setDonHang(o || []); setPhieuDV(dv || []); setCareLogs(care || []);
+    // Gop 2 nguon (mua truc tiep + duoc dung ten khach le cuoi cua don ban buon), loai trung neu co,
+    // danh dau ro vai tro (o1 = nguoi mua chinh, o2 = khach le dung ten HD trong don ban buon)
+    const map = new Map();
+    (o1 || []).forEach((x) => map.set(x.id, { ...x, _vai_tro: "Người mua" }));
+    (o2 || []).forEach((x) => { if (!map.has(x.id)) map.set(x.id, { ...x, _vai_tro: "Khách lẻ đứng tên HĐ" }); });
+    const merged = [...map.values()].sort((a, b) => new Date(b.sale_date) - new Date(a.sale_date));
+    setDonHang(merged); setPhieuDV(dv || []); setCareLogs(care || []);
   };
 
   const luu = async () => {
@@ -351,6 +358,7 @@ function KhachHangInner() {
                     <div className="tbl-scroll"><table className="w-full border-collapse tbl-card">
                       <thead><tr>
                         <th className="th">Mã đơn hàng</th><th className="th">Trạng thái</th>
+                        <th className="th">Vai trò</th>
                         <th className="th">Xe</th><th className="th">Số khung</th>
                         <th className="th text-right">Giá trị</th><th className="th">Chi nhánh</th>
                         <th className="th">Nhân viên xử lý</th><th className="th">Ngày ghi nhận</th>
@@ -361,6 +369,7 @@ function KhachHangInner() {
                           <tr key={o.id} className={conNo > 0 ? "bg-[#FFF6F6] hover:bg-[#FDEDED]" : "hover:bg-[#F8FAFC]"}>
                             <td className="td font-bold"><Link href={`/don-ban/${o.id}`} className="text-brand hover:underline">{o.code}</Link></td>
                             <td className="td"><Badge tone={o.invoice_status === "Đã xuất HĐ" ? "green" : "amber"}>{o.invoice_status === "Đã xuất HĐ" ? "Hoàn thành" : "Chờ xuất HĐ"}</Badge></td>
+                            <td className="td"><Badge tone={o._vai_tro === "Người mua" ? "blue" : "purple"}>{o._vai_tro}</Badge></td>
                             <td className="td text-[13px]">{vName(o.vehicle_id)}</td>
                             <td className="td font-mono text-xs">{o.frame_number}</td>
                             <td className="td text-right font-bold">{fmtVND(o.sale_price * o.quantity)}</td>
