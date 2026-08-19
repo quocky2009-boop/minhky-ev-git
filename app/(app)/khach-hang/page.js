@@ -368,7 +368,9 @@ function KhachHangInner() {
                         return (
                           <tr key={o.id} className={conNo > 0 ? "bg-[#FFF6F6] hover:bg-[#FDEDED]" : "hover:bg-[#F8FAFC]"}>
                             <td className="td font-bold"><Link href={`/don-ban/${o.id}`} className="text-brand hover:underline">{o.code}</Link></td>
-                            <td className="td"><Badge tone={o.invoice_status === "Đã xuất HĐ" ? "green" : "amber"}>{o.invoice_status === "Đã xuất HĐ" ? "Hoàn thành" : "Chờ xuất HĐ"}</Badge></td>
+                            <td className="td">{o.status === "Đã hủy" || o.status === "Đã trả hàng"
+                              ? <Badge tone="red">{o.status}</Badge>
+                              : <Badge tone={o.invoice_status === "Đã xuất HĐ" ? "green" : "amber"}>{o.invoice_status === "Đã xuất HĐ" ? "Hoàn thành" : "Chờ xuất HĐ"}</Badge>}</td>
                             <td className="td"><Badge tone={o._vai_tro === "Người mua" ? "blue" : "purple"}>{o._vai_tro}</Badge></td>
                             <td className="td text-[13px]">{vName(o.vehicle_id)}</td>
                             <td className="td font-mono text-xs">{o.frame_number}</td>

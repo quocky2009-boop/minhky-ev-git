@@ -283,7 +283,7 @@ export default function DonBanChiTiet() {
                 ["Bán tại", locName(o.location_code)],
                 ["Bán bởi", o.seller_name || "—"],
                 ["Ngày bán", fmtTime(o.sale_date)],
-                ["Trạng thái HĐ", o.invoice_status || "Chờ xuất HĐ"],
+                ["Trạng thái HĐ", o.status === "Đã hủy" ? "Đã hủy (không xuất HĐ)" : o.status === "Đã trả hàng" ? "Đã trả hàng (không xuất HĐ)" : (o.invoice_status || "Chờ xuất HĐ")],
                 o.invoice_no && ["Số hóa đơn", o.invoice_no],
                 o.invoice_date && ["Ngày xuất HĐ", fmtDate(o.invoice_date)],
                 o.invoice_by_name && ["Người xác nhận HĐ", o.invoice_by_name],

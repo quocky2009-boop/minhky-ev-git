@@ -2,7 +2,7 @@
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Field, Badge, Toast, LocSearch, CustomerSearch, MoneyInput, FrameSearch, ComboFree } from "@/components/ui";
+import { Field, Badge, Toast, LocSearch, CustomerSearch, MoneyInput, FrameSearch, ComboFree, VehicleSearch } from "@/components/ui";
 import { printOrder as _printOrder } from "@/lib/print";
 import { uploadAnhDon } from "@/lib/img";
 import Link from "next/link";
@@ -207,6 +207,27 @@ function TaoDonInner() {
   };
 
   // ===== HÀNG HÓA =====
+  const locName = (c) => locations.find((l) => l.code === c)?.name || c || "—";
+
+  const [che_do_tim, setCheDoTim] = useState("sk"); // "sk" | "model"
+  const [modelChon, setModelChon] = useState("");
+  const [xeTheoModel, setXeTheoModel] = useState([]);
+  const [skTick, setSkTick] = useState([]);
+  const [locSk, setLocSk] = useState("");
+
+  const timXeTheoModel = async (vehicleId) => {
+    setModelChon(vehicleId); setSkTick([]); setLocSk("");
+    if (!vehicleId) { setXeTheoModel([]); return; }
+    const { data } = await supabase.from("vehicle_units").select("frame_number, location_code, status")
+      .eq("vehicle_id", vehicleId).in("status", ["TON_KHO", "GIU_CHO"]).order("frame_number");
+    setXeTheoModel(data || []);
+  };
+
+  const themNhieuXe = async () => {
+    for (const sk of skTick) await themXe(sk);
+    setSkTick([]);
+  };
+
   const themXe = async (sk) => {
     const s = String(sk || "").trim().toUpperCase();
     if (!s) return;
@@ -591,10 +612,52 @@ function TaoDonInner() {
         </div>
 
         <div className="mb-3">
-          <FrameSearch supabase={supabase} value=""
-            onlyStatus={["TON_KHO", "GIU_CHO"]}
-            placeholder="Tìm số khung để thêm xe, hoặc quét mã…"
-            onPick={(sk, u) => { if (u) themXe(sk); }} />
+          <div className="flex gap-1.5 mb-2">
+            <button type="button" className={`btn-ghost !text-xs ${che_do_tim === "sk" ? "!bg-brand !text-white" : ""}`} onClick={() => setCheDoTim("sk")}>🔢 Theo số khung</button>
+            <button type="button" className={`btn-ghost !text-xs ${che_do_tim === "model" ? "!bg-brand !text-white" : ""}`} onClick={() => setCheDoTim("model")}>🚗 Theo tên xe & màu</button>
+          </div>
+
+          {che_do_tim === "sk" ? (
+            <FrameSearch supabase={supabase} value=""
+              onlyStatus={["TON_KHO", "GIU_CHO"]}
+              placeholder="Tìm số khung để thêm xe, hoặc quét mã…"
+              onPick={(sk, u) => { if (u) themXe(sk); }} />
+          ) : (
+            <div className="rounded-xl border border-[#E3E8EF] p-3">
+              <VehicleSearch vehicles={vehicles} value={modelChon} onChange={timXeTheoModel} />
+              {modelChon && (
+                <div className="mt-2.5">
+                  {xeTheoModel.length === 0 ? (
+                    <div className="text-xs text-[#8A93A0] py-2">Model này hiện không còn xe sẵn sàng bán (Tồn kho/Giữ chỗ) ở bất kỳ kho nào.</div>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-2 mb-2">
+                        <input className="inp !w-40 !py-1.5 !text-xs" placeholder="Lọc theo số khung/kho…" value={locSk} onChange={(e) => setLocSk(e.target.value.toUpperCase())} />
+                        <span className="text-[11px] text-[#8A93A0]">{xeTheoModel.length} xe sẵn sàng · đã chọn {skTick.length}</span>
+                        {skTick.length > 0 && <button type="button" className="btn-ok !text-xs ml-auto" onClick={themNhieuXe}>+ Thêm {skTick.length} xe đã chọn</button>}
+                      </div>
+                      <div className="max-h-52 overflow-y-auto flex flex-col gap-1 border-t border-[#F0F2F5] pt-2">
+                        {xeTheoModel.filter((u) => !locSk || u.frame_number.includes(locSk) || u.location_code.toUpperCase().includes(locSk))
+                          .map((u) => {
+                            const daCo = xeRows.some((r) => r.frame_number === u.frame_number);
+                            return (
+                              <label key={u.frame_number} className={`flex items-center gap-2 text-xs px-2 py-1.5 rounded-lg ${daCo ? "opacity-40" : "hover:bg-[#F8FAFC] cursor-pointer"}`}>
+                                <input type="checkbox" disabled={daCo} checked={skTick.includes(u.frame_number)}
+                                  onChange={(e) => setSkTick((cur) => e.target.checked ? [...cur, u.frame_number] : cur.filter((x) => x !== u.frame_number))} />
+                                <span className="font-mono font-bold">{u.frame_number}</span>
+                                <span className="text-[#8A93A0]">{locName(u.location_code)}</span>
+                                {u.status === "GIU_CHO" && <Badge tone="amber">Đang giữ chỗ</Badge>}
+                                {daCo && <span className="text-[#8A93A0] ml-auto">Đã có trong đơn</span>}
+                              </label>
+                            );
+                          })}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="tbl-scroll"><table className="w-full border-collapse tbl-card">
