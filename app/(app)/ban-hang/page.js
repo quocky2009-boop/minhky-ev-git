@@ -34,6 +34,34 @@ const lineTotal = (qty, price, dtype, dval) => {
   return { goc, ck, con: Math.max(goc - ck, 0) };
 };
 
+// Dat o MODULE-LEVEL (ngoai component) — neu dinh nghia BEN TRONG
+// TaoDonInner, moi lan component cha re-render (vi du moi lan go 1 ky
+// tu) React se coi day la 1 COMPONENT TYPE MOI hoan toan, gay UNMOUNT
+// + MOUNT LAI DOM cu, lam MoneyInput ben trong MAT FOCUS/con tro giua
+// chung khi dang go — day chinh la nguyen nhan loi "go 1 so lai mat
+// con tro" da gap phai.
+const RowCK = ({ r, set, i }) => (
+  <>
+    <td data-label="Chiết khấu" className="td">
+      <div className="flex gap-1">
+        {r.discount_type === "percent" ? (
+          <input type="number" className="inp !py-1 !text-xs !w-20" value={r.discount_value || ""} placeholder="0"
+            onChange={(e) => set(i, "discount_value", e.target.value)} />
+        ) : (
+          <MoneyInput className="!py-1 !text-xs !w-28" value={r.discount_value || ""} placeholder="0"
+            onChange={(v) => set(i, "discount_value", v)} />
+        )}
+        <select className="inp !py-1 !text-xs !w-14" value={r.discount_type} onChange={(e) => set(i, "discount_type", e.target.value)}>
+          <option value="amount">đ</option><option value="percent">%</option>
+        </select>
+      </div>
+    </td>
+    <td data-label="Thành tiền" className="td text-right font-bold whitespace-nowrap">
+      {fmtVND(lineTotal(r.qty || 1, r.unit_price, r.discount_type, r.discount_value).con)}
+    </td>
+  </>
+);
+
 function TaoDonInner() {
   const params = useSearchParams();
   const router = useRouter();
@@ -425,29 +453,8 @@ function TaoDonInner() {
     );
   }
 
-  // Bảng dòng hàng hóa dùng chung
-  const RowCK = ({ r, set, i }) => (
-    <>
-      <td data-label="Chiết khấu" className="td">
-        <div className="flex gap-1">
-          {r.discount_type === "percent" ? (
-            <input type="number" className="inp !py-1 !text-xs !w-20" value={r.discount_value || ""} placeholder="0"
-              onChange={(e) => set(i, "discount_value", e.target.value)} />
-          ) : (
-            <MoneyInput className="!py-1 !text-xs !w-28" value={r.discount_value || ""} placeholder="0"
-              onChange={(v) => set(i, "discount_value", v)} />
-          )}
-          <select className="inp !py-1 !text-xs !w-14" value={r.discount_type} onChange={(e) => set(i, "discount_type", e.target.value)}>
-            <option value="amount">đ</option><option value="percent">%</option>
-          </select>
-        </div>
-      </td>
-      <td data-label="Thành tiền" className="td text-right font-bold whitespace-nowrap">
-        {fmtVND(lineTotal(r.qty || 1, r.unit_price, r.discount_type, r.discount_value).con)}
-      </td>
-    </>
-  );
-
+  // Bảng dòng hàng hóa dùng chung: xem RowCK ở module-level cuối file
+    
   return (
     <div className="flex flex-col gap-4 pb-24">
       <Toast toast={toast} />

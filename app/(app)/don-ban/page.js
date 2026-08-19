@@ -130,6 +130,7 @@ export default function DonBan() {
   const isVF = (o) => (vOf(o.vehicle_id)?.brand || "").toUpperCase().includes("VINFAST");
   const confirmInv = async (o) => {
     if (!invF.no.trim()) return notify("Bắt buộc nhập số hóa đơn.", "err");
+    if (!invF.dms?.trim()) return notify("Bắt buộc nhập Mã đơn DMS.", "err");
     if (!invF.checklist?.bao_hanh) return notify("Checklist: phải kích hoạt bảo hành.", "err");
     if (isVF(o) && !invF.checklist?.app_vf) return notify("Xe VinFast: phải kích hoạt app VF eScooter.", "err");
     if (!invF.checklist?.coc_giao) return notify("Checklist: phải xác nhận đã bàn giao giấy COC.", "err");
@@ -476,7 +477,7 @@ export default function DonBan() {
                         <div className="flex gap-1.5 items-end flex-wrap">
                           <div><label className="lbl">Số hóa đơn (bắt buộc)</label><input className="inp !py-2 !w-48" autoFocus value={invF.no} onChange={(e) => setInvF((p) => ({ ...p, no: e.target.value }))} placeholder="VD: 00012345" /></div>
                           <div><label className="lbl">Ngày xuất HĐ</label><input type="date" className="inp !py-2 !w-40" value={invF.date} onChange={(e) => setInvF((p) => ({ ...p, date: e.target.value }))} /></div>
-                          <div><label className="lbl">Mã đơn DMS</label><input className="inp !py-2 !w-44" value={invF.dms || ""} onChange={(e) => setInvF((p) => ({ ...p, dms: e.target.value }))} placeholder="Điền khi giao xe (nếu có)" /></div>
+                          <div><label className="lbl">Mã đơn DMS (bắt buộc)</label><input className="inp !py-2 !w-44" value={invF.dms || ""} onChange={(e) => setInvF((p) => ({ ...p, dms: e.target.value }))} placeholder="VD: DMS00012345" /></div>
                         </div>
                         {/* CHECKLIST GIAO XE */}
                         <div className="border border-[#D5DBE3] rounded-xl p-3 bg-white">
