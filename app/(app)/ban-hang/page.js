@@ -80,6 +80,11 @@ function TaoDonInner() {
   const [promoChon, setPromoChon] = useState([]);   // mang id khuyen mai da tick
   const [promoQ, setPromoQ] = useState("");
   const [bankAccounts, setBankAccounts] = useState([]);
+  const [che_do_tim, setCheDoTim] = useState("sk"); // "sk" | "model"
+  const [modelChon, setModelChon] = useState("");
+  const [xeTheoModel, setXeTheoModel] = useState([]);
+  const [skTick, setSkTick] = useState([]);
+  const [locSk, setLocSk] = useState("");
   const [suaPaidAmount, setSuaPaidAmount] = useState(0); // paid_amount thuc te tren don (sau hoan tien)
 
   // Khách hàng
@@ -236,12 +241,6 @@ function TaoDonInner() {
 
   // ===== HÀNG HÓA =====
   const locName = (c) => locations.find((l) => l.code === c)?.name || c || "—";
-
-  const [che_do_tim, setCheDoTim] = useState("sk"); // "sk" | "model"
-  const [modelChon, setModelChon] = useState("");
-  const [xeTheoModel, setXeTheoModel] = useState([]);
-  const [skTick, setSkTick] = useState([]);
-  const [locSk, setLocSk] = useState("");
 
   const timXeTheoModel = async (vehicleId) => {
     setModelChon(vehicleId); setSkTick([]); setLocSk("");
