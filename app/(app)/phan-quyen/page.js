@@ -13,6 +13,7 @@ const ROLES_LIST = [
 const PERM_GROUPS = [
   { group: "Kho & hàng hóa", icon: "📦", items: [
     { key: "nhap_hang", label: "Nhập hàng vào kho", desc: "Tạo phiếu nhập, thêm xe vào tồn" },
+    { key: "sua_kho_nhap", label: "Sửa kho nhập / Khôi phục đơn đã hủy", desc: "Đổi lại kho cho đơn nhập nhầm, hoặc khôi phục đơn đã hủy về tồn kho" },
     { key: "xuat_ban", label: "Tạo đơn xuất bán", desc: "Tạo và sửa đơn bán hàng" },
     { key: "dieu_chuyen", label: "Tạo phiếu điều chuyển", desc: "Chuyển xe giữa các kho" },
     { key: "dieu_chinh", label: "Đề xuất điều chỉnh tồn", desc: "Gửi yêu cầu điều chỉnh số lượng" },

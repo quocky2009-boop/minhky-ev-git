@@ -26,6 +26,8 @@ function NhapHangInner() {
   const [txns, setTxns] = useState([]);
   const [trangThaiMap, setTrangThaiMap] = useState({});
   const [busy, setBusy] = useState(false);
+  const [suaKhoDoc, setSuaKhoDoc] = useState(null);
+  const [suaKhoMoi, setSuaKhoMoi] = useState("");
   const [from, setFrom] = useState(firstOfMonth());
   const [to, setTo] = useState(iso(new Date()));
   const [fLoc, setFLoc] = useState("");
@@ -100,6 +102,26 @@ function NhapHangInner() {
     const { data, error } = await supabase.rpc("fn_xoa_han_don_nhap_huy", { p_doc: doc });
     if (error) return notify(errMsg(error), "err");
     notify(`Đã xóa hẳn ${data.so_xe_xoa} số khung + ${data.so_dong_log_xoa} dòng lịch sử của đơn ${doc}.`);
+    load();
+  };
+
+  const luuSuaKho = async (doc) => {
+    if (!suaKhoMoi) return notify("Chọn kho mới.", "err");
+    setBusy(true);
+    const { data, error } = await supabase.rpc("fn_sua_kho_don_nhap", { p_doc: doc, p_location_code: suaKhoMoi });
+    setBusy(false);
+    if (error) return notify(errMsg(error), "err");
+    notify(`Đã chuyển ${data} xe của đơn ${doc} sang kho mới.`);
+    setSuaKhoDoc(null); setSuaKhoMoi(""); load();
+  };
+
+  const khoiPhucDon = async (doc) => {
+    if (!confirm(`Khôi phục đơn nhập ${doc} đã hủy?\n\nToàn bộ xe trong đơn sẽ trở lại Tồn kho như trước khi hủy. Sau khi khôi phục, có thể dùng "✏️ Sửa kho nhập" để đổi kho nếu cần.`)) return;
+    setBusy(true);
+    const { data, error } = await supabase.rpc("fn_khoi_phuc_don_nhap_huy", { p_doc: doc });
+    setBusy(false);
+    if (error) return notify(errMsg(error), "err");
+    notify(`Đã khôi phục ${data} xe của đơn ${doc} về Tồn kho.`);
     load();
   };
 
@@ -481,7 +503,7 @@ function NhapHangInner() {
                 <Th label="Người nhập" k="nv" sort={sort} />
                 <th className="th"></th>
               </tr></thead>
-              <tbody>{pageSlice(sorted, page, pageSize).map((d) => (
+              <tbody>{pageSlice(sorted, page, pageSize).map((d) => { return [
                 <tr key={d.doc} className={`hover:bg-[#F8FAFC] ${trangThaiMap[d.doc] === "Đơn hủy" ? "bg-[#F3F4F6] text-[#8A93A0]" : sel.has(d.doc) ? "bg-[#EAF2FF]" : ""}`}>
                   <TdCheck sel={sel} id={d.doc} />
                   <td data-label="Mã phiếu" className="td font-bold"><Link href={`/nhap-hang/${encodeURIComponent(d.doc)}`} className="text-brand hover:underline">{d.doc}</Link></td>
@@ -494,13 +516,34 @@ function NhapHangInner() {
                   <td className="td">
                     <div className="flex gap-1">
                       <Link href={`/nhap-hang/${encodeURIComponent(d.doc)}`} className="btn-ghost !px-2 !py-1 !text-xs" title="Xem chi tiết phiếu">👁</Link>
+                      {trangThaiMap[d.doc] !== "Đơn hủy" && (profile.role === "CEO" || perms["sua_kho_nhap"]) && (
+                        <button className="btn-ghost !px-2 !py-1 !text-xs" title="Sửa kho nhập (chỉ khi toàn bộ xe còn Tồn kho)" onClick={() => { setSuaKhoDoc(suaKhoDoc === d.doc ? null : d.doc); setSuaKhoMoi(""); }}>✏️</button>
+                      )}
+                      {trangThaiMap[d.doc] === "Đơn hủy" && (profile.role === "CEO" || perms["sua_kho_nhap"]) && (
+                        <button className="btn-ghost !px-2 !py-1 !text-xs" title="Khôi phục đơn đã hủy về Tồn kho" onClick={() => khoiPhucDon(d.doc)}>↩️</button>
+                      )}
                       {trangThaiMap[d.doc] === "Đơn hủy" && ["ADMIN","CEO"].includes(profile.role) && (
                         <button className="btn-ghost !px-2 !py-1 !text-xs !text-danger" title="Xóa hẳn khỏi database (không thể hoàn tác)" onClick={() => xoaHanDon(d.doc)}>🗑</button>
                       )}
                     </div>
                   </td>
-                </tr>
-              ))}
+                </tr>,
+                suaKhoDoc === d.doc && (
+                  <tr key={d.doc + "_suakho"}><td colSpan={9} className="td bg-[#EAF2FF] !p-3">
+                    <div className="flex items-end gap-2 flex-wrap">
+                      <div className="font-semibold text-[13px] mr-2">✏️ Sửa kho nhập — {d.doc}</div>
+                      <Field label="Kho mới">
+                        <select className="inp !w-56" value={suaKhoMoi} onChange={(e) => setSuaKhoMoi(e.target.value)}>
+                          <option value="">— Chọn kho mới —</option>
+                          {locations.filter((l) => l.code !== d.location_code).map((l) => <option key={l.code} value={l.code}>{l.name}</option>)}
+                        </select>
+                      </Field>
+                      <button className="btn-ok !text-xs" disabled={busy} onClick={() => luuSuaKho(d.doc)}>Lưu</button>
+                      <button className="btn-ghost !text-xs" onClick={() => setSuaKhoDoc(null)}>Hủy</button>
+                    </div>
+                  </td></tr>
+                ),
+              ];})}
               {sorted.length === 0 && <tr><td className="td" colSpan={8}>Không có đơn nhập nào khớp bộ lọc.</td></tr>}
               </tbody>
             </table></div>
