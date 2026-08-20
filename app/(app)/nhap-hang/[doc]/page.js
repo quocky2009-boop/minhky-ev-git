@@ -17,6 +17,7 @@ export default function NhapChiTiet() {
   const [suaMode, setSuaMode] = useState(false);
   const [suaLines, setSuaLines] = useState([]);
   const [huyBusy, setHuyBusy] = useState(false);
+  const [canSua, setCanSua] = useState(false);
 
   const load = async () => {
     setBusy(true);
@@ -28,6 +29,12 @@ export default function NhapChiTiet() {
     setBusy(false);
   };
   useEffect(() => { if (!loading) load(); }, [loading, docCode]);
+  useEffect(() => {
+    if (!profile) return;
+    if (profile.role === "CEO") { setCanSua(true); return; }
+    supabase.from("role_perms").select("allowed").eq("role", profile.role).eq("perm", "sua_kho_nhap").maybeSingle()
+      .then(({ data }) => setCanSua(!!data?.allowed));
+  }, [profile]);
 
   const canSuaHuy = units.every((u) => u.status === "TON_KHO");
 
@@ -71,6 +78,19 @@ export default function NhapChiTiet() {
   const t0 = txns[0];
   const loc = t0.to_location;
   const supplier = parseSup(t0.note);
+
+  const suaSoKhung = async (frameCu) => {
+    const moi = prompt(`Sửa số khung\n\nSố khung cũ: ${frameCu}\nNhập số khung ĐÚNG:`, "");
+    if (moi === null) return;
+    const trimmed = moi.trim().toUpperCase();
+    if (!trimmed) return notify("Chưa nhập số khung mới.", "err");
+    setBusy(true);
+    const { error } = await supabase.rpc("fn_sua_so_khung", { p_frame_cu: frameCu, p_frame_moi: trimmed });
+    setBusy(false);
+    if (error) return notify(errMsg(error), "err");
+    notify(`Đã sửa số khung ${frameCu} → ${trimmed}.`);
+    load();
+  };
   const soXe = txns.reduce((s, t) => s + (t.qty || 0), 0);
   const soMa = txns.length;
   const tongVon = units.reduce((s, u) => s + (u.cost_price || 0), 0);
@@ -134,6 +154,9 @@ export default function NhapChiTiet() {
                                 <span key={u.frame_number} className="inline-flex items-center gap-1 bg-[#F3F5F8] rounded px-1.5 py-0.5 text-[10.5px] font-mono">
                                   {u.frame_number}
                                   {u.status !== "TON_KHO" && <span className="text-[9px] text-[#8A93A0]">·{u.status === "DA_BAN" ? "đã bán" : u.status === "DANG_CHUYEN" ? "đang chuyển" : u.status}</span>}
+                                  {u.status === "TON_KHO" && canSua && (
+                                    <button className="text-[9px] text-brand hover:underline ml-0.5" title="Sửa số khung" onClick={() => suaSoKhung(u.frame_number)}>✏️</button>
+                                  )}
                                 </span>
                               ))}
                             </div>
