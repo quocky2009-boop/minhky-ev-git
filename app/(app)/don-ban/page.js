@@ -689,7 +689,8 @@ export default function DonBan() {
 
                       <MoneyRows
                         lines={[
-                          ["Giá xe" + (detail.quantity > 1 ? ` × ${detail.quantity}` : ""), fmtVND(detail.sale_price * detail.quantity)],
+                          ["Giá xe" + (detail.quantity > 1 ? ` × ${detail.quantity}` : ""), fmtVND(tienXe)],
+...(ckXe > 0 ? [["Chiết khấu xe", "−" + fmtVND(ckXe), "font-semibold text-danger"]] : []),
                           ...(detail._items && detail._items.length > 0
                             ? detail._items.map((it) => [`${it.name} × ${it.qty}`, fmtVND(it.amount), "font-semibold text-[#5A6572]"])
                             : []),
