@@ -519,12 +519,17 @@ export default function DonBan() {
             <Pager total={sorted.length} page={page} setPage={setPage} pageSize={pageSize} setPageSize={setPageSize} />
           </>
         )}
-        {detail && (() => {
-          const v = vOf(detail.vehicle_id);
-          const st = detail.invoice_status || "Chờ xuất HĐ";
-          const kem = (detail._items || []).reduce((sm, it) => sm + it.amount, 0);
-          const tong = Math.max(detail.sale_price * detail.quantity + kem - (detail.discount_amount || 0), 0);
-          return (
+{detail && (() => {
+  const v = vOf(detail.vehicle_id);
+  const st = detail.invoice_status || "Chờ xuất HĐ";
+  const tienXe = detail.sale_price * detail.quantity;
+  const ckXe = detail.vehicle_discount_type === "percent"
+    ? Math.round(tienXe * (detail.vehicle_discount_value || 0) / 100)
+    : (detail.vehicle_discount_value || 0);
+  const kem = (detail._items || []).reduce((sm, it) => sm + it.amount, 0);
+  const tamTinh = tienXe - ckXe + kem;
+  const tong = Math.max(tamTinh - (detail.discount_amount || 0), 0);
+  return (
             <div className="fixed inset-0 z-[95] bg-black/50 flex items-center justify-center p-3" onClick={() => setDetail(null)}>
               <div className="bg-white rounded-2xl w-[600px] max-w-full max-h-[88vh] overflow-y-auto p-4" onClick={(e) => e.stopPropagation()}>
                 <div className="flex items-center gap-1.5 mb-2 flex-wrap">
