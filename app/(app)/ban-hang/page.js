@@ -148,7 +148,7 @@ function TaoDonInner() {
       setSuaId(o.id);
       setKh({ customer_name: o.customer_name, customer_phone: o.customer_phone, customer_cccd: o.customer_cccd || "",
         customer_address: o.customer_address || "", customer_type: o.customer_type, customer_source: o.customer_source });
-      setMeta({ sale_date: o.sale_date, location_code: o.location_code, document_status: o.document_status, note: o.note || "", seller_id: o.seller_id || "", seller_name: o.seller_name || "" });
+      setMeta({ sale_date: o.sale_date, location_code: o.location_code, document_status: o.document_status, note: o.note || "", seller_id: o.seller_id || "", seller_name: o.seller_name || "", battery_option: o.battery_option || "" });
       setExtra(o.extra || {});
       setDTong({ type: o.discount_type || "amount", value: o.discount_value || 0 });
       setPayCu(pays0 || []);
@@ -340,6 +340,10 @@ function TaoDonInner() {
     if (tgThieuSua) return notify("Chọn đơn vị trả góp cho khoản thu thêm.", "err");
     const nhThieuSua = pays.find((p) => Number(p.amount) > 0 && quyTypeOf(p.method) === "Ngân hàng" && !p.account_id);
     if (nhThieuSua) return notify(`Chọn tài khoản Ngân hàng nhận tiền cho phương thức "${nhThieuSua.method}".`, "err");
+    const v0ForBatterySua = vehicles.find((v) => v.id === xeRows[0]?.vehicle_id);
+    if (v0ForBatterySua?.model_pin === "Xe đổi pin" && !meta.battery_option) {
+      return notify("Xe Đổi pin bắt buộc chọn Hình thức kinh doanh pin.", "err");
+    }
     if (!canhBaoMotPTTT()) return;
     setBusy(true);
     const { data, error } = await supabase.rpc("fn_sua_don_ban", { p: {
