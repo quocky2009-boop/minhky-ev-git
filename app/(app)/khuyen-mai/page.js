@@ -5,7 +5,8 @@ import { Field, Badge, Toast, Pager, pageSlice, useSortable, Th } from "@/compon
 import { fmtDate, errMsg } from "@/lib/format";
 
 const iso = (d) => d.toLocaleDateString("sv-SE");
-const empty = { brand: "VinFast", name: "", vehicle_names: [], start_date: iso(new Date()), end_date: iso(new Date()), note: "", status: "Đang áp dụng" };
+const empty = { brand: "VinFast", name: "", vehicle_names: [], start_date: iso(new Date()), end_date: iso(new Date()), note: "", status: "Đang áp dụng", battery_options: [] };
+const BATTERY_OPTIONS = ["Kèm pin", "Thuê pin"];
 
 export default function KhuyenMai() {
   const { supabase, vehicles, brands, profile, loading, refresh } = useCatalog();
@@ -40,7 +41,7 @@ export default function KhuyenMai() {
 
   const openNew = () => { setEditId(null); setF(empty); setShow(true); };
   const openEdit = (r) => { setEditId(r.id); setF({ brand: r.brand, name: r.name, vehicle_names: r.vehicle_names || [],
-    start_date: r.start_date, end_date: r.end_date, note: r.note || "", status: r.status }); setShow(true); };
+    start_date: r.start_date, end_date: r.end_date, note: r.note || "", status: r.status, battery_options: r.battery_options || [] }); setShow(true); };
 
   const luu = async () => {
     if (!f.name.trim()) return notify("Nhập tên chương trình.", "err");
@@ -102,6 +103,18 @@ export default function KhuyenMai() {
               </div>
             </div>
             <div className="md:col-span-3 sm:col-span-2">
+              <label className="lbl">Hình thức kinh doanh pin áp dụng — bỏ trống = áp dụng mọi hình thức (kể cả xe không phải Đổi pin)</label>
+              <div className="flex flex-wrap gap-1.5 p-2 rounded-lg border border-[#E3E8EF]">
+                {BATTERY_OPTIONS.map((b) => (
+                  <label key={b} className={`text-xs px-2 py-1 rounded-md border cursor-pointer ${f.battery_options.includes(b) ? "bg-[#EAF2FF] border-brand text-brand font-semibold" : "border-[#E3E8EF]"}`}>
+                    <input type="checkbox" className="hidden" checked={f.battery_options.includes(b)}
+                      onChange={(e) => set("battery_options", e.target.checked ? [...f.battery_options, b] : f.battery_options.filter((x) => x !== b))} />
+                    {b}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="md:col-span-3 sm:col-span-2">
               <Field label="Ghi chú / điều kiện chương trình"><textarea className="inp" rows={8} value={f.note} onChange={(e) => set("note", e.target.value)} /></Field>
             </div>
           </div>
@@ -120,6 +133,7 @@ export default function KhuyenMai() {
             <Th label="Tên chương trình" k="name" sort={sort} />
             <Th label="Hãng" k="brand" sort={sort} />
             <th className="th">Model áp dụng</th>
+            <th className="th">Pin áp dụng</th>
             <Th label="Từ ngày" k="tu" sort={sort} />
             <Th label="Đến ngày" k="den" sort={sort} />
             <Th label="Trạng thái" k="tt" sort={sort} />
@@ -131,13 +145,14 @@ export default function KhuyenMai() {
               <td className="td">{r.name}</td>
               <td className="td text-[13px]">{r.brand}</td>
               <td className="td text-[12px]">{(r.vehicle_names || []).length === 0 ? <span className="text-[#8A93A0]">Mọi model</span> : r.vehicle_names.join(", ")}</td>
+              <td className="td text-[12px]">{(r.battery_options || []).length === 0 ? <span className="text-[#8A93A0]">Mọi hình thức</span> : r.battery_options.join(", ")}</td>
               <td className="td text-xs">{fmtDate(r.start_date)}</td>
               <td className="td text-xs">{fmtDate(r.end_date)}</td>
               <td className="td"><Badge tone={TONE[trangThaiThuc(r)]}>{trangThaiThuc(r)}</Badge></td>
               {canQuan && <td className="td"><button className="btn-ghost !px-2 !py-1 !text-xs" onClick={() => openEdit(r)}>Sửa</button></td>}
             </tr>
           ))}
-          {sorted.length === 0 && <tr><td className="td" colSpan={8}>Chưa có chương trình khuyến mại nào.</td></tr>}
+          {sorted.length === 0 && <tr><td className="td" colSpan={9}>Chưa có chương trình khuyến mại nào.</td></tr>}
           </tbody>
         </table></div>
         <Pager total={sorted.length} page={page} setPage={setPage} pageSize={20} setPageSize={() => {}} />

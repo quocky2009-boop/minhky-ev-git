@@ -779,6 +779,7 @@ function TaoDonInner() {
           const hopLe = promos.filter((p) =>
             brandsXe.some((b) => b.trim().toLowerCase() === p.brand.trim().toLowerCase()) &&
             (p.vehicle_names.length === 0 || p.vehicle_names.some((n) => namesXe.some((nx) => nx.trim().toLowerCase() === n.trim().toLowerCase()))) &&
+            ((p.battery_options || []).length === 0 || (meta.battery_option && p.battery_options.includes(meta.battery_option))) &&
             p.end_date >= iso(new Date()));
           const hopLeLoc = promoQ ? hopLe.filter((p) => `${p.code} ${p.name}`.toLowerCase().includes(promoQ.toLowerCase())) : hopLe;
           if (xeRows.length === 0) return null;
