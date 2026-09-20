@@ -568,19 +568,6 @@ function TaoDonInner() {
             </Field>
             <Field label="Ngày bán"><input type="date" className="inp" value={meta.sale_date} onChange={(e) => setMeta((p) => ({ ...p, sale_date: e.target.value }))} /></Field>
             <Field label="Hạn thanh toán (nếu nợ)"><input type="date" className="inp" value={meta.due_date || ""} onChange={(e) => setMeta((p) => ({ ...p, due_date: e.target.value }))} placeholder="Để trống nếu trả đủ ngay" /></Field>
-            {(() => {
-              const v0 = vehicles.find((v) => v.id === xeRows[0]?.vehicle_id);
-              if (v0?.model_pin !== "Xe đổi pin") return null;
-              return (
-                <Field label="Hình thức kinh doanh pin" required>
-                  <select className="inp" value={meta.battery_option || ""} onChange={(e) => setMeta((p) => ({ ...p, battery_option: e.target.value }))}>
-                    <option value="">— Chọn —</option>
-                    <option value="Kèm pin">Kèm pin</option>
-                    <option value="Thuê pin">Thuê pin</option>
-                  </select>
-                </Field>
-              );
-            })()}
 
             {cfields.map((c) => {
               if (c.field_type === "formula") {
@@ -739,6 +726,22 @@ function TaoDonInner() {
         <button className="btn-ghost !text-xs mt-2.5" onClick={() => setKemRows((p) => [...p, { item_type: "PHU_KIEN", name: "", qty: 1, unit_price: 0, discount_type: "amount", discount_value: 0 }])}>
           ⊕ Thêm phụ kiện / dịch vụ đăng ký
         </button>
+
+        {(() => {
+          const v0 = vehicles.find((v) => v.id === xeRows[0]?.vehicle_id);
+          if (v0?.model_pin !== "Xe đổi pin") return null;
+          return (
+            <div className="mt-3 p-3 rounded-xl border border-[#F0C000] bg-[#FFFCF0]">
+              <Field label="🔋 Hình thức kinh doanh pin (xe Đổi pin)" required>
+                <select className="inp !w-64" value={meta.battery_option || ""} onChange={(e) => setMeta((p) => ({ ...p, battery_option: e.target.value }))}>
+                  <option value="">— Chọn —</option>
+                  <option value="Kèm pin">Kèm pin</option>
+                  <option value="Thuê pin">Thuê pin</option>
+                </select>
+              </Field>
+            </div>
+          );
+        })()}
       </div>
 
       {/* ===== HÀNG 3: GHI CHÚ + ẢNH | THANH TOÁN ===== */}
