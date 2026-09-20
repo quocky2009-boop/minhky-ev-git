@@ -608,7 +608,8 @@ export default function DonBan() {
                         ["Ngày bán", fmtDate(detail.sale_date)],
                         ["Điểm bán", locName(detail.location_code)],
                         ["Xe", <span key="x">{v ? `${v.brand} · ${v.name} · ${v.color}` : detail.vehicle_id} × {detail.quantity}
-                          {detail.frame_number && <span className="block text-[11px] text-[#8A93A0] font-mono">SK {detail.frame_number}</span>}</span>],
+                          {detail.frame_number && <span className="block text-[11px] text-[#8A93A0] font-mono">SK {detail.frame_number}</span>}
+                          {detail.battery_option && <Badge tone="amber">🔋 {detail.battery_option}</Badge>}</span>],
                         ["Khách hàng", <span key="k">{detail.customer_name}<span className="block text-[11px] text-[#8A93A0]">{detail.customer_phone}</span></span>],
                         ["NV bán", detail.seller_name],
                         ["Trạng thái", st === "Đã xuất HĐ"
