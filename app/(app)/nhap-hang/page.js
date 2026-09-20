@@ -10,6 +10,7 @@ import Scanner from "@/components/Scanner";
 const iso = (d) => d.toLocaleDateString("sv-SE");
 const firstOfMonth = () => { const d = new Date(); return iso(new Date(d.getFullYear(), d.getMonth(), 1)); };
 const emptyLine = { vehicle_id: "", frames: [], cost_price: 0, note: "" };
+const emptyCongNo = { co_tra_cham: false, dots: [{ so_ngay: 30, ty_le: 100 }] };
 
 function NhapHangInner() {
   const { supabase, vehicles, locations, settings, profile, loading, refresh } = useCatalog();
@@ -65,6 +66,7 @@ function NhapHangInner() {
   const [ketQua, setKetQua] = useState(null);
   const [meta, setMeta] = useState({ location_code: "", supplier: "", doc: "", note: "", ngay: iso(new Date()), nguoi_nhap_id: "", nguoi_nhap_name: "", po_id: "", po_code: "" });
   const [lines, setLines] = useState([{ ...emptyLine }]);
+  const [congNo, setCongNo] = useState({ ...emptyCongNo });
   const [scanIdx, setScanIdx] = useState(null);
   const [staff, setStaff] = useState([]);
   useEffect(() => {
@@ -186,10 +188,12 @@ function NhapHangInner() {
   const soMaForm = lines.filter((l) => l.vehicle_id && l.frames.length > 0).length;
 
   const moForm = () => {
-    setShowForm(true); setKetQua(null); setLines([{ ...emptyLine }]);
+    setShowForm(true); setKetQua(null); setLines([{ ...emptyLine }]); setCongNo({ ...emptyCongNo });
     setMeta({ location_code: "", supplier: "", doc: "", note: "", ngay: iso(new Date()), nguoi_nhap_id: profile?.id || "", nguoi_nhap_name: profile?.name || "", po_id: "", po_code: "" });
   };
   const dongForm = () => { setShowForm(false); setKetQua(null); load(); };
+
+  const tongTyLe = congNo.dots.reduce((s, d) => s + (Number(d.ty_le) || 0), 0);
 
   const luuPhieu = async () => {
     if (!meta.location_code) return notify("Chọn kho nhập.", "err");
@@ -212,22 +216,36 @@ function NhapHangInner() {
       if (!confirm(`⚠️ Có dòng số lượng xe LỚN BẤT THƯỜNG trong 1 lần nhập:\n- ${chiTiet}\n\nKIỂM TRA LẠI: có phải đã lỡ dán nhầm số khung của NHIỀU MODEL/MÀU khác nhau vào chung 1 dòng này không?\n\nBấm OK nếu chắc chắn đúng cả ${dongNhieu.reduce((s,l)=>s+l.frames.length,0)} xe này CÙNG 1 model/màu. Bấm Hủy để kiểm tra lại.`)) return;
     }
 
+    // CANH BAO 3: tra cham/bao lanh NCC — bat buoc khai gia von + ty le dung 100%
+    if (congNo.co_tra_cham) {
+      if (tongVon <= 0) return notify("Đã tick Trả chậm/bảo lãnh NCC nhưng chưa khai giá vốn — cần giá vốn để tính số tiền từng đợt.", "err");
+      if (congNo.dots.length === 0 || congNo.dots.some((d) => !(Number(d.so_ngay) > 0))) {
+        return notify("Mỗi đợt trả chậm cần nhập số ngày > 0.", "err");
+      }
+      if (tongTyLe !== 100) return notify(`Tổng tỷ lệ các đợt trả chậm phải = 100% (hiện đang ${tongTyLe}%).`, "err");
+    }
+
     setBusy(true);
     const { data, error } = await supabase.rpc("fn_nhap_hang_v2", { p: {
       location_code: meta.location_code, supplier: meta.supplier, doc: meta.doc, note: meta.note,
       lines: ok.map((l) => ({ vehicle_id: l.vehicle_id, frames: l.frames, cost_price: Number(l.cost_price) || 0, note: l.note })),
       nguoi_nhap_id: meta.nguoi_nhap_id,
       po_id: meta.po_id || null,
+      ...(congNo.co_tra_cham ? { cong_no: {
+        co_tra_cham: true,
+        so_ngay: congNo.dots.map((d) => Number(d.so_ngay) || 0),
+        ty_le: congNo.dots.map((d) => Number(d.ty_le) || 0),
+      } } : {}),
     } });
     setBusy(false);
     if (error) return notify(errMsg(error), "err");
     setKetQua(data);
-    notify(`Đã nhập ${data.so_xe} xe vào kho.`);
+    notify(`Đã nhập ${data.so_xe} xe vào kho.${congNo.co_tra_cham ? ` Đã ghi ${congNo.dots.length} đợt công nợ trả chậm NCC.` : ""}`);
     refresh();
   };
 
   const lamMoi = () => {
-    setKetQua(null); setLines([{ ...emptyLine }]);
+    setKetQua(null); setLines([{ ...emptyLine }]); setCongNo({ ...emptyCongNo });
     setMeta((p) => ({ ...p, supplier: "", doc: "", note: "" }));
   };
 
@@ -378,6 +396,56 @@ function NhapHangInner() {
           </div>
 
           <button className="btn-ghost !text-xs mt-2.5" onClick={() => setLines((p) => [...p, { ...emptyLine }])}>⊕ Thêm mã xe khác</button>
+        </div>
+
+        {/* CÔNG NỢ TRẢ CHẬM / BẢO LÃNH NCC */}
+        <div className="card">
+          <div className="flex items-center gap-2 mb-2.5 flex-wrap">
+            <div className="font-extrabold mr-auto">Công nợ trả chậm / bảo lãnh NCC</div>
+            <label className="flex items-center gap-1.5 text-[13px] cursor-pointer">
+              <input type="checkbox" checked={congNo.co_tra_cham}
+                onChange={(e) => setCongNo((p) => ({ ...p, co_tra_cham: e.target.checked }))} />
+              Trả chậm / bảo lãnh NCC
+            </label>
+          </div>
+
+          {congNo.co_tra_cham && (
+            <div className="flex flex-col gap-2">
+              <p className="text-[11.5px] text-[#8A93A0]">Chia tổng giá vốn lô hàng thành nhiều đợt trả — tự động ghi vào Công nợ phải trả (NCC), hạn tính từ hôm nay.</p>
+              {congNo.dots.map((d, i) => {
+                const daChiaTruoc = congNo.dots.slice(0, i).reduce((s, x) => s + Math.round(tongVon * (Number(x.ty_le) || 0) / 100), 0);
+                const tienDot = i === congNo.dots.length - 1 ? tongVon - daChiaTruoc : Math.round(tongVon * (Number(d.ty_le) || 0) / 100);
+                const han = new Date(Date.now() + (Number(d.so_ngay) || 0) * 86400000);
+                return (
+                  <div key={i} className="flex items-end gap-2 flex-wrap p-2 rounded-lg border border-[#E3E8EF]">
+                    <div>
+                      <label className="lbl">Đợt {i + 1} — số ngày</label>
+                      <input type="number" min="1" className="inp !w-24" value={d.so_ngay}
+                        onChange={(e) => setCongNo((p) => ({ ...p, dots: p.dots.map((x, j) => j === i ? { ...x, so_ngay: e.target.value } : x) }))} />
+                    </div>
+                    <div>
+                      <label className="lbl">Tỷ lệ %</label>
+                      <input type="number" min="0" max="100" className="inp !w-24" value={d.ty_le}
+                        onChange={(e) => setCongNo((p) => ({ ...p, dots: p.dots.map((x, j) => j === i ? { ...x, ty_le: e.target.value } : x) }))} />
+                    </div>
+                    <div className="text-[12px] text-[#5A6572] flex-1 min-w-[140px]">
+                      Hạn {han.toLocaleDateString("vi-VN")} · <b className="text-brand">{fmtVND(Math.max(tienDot, 0))}</b>
+                    </div>
+                    {congNo.dots.length > 1 && (
+                      <button className="btn-ghost !px-2 !py-1 !text-xs !text-danger" onClick={() => setCongNo((p) => ({ ...p, dots: p.dots.filter((_, j) => j !== i) }))}>✕</button>
+                    )}
+                  </div>
+                );
+              })}
+              <div className="flex items-center gap-2 flex-wrap">
+                <button className="btn-ghost !text-xs" onClick={() => setCongNo((p) => ({ ...p, dots: [...p.dots, { so_ngay: "", ty_le: "" }] }))}>⊕ Thêm đợt</button>
+                <span className={`text-[12px] ml-auto ${tongTyLe === 100 ? "text-[#5A6572]" : "text-danger font-bold"}`}>
+                  Tổng tỷ lệ: {tongTyLe}%{tongTyLe !== 100 ? " — phải = 100%" : ""}
+                </span>
+              </div>
+              {tongVon === 0 && <div className="text-[11.5px] text-danger">⚠ Chưa khai giá vốn — không thể tính số tiền từng đợt.</div>}
+            </div>
+          )}
         </div>
 
         {/* HÀNG 3: TỔNG KẾT */}
