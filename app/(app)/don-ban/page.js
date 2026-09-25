@@ -102,7 +102,13 @@ export default function DonBan() {
 
   const vOf = (id) => vehicles.find((x) => x.id === id);
   const locName = (c) => locations.find((l) => l.code === c)?.name || c;
-  const total = (o) => Math.max(o.sale_price * o.quantity + (itemSum[o.code] || 0) - (o.discount_amount || 0), 0);
+  const total = (o) => {
+    const tienXe = o.sale_price * o.quantity;
+    const ckXe = o.vehicle_discount_type === "percent"
+      ? Math.round(tienXe * (o.vehicle_discount_value || 0) / 100)
+      : (o.vehicle_discount_value || 0);
+    return Math.max(tienXe - ckXe + (itemSum[o.code] || 0) - (o.discount_amount || 0), 0);
+  };
   const canConfirm = ["SALES", "MANAGER", "ADMIN", "CEO"].includes(profile.role);
   const canCancel = ["ADMIN", "CEO"].includes(profile.role);
 
