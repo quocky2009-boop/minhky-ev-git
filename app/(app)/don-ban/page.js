@@ -51,6 +51,7 @@ export default function DonBan() {
   const [editPromo, setEditPromo] = useState(false);
   const [promoChon, setPromoChon] = useState([]);
   const [allPromos, setAllPromos] = useState([]);
+  const [promoQ, setPromoQ] = useState("");
   const [canSuaKM, setCanSuaKM] = useState(false);
   const [payEdit, setPayEdit] = useState(null);
   const [klEdit, setKlEdit] = useState(null);   // khach le cuoi (don ban buon)
@@ -442,39 +443,37 @@ export default function DonBan() {
                     <TdCheck sel={sel} id={o.id} />
                     <td data-label="Mã đơn" className="td font-bold"><Link href={`/don-ban/${o.id}`} className="text-brand hover:underline">{o.code}</Link>{nhanTra ? <Badge tone="red">Đã trả hàng</Badge> : huy && <Badge tone="red">Đã hủy</Badge>}</td>
                     <td data-label="Ngày" className="td text-xs whitespace-nowrap">{fmtDate(o.sale_date)}</td>
-                    <td data-label="Xe" className="td text-[13px]">{v ? `${v.name} ${v.color}` : o.vehicle_id}<div className="font-mono text-[10.5px] text-[#8A93A0]">{o.frame_number}</div><div className="text-[10.5px] text-[#8A93A0]">{locName(o.location_code)}</div></td>
+                    <td data-label="Xe" className="td text-[13px] whitespace-nowrap">{v ? `${v.name} ${v.color}` : o.vehicle_id}<span className="font-mono text-[10.5px] text-[#8A93A0] ml-1.5">{o.frame_number}</span></td>
                     <td data-label="Điểm bán" className="td text-xs">{locName(o.location_code)}</td>
-                    <td data-label="Khách" className="td text-[13px]">{o.customer_name}<div className="text-[10.5px] text-[#8A93A0]">{o.customer_phone}</div></td>
+                    <td data-label="Khách" className="td text-[13px] whitespace-nowrap">{o.customer_name}<span className="text-[10.5px] text-[#8A93A0] ml-1.5">{o.customer_phone}</span></td>
                     <td data-label="Loại KH" className="td text-xs"><Badge tone={o.customer_type === "Khách buôn" ? "amber" : o.customer_type === "Khách lẻ của Đại lý" ? "blue" : o.customer_type === "Khách lẻ" || !o.customer_type ? "green" : "purple"}>{o.customer_type || "Khách lẻ"}</Badge></td>
-                    <td data-label="Tổng đơn" className="td font-bold">{fmtVND(total(o))}</td>
-                    <td data-label="Hóa đơn" className="td">{huy
-                      ? <><Badge tone="red">{nhanTra ? "Đã trả hàng" : "Đã hủy"}</Badge>{o.cancel_reason && <div className="text-[10.5px] text-[#8A93A0] mt-0.5">{o.cancel_reason}<br/>{o.cancelled_by_name} · {fmtDate(o.cancelled_at)}</div>}</>
-                      : done
-                      ? <><Badge tone="green">✓ Hoàn thành</Badge><div className="text-[10.5px] text-[#8A93A0] mt-0.5">HĐ {o.invoice_no} · {fmtDate(o.invoice_date)}<br/>{o.invoice_by_name}<br/>BH ✓{o.app_activated ? " · App ✓" : ""}{o.coc_giao ? " · COC ✓" : ""}{o.checklist_giao_xe?.anh_khach ? " · Ảnh ✓" : ""}{o.checklist_giao_xe?.khoe_fb ? " · FB ✓" : ""}</div></>
-                      : <Badge tone="amber">Chờ xuất HĐ</Badge>}
-                      {!huy && thieuKhachLe(o) && <div className="mt-0.5"><Badge tone="red">⚠ Thiếu khách lẻ</Badge></div>}</td>
-                    <td data-label="NV bán" className="td text-xs">{o.seller_name}</td>
-                    <td className="td w-36 align-top"><div className="flex flex-col gap-1 items-end">
-                      {huy ? (
-                        <div className="flex gap-1 flex-wrap justify-end">
-                          <Link href={`/don-ban/${o.id}`} className="btn-ghost !px-2 !py-1 !text-xs" title="Xem chi tiết đơn">👁</Link>
-                          {profile.role === "CEO" && !nhanTra && <button className="btn-ghost !px-2 !py-1 !text-xs hover:text-brand" title="Mở lại đơn (đã hủy nhầm)" onClick={() => moLaiDon(o)}>↩ Mở lại</button>}
-                        </div>
-                      ) : (
-                      <div className="flex flex-col gap-1 items-end">
-                        {!done && canConfirm && <button className={`!px-2.5 !py-1 !text-xs w-full ${invId === o.id ? "btn-primary" : "btn-ok"}`} onClick={() => { setInvId(invId === o.id ? null : o.id); setInvF({ no: "", date: iso(new Date()), checklist: {}, dms: "" }); }}>{invId === o.id ? "Đóng" : "✓ Xác nhận HĐ"}</button>}
-                        <div className="flex gap-1 flex-wrap justify-end">
-                          {thieuKhachLe(o) && <button className="btn-primary !px-2 !py-1 !text-xs !bg-danger !border-danger" title="Nhập thông tin khách lẻ mua sau cùng" onClick={() => openDetail(o)}>👤</button>}
-                          <button className="btn-ghost !px-2 !py-1 !text-xs" title="Xem nhanh đơn" onClick={() => openDetail(o)}>👁</button>
-                          {canSuaTT && total(o) - (o.paid_amount || 0) > 0 && (
-                            <button className="btn-ok !px-2 !py-1 !text-xs" title={`Còn thiếu ${fmtVND(total(o) - (o.paid_amount || 0))} — bấm để thu`}
-                              onClick={async () => { await openDetail(o); setPayEdit({ paid: o.paid_amount || 0, note: "", method: "Tiền mặt" }); }}>💵</button>
-                          )}
-                          <button className="btn-ghost !px-2 !py-1 !text-xs" title="In phiếu xuất" onClick={() => printOrder({ supabase, o, vehicles, locations, settings, notify })}>🖨</button>
-                          {done && canCancel && <button className="btn-ghost !px-2 !py-1 !text-xs hover:text-danger" title="Hủy xác nhận" onClick={() => cancelInv(o)}>↺</button>}
-                        </div>
+                    <td data-label="Tổng đơn" className="td font-bold whitespace-nowrap">{fmtVND(total(o))}</td>
+                    <td data-label="Hóa đơn" className="td whitespace-nowrap">
+                      <div className="flex items-center gap-1 flex-wrap">
+                        {huy
+                          ? <Badge tone="red">{nhanTra ? "Đã trả hàng" : "Đã hủy"}</Badge>
+                          : done
+                          ? <span title={`HĐ ${o.invoice_no} · ${fmtDate(o.invoice_date)} · ${o.invoice_by_name} · BH✓${o.app_activated ? " App✓" : ""}${o.coc_giao ? " COC✓" : ""}${o.checklist_giao_xe?.anh_khach ? " Ảnh✓" : ""}${o.checklist_giao_xe?.khoe_fb ? " FB✓" : ""}`}><Badge tone="green">✓ {o.invoice_no}</Badge></span>
+                          : <Badge tone="amber">Chờ xuất HĐ</Badge>}
+                        {!huy && thieuKhachLe(o) && <Badge tone="red">⚠ Thiếu KL</Badge>}
                       </div>
-                      )}
+                    </td>
+                    <td data-label="NV bán" className="td text-xs whitespace-nowrap">{o.seller_name}</td>
+                    <td className="td min-w-[230px] align-middle"><div className="flex gap-1 flex-wrap items-center justify-end">
+                      {huy ? (<>
+                        <Link href={`/don-ban/${o.id}`} className="btn-ghost !px-2 !py-1 !text-xs" title="Xem chi tiết đơn">👁</Link>
+                        {profile.role === "CEO" && !nhanTra && <button className="btn-ghost !px-2 !py-1 !text-xs hover:text-brand" title="Mở lại đơn (đã hủy nhầm)" onClick={() => moLaiDon(o)}>↩ Mở lại</button>}
+                      </>) : (<>
+                        {!done && canConfirm && <button className={`!px-2 !py-1 !text-xs ${invId === o.id ? "btn-primary" : "btn-ok"}`} onClick={() => { setInvId(invId === o.id ? null : o.id); setInvF({ no: "", date: iso(new Date()), checklist: {}, dms: "" }); }}>{invId === o.id ? "Đóng" : "✓ HĐ"}</button>}
+                        {thieuKhachLe(o) && <button className="btn-primary !px-2 !py-1 !text-xs !bg-danger !border-danger" title="Nhập thông tin khách lẻ mua sau cùng" onClick={() => openDetail(o)}>👤</button>}
+                        <button className="btn-ghost !px-2 !py-1 !text-xs" title="Xem nhanh đơn" onClick={() => openDetail(o)}>👁</button>
+                        {canSuaTT && total(o) - (o.paid_amount || 0) > 0 && (
+                          <button className="btn-ok !px-2 !py-1 !text-xs" title={`Còn thiếu ${fmtVND(total(o) - (o.paid_amount || 0))} — bấm để thu`}
+                            onClick={async () => { await openDetail(o); setPayEdit({ paid: o.paid_amount || 0, note: "", method: "Tiền mặt" }); }}>💵</button>
+                        )}
+                        <button className="btn-ghost !px-2 !py-1 !text-xs" title="In phiếu xuất" onClick={() => printOrder({ supabase, o, vehicles, locations, settings, notify })}>🖨</button>
+                        {done && canCancel && <button className="btn-ghost !px-2 !py-1 !text-xs hover:text-danger" title="Hủy xác nhận" onClick={() => cancelInv(o)}>↺</button>}
+                      </>)}
                     </div></td>
                   </tr>,
                   invId === o.id && (
@@ -564,27 +563,40 @@ export default function DonBan() {
                 {(detail._promos && detail._promos.length > 0) || canSuaKM ? (
                   <div className="flex flex-wrap gap-1.5 items-center mb-3">
                     {(detail._promos || []).map((t) => <Badge key={t.id} tone="purple">🏷 {t.name}</Badge>)}
-                    {canSuaKM && <button className="btn-ghost !px-2 !py-1 !text-xs" onClick={() => setEditPromo(!editPromo)}>✎ Sửa khuyến mại</button>}
+                    {canSuaKM && <button className="btn-ghost !px-2 !py-1 !text-xs" onClick={() => { setEditPromo(!editPromo); setPromoQ(""); }}>✎ Sửa khuyến mại</button>}
                   </div>
                 ) : null}
                 {editPromo && canSuaKM && (() => {
                   const vXe = vehicles.find((v) => v.id === detail.vehicle_id);
+                  const today = iso(new Date());
+                  const daChonIds = new Set(promoChon);
+                  // Chi hien: dung hang/model VA (con hieu luc HOAC dang duoc chon san — de van
+                  // co the bo tick 1 chuong trinh cu da het han nhung dang gan tren don).
                   const promosHopLe = allPromos.filter((p) =>
                     vXe && p.brand.trim().toLowerCase() === vXe.brand.trim().toLowerCase() &&
-                    (p.vehicle_names.length === 0 || p.vehicle_names.some((n) => n.trim().toLowerCase() === vXe.name.trim().toLowerCase())));
+                    (p.vehicle_names.length === 0 || p.vehicle_names.some((n) => n.trim().toLowerCase() === vXe.name.trim().toLowerCase())) &&
+                    (daChonIds.has(p.id) || (p.status !== "Tạm dừng" && p.end_date >= today)));
+                  const promosLoc = promoQ ? promosHopLe.filter((p) => `${p.code} ${p.name}`.toLowerCase().includes(promoQ.toLowerCase())) : promosHopLe;
                   return (
                     <div className="card border-l-4 border-l-purple-400 !py-3 mb-3">
                       <div className="font-extrabold mb-1 text-[13px]">🏷 Chương trình khuyến mại áp dụng</div>
                       <p className="text-[11px] text-[#8A93A0] mb-2">Chỉ để đánh dấu/nhận diện, không tính giảm giá — sửa được bất kể trạng thái đơn.</p>
-                      {promosHopLe.length === 0 && <div className="text-xs text-[#8A93A0] mb-2">Không có chương trình nào đang áp dụng cho xe này.</div>}
+                      {promosHopLe.length === 0 && <div className="text-xs text-[#8A93A0] mb-2">Không có chương trình còn hiệu lực cho xe này.</div>}
+                      {promosHopLe.length > 5 && (
+                        <input className="inp !w-64 !py-1.5 !text-xs mb-2" placeholder="Gõ tìm chương trình…" value={promoQ} onChange={(e) => setPromoQ(e.target.value)} />
+                      )}
+                      {promosHopLe.length > 0 && promosLoc.length === 0 && <div className="text-xs text-[#8A93A0] mb-2">Không có chương trình nào khớp tìm kiếm.</div>}
                       <div className="flex flex-wrap gap-1.5 mb-3">
-                        {promosHopLe.map((p) => (
-                          <label key={p.id} className={`text-xs px-2.5 py-1.5 rounded-lg border cursor-pointer ${promoChon.includes(p.id) ? "bg-[#EAF2FF] border-brand text-brand font-semibold" : "border-[#E3E8EF]"}`}>
+                        {promosLoc.map((p) => {
+                          const hetHan = p.status === "Tạm dừng" || p.end_date < today;
+                          return (
+                          <label key={p.id} className={`text-xs px-2.5 py-1.5 rounded-lg border cursor-pointer ${promoChon.includes(p.id) ? "bg-[#EAF2FF] border-brand text-brand font-semibold" : "border-[#E3E8EF]"} ${hetHan ? "opacity-60" : ""}`}>
                             <input type="checkbox" className="hidden" checked={promoChon.includes(p.id)}
                               onChange={(e) => setPromoChon((cur) => e.target.checked ? [...cur, p.id] : cur.filter((x) => x !== p.id))} />
-                            {p.name}
+                            {p.name}{hetHan && <span className="ml-1 text-danger">(Hết hạn)</span>}
                           </label>
-                        ))}
+                          );
+                        })}
                       </div>
                       <div className="flex gap-2">
                         <button className="btn-ghost !text-xs" onClick={() => { setEditPromo(false); setPromoChon((detail._promos || []).map((t) => t.id)); }}>Hủy</button>
