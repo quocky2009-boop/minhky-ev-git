@@ -82,6 +82,18 @@ export default function CongNoPhaiTra() {
     notify("Đã ghi nhận thanh toán NCC."); setPayId(null); load();
   };
 
+  const canXacNhan = ["CEO", "ADMIN"].includes(profile?.role);
+  const xacNhanDaThanhToan = async (r) => {
+    if (!confirm(`Xác nhận đã thanh toán TOÀN BỘ ${fmtVND(r.con_no)} còn nợ cho ${r.supplier} (mã ${r.code})?\n\nSẽ ghi 1 khoản chi ${fmtVND(r.con_no)} vào sổ quỹ và dừng mọi nhắc hạn cho khoản nợ này.`)) return;
+    setBusy(true);
+    const { error } = await supabase.rpc("fn_tra_no_ncc", { p: {
+      debt_id: r.id, amount: r.con_no, method: "Chuyển khoản", paid_at: iso(new Date()), note: "Xác nhận đã thanh toán (1 chạm)",
+    }});
+    setBusy(false);
+    if (error) return notify(errMsg(error), "err");
+    notify("Đã xác nhận thanh toán — dừng nhắc hạn."); load();
+  };
+
   const chon = () => sorted.filter((r) => sel.has(r.id));
 
   return (
@@ -167,6 +179,7 @@ export default function CongNoPhaiTra() {
                 <td className="td">
                   <div className="flex flex-col gap-1">
                     {r.con_no > 0 && <button className="btn-ok !px-2 !py-1 !text-xs" onClick={() => { setPayId(r.id); setPayF({ amount: r.con_no, method: "Chuyển khoản", paid_at: iso(new Date()), note: "" }); }}>💸 Thanh toán</button>}
+                    {r.con_no > 0 && canXacNhan && <button className="btn-primary !px-2 !py-1 !text-xs !bg-[#0E7A4A] !border-[#0E7A4A]" disabled={busy} title="Ghi nhận đã trả đủ toàn bộ — dừng nhắc hạn ngay" onClick={() => xacNhanDaThanhToan(r)}>✓ Xác nhận đã TT</button>}
                     {pays.length > 0 && <button className="btn-ghost !px-2 !py-1 !text-xs" onClick={() => setShowPayHist(showPayHist === r.id ? null : r.id)}>{pays.length} lần trả {showPayHist === r.id ? "▲" : "▼"}</button>}
                   </div>
                 </td>
