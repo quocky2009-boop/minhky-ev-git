@@ -15,6 +15,10 @@ body { @apply bg-[#F3F5F8] text-[#1B2733] font-sans; }
 .btn-danger { @apply btn bg-[#FDE8EA] text-[#B01E2C]; }
 .th { @apply text-left px-3 py-2.5 text-[11px] font-bold text-[#5A6572] border-b-2 border-[#E6EAEF] uppercase tracking-wide whitespace-nowrap; }
 .td { @apply px-3 py-2.5 text-[13.5px] border-b border-[#EEF1F4] align-top; }
+/* Bang qua rong (nhieu cot nowrap) phai tu cuon ngang trong khung cua no,
+   khong duoc tran ra ngoai trang — ap dung moi kich thuoc man hinh, khong
+   chi rieng mobile. */
+.tbl-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
 /* ===== MOBILE: bang rong -> the (card) khi man hinh < 768px =====
    Cach dung: them class "tbl-card" vao <table>, va o moi <td> them
@@ -35,8 +39,6 @@ body { @apply bg-[#F3F5F8] text-[#1B2733] font-sans; }
     min-width: 88px;
   }
   .tbl-card td:empty { display: none; }
-  /* Bang trong popup/khoi hep van cuon ngang binh thuong neu khong gan class */
-  .tbl-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 }
 
 /* Tren mobile: giam padding trang cho rong hon */
