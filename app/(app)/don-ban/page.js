@@ -1,6 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useState, useRef } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Badge, Toast, KPI, Pager, pageSlice, pageClamp, useSortable, Th, LocSearch, MoneyInput, useSelection, ThCheck, TdCheck, SelectionBar } from "@/components/ui";
 import { fmtVND, fmtDate, fmtTime, errMsg, downloadCSV, downloadXLSX } from "@/lib/format";
@@ -15,6 +15,9 @@ const firstOfMonth = () => { const d = new Date(); return iso(new Date(d.getFull
 export default function DonBan() {
   const { supabase, vehicles, locations, regions, settings, profile, loading } = useCatalog();
   const { toast, notify } = useToast();
+  const _params = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const [rows, setRows] = useState([]);
   const [itemSum, setItemSum] = useState({});
   const [itemSumByType, setItemSumByType] = useState({});
@@ -24,15 +27,45 @@ export default function DonBan() {
   const [showThuong, setShowThuong] = useState(false);
   const [khuVucThuong, setKhuVucThuong] = useState("");
   const [busy, setBusy] = useState(false);
-  const [from, setFrom] = useState(firstOfMonth());
-  const [to, setTo] = useState(iso(new Date()));
-  const [fLoc, setFLoc] = useState("");
-  const [fInv, setFInv] = useState("");
-  const [fType, setFType] = useState("");
-  const [showHuy, setShowHuy] = useState(false);
-  const [q, setQ] = useState("");
-  const _params = useSearchParams();
-  useEffect(() => { const v = _params.get("q"); if (v) { setQ(v); setFrom("2000-01-01"); } }, [_params]);
+  // Cac bo loc duoi day duoc khoi tao TU URL (?q=&from=&to=&kho=&hd=&loai=&huy=&trang=)
+  // va dong bo nguoc lai vao URL (xem effect "dong bo loc -> URL" ben duoi) bang
+  // router.replace (khong day them lich su) — de khi bam vao 1 don (Link sang
+  // /don-ban/[id]) roi bam Back tren trinh duyet, URL cu (co day du bo loc) duoc
+  // khoi phuc va man hinh danh sach hien dung lai dung trang thai dang loc/tim.
+  const [from, setFrom] = useState(() => _params.get("from") || (_params.get("q") ? "2000-01-01" : firstOfMonth()));
+  const [to, setTo] = useState(() => _params.get("to") || iso(new Date()));
+  const [fLoc, setFLoc] = useState(() => _params.get("kho") || "");
+  const [fInv, setFInv] = useState(() => _params.get("hd") || "");
+  const [fType, setFType] = useState(() => _params.get("loai") || "");
+  const [showHuy, setShowHuy] = useState(() => _params.get("huy") === "1");
+  const [q, setQ] = useState(() => _params.get("q") || "");
+  const [page, setPage] = useState(() => Number(_params.get("trang")) || 1);
+  // Chi phan ung khi q tren URL la 1 gia tri MOI tu ben ngoai (vd bam vao ket qua
+  // o tim kiem toan cuc trong khi trang nay dang mo san) — tranh vong lap voi
+  // effect dong bo state -> URL ben duoi (no cung ghi q vao URL).
+  const _qUrlSeen = useRef(q);
+  useEffect(() => {
+    const v = _params.get("q") || "";
+    if (v && v !== _qUrlSeen.current) {
+      setQ(v);
+      if (!_params.get("from")) setFrom("2000-01-01");
+    }
+    _qUrlSeen.current = v;
+  }, [_params]);
+  // Dong bo cac bo loc hien tai -> URL (replace, khong push, de khong lam ret lich su)
+  useEffect(() => {
+    const sp = new URLSearchParams();
+    if (q) sp.set("q", q);
+    if (from) sp.set("from", from);
+    if (to) sp.set("to", to);
+    if (fLoc) sp.set("kho", fLoc);
+    if (fInv) sp.set("hd", fInv);
+    if (fType) sp.set("loai", fType);
+    if (showHuy) sp.set("huy", "1");
+    if (page > 1) sp.set("trang", String(page));
+    const qs = sp.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }, [q, from, to, fLoc, fInv, fType, showHuy, page]);
   // Tu mo chi tiet khi den tu o tim kiem toan cuc (khop dung 1 don)
   const [_autoOpened, _setAutoOpened] = useState(false);
   useEffect(() => {
@@ -41,7 +74,6 @@ export default function DonBan() {
     const hit = rows.filter((o) => o.code.toLowerCase() === v.toLowerCase());
     if (hit.length === 1) { _setAutoOpened(true); openDetail(hit[0]); }
   }, [_params, rows]);
-  const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const sort = useSortable();
   const sel = useSelection();
@@ -430,8 +462,8 @@ export default function DonBan() {
                 notify(`Đã xuất ${rs.length} đơn đã chọn.`);
               }}>⬇ Xuất Excel</button>
             </SelectionBar>
-            <div className="tbl-scroll"><table className="w-full border-collapse tbl-card">
-              <thead><tr><ThCheck sel={sel} rows={pageSlice(sorted, page, pageSize)} idOf={(o) => o.id} /><Th label="Mã đơn" k="code" sort={sort} /><Th label="Ngày" k="date" sort={sort} /><Th label="Xe · Số khung · Kho" k="xe" sort={sort} /><Th label="Điểm bán" k="kho" sort={sort} /><Th label="Khách" k="kh" sort={sort} /><Th label="Loại KH" k="type" sort={sort} /><Th label="Tổng đơn" k="tien" sort={sort} /><Th label="Hóa đơn" k="hd" sort={sort} /><Th label="NV bán" k="nv" sort={sort} /><th className="th"></th></tr></thead>
+            <div className="tbl-scroll"><table className="w-full border-collapse tbl-card table-fixed">
+              <thead><tr><ThCheck sel={sel} rows={pageSlice(sorted, page, pageSize)} idOf={(o) => o.id} /><Th label="Mã đơn" k="code" sort={sort} className="w-[9%]" /><Th label="Ngày" k="date" sort={sort} className="w-[6%]" /><Th label="Xe · Số khung · Kho" k="xe" sort={sort} className="w-[15%]" /><Th label="Điểm bán" k="kho" sort={sort} className="w-[8%]" /><Th label="Khách" k="kh" sort={sort} className="w-[14%]" /><Th label="Loại KH" k="type" sort={sort} className="w-[7%]" /><Th label="Tổng đơn" k="tien" sort={sort} className="w-[9%]" /><Th label="Hóa đơn" k="hd" sort={sort} className="w-[9%]" /><Th label="NV bán" k="nv" sort={sort} className="w-[7%]" /><th className="th w-[16%]"></th></tr></thead>
               <tbody>{pageSlice(sorted, page, pageSize).map((o, i) => {
                 const v = vOf(o.vehicle_id);
                 const st = o.invoice_status || "Chờ xuất HĐ";
@@ -442,13 +474,21 @@ export default function DonBan() {
                   <tr key={o.id} className={huy ? "bg-[#F3F4F6] text-[#8A93A0]" : sel.has(o.id) ? "bg-[#EAF2FF]" : invId === o.id ? "bg-[#FDF6E3]" : done ? "hover:bg-[#F8FAFC]" : "bg-[#FFFCF5] hover:bg-[#FDF6E3]"}>
                     <TdCheck sel={sel} id={o.id} />
                     <td data-label="Mã đơn" className="td font-bold"><Link href={`/don-ban/${o.id}`} className="text-brand hover:underline">{o.code}</Link>{nhanTra ? <Badge tone="red">Đã trả hàng</Badge> : huy && <Badge tone="red">Đã hủy</Badge>}</td>
-                    <td data-label="Ngày" className="td text-xs whitespace-nowrap">{fmtDate(o.sale_date)}</td>
-                    <td data-label="Xe" className="td text-[13px] whitespace-nowrap">{v ? `${v.name} ${v.color}` : o.vehicle_id}<span className="font-mono text-[10.5px] text-[#8A93A0] ml-1.5">{o.frame_number}</span></td>
-                    <td data-label="Điểm bán" className="td text-xs">{locName(o.location_code)}</td>
-                    <td data-label="Khách" className="td text-[13px] whitespace-nowrap">{o.customer_name}<span className="text-[10.5px] text-[#8A93A0] ml-1.5">{o.customer_phone}</span></td>
+                    <td data-label="Ngày" className="td text-xs">{fmtDate(o.sale_date)}</td>
+                    <td data-label="Xe" className="td text-[13px]">
+                      <div className="truncate" title={`${v ? `${v.name} ${v.color}` : o.vehicle_id} · SK ${o.frame_number}`}>
+                        {v ? `${v.name} ${v.color}` : o.vehicle_id}<span className="font-mono text-[10.5px] text-[#8A93A0] ml-1.5">{o.frame_number}</span>
+                      </div>
+                    </td>
+                    <td data-label="Điểm bán" className="td text-xs"><div className="truncate" title={locName(o.location_code)}>{locName(o.location_code)}</div></td>
+                    <td data-label="Khách" className="td text-[13px]">
+                      <div className="truncate" title={`${o.customer_name} · ${o.customer_phone}`}>
+                        {o.customer_name}<span className="text-[10.5px] text-[#8A93A0] ml-1.5">{o.customer_phone}</span>
+                      </div>
+                    </td>
                     <td data-label="Loại KH" className="td text-xs"><Badge tone={o.customer_type === "Khách buôn" ? "amber" : o.customer_type === "Khách lẻ của Đại lý" ? "blue" : o.customer_type === "Khách lẻ" || !o.customer_type ? "green" : "purple"}>{o.customer_type || "Khách lẻ"}</Badge></td>
-                    <td data-label="Tổng đơn" className="td font-bold whitespace-nowrap">{fmtVND(total(o))}</td>
-                    <td data-label="Hóa đơn" className="td whitespace-nowrap">
+                    <td data-label="Tổng đơn" className="td font-bold">{fmtVND(total(o))}</td>
+                    <td data-label="Hóa đơn" className="td">
                       <div className="flex items-center gap-1 flex-wrap">
                         {huy
                           ? <Badge tone="red">{nhanTra ? "Đã trả hàng" : "Đã hủy"}</Badge>
@@ -458,8 +498,8 @@ export default function DonBan() {
                         {!huy && thieuKhachLe(o) && <Badge tone="red">⚠ Thiếu KL</Badge>}
                       </div>
                     </td>
-                    <td data-label="NV bán" className="td text-xs whitespace-nowrap">{o.seller_name}</td>
-                    <td className="td min-w-[230px] align-middle"><div className="flex gap-1 flex-wrap items-center justify-end">
+                    <td data-label="NV bán" className="td text-xs"><div className="truncate" title={o.seller_name}>{o.seller_name}</div></td>
+                    <td className="td align-middle"><div className="flex gap-1 flex-wrap items-center justify-end">
                       {huy ? (<>
                         <Link href={`/don-ban/${o.id}`} className="btn-ghost !px-2 !py-1 !text-xs" title="Xem chi tiết đơn">👁</Link>
                         {profile.role === "CEO" && !nhanTra && <button className="btn-ghost !px-2 !py-1 !text-xs hover:text-brand" title="Mở lại đơn (đã hủy nhầm)" onClick={() => moLaiDon(o)}>↩ Mở lại</button>}
