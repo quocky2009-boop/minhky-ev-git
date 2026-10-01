@@ -464,6 +464,7 @@ function TaoDonInner() {
 
       <div className="flex items-center gap-2 flex-wrap">
         <div className="font-extrabold text-lg mr-auto">{suaId ? "Sửa đơn bán" : "Tạo đơn bán"}</div>
+        {!suaId && <Link href="/ban-hang/wizard" className="btn-ghost !text-xs" title="Form mới theo 4 bước, có Bảng giá tự động theo khuyến mại — đang hoàn thiện, chưa lưu được đơn thật">🧪 Thử Wizard 4 bước (mới)</Link>}
         <Link href="/don-ban" className="btn-ghost !text-xs">← Danh sách đơn</Link>
       </div>
 
