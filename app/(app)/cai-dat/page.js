@@ -49,7 +49,7 @@ const PERM_LIST = [
 ];
 
 export default function CaiDat() {
-  const { supabase, profile, loading, settings, customFields, brands, locations, refresh, taxRate, regions } = useCatalog();
+  const { supabase, profile, loading, settings, customFields, brands, locations, refresh, taxRate, regions, diaBan } = useCatalog();
   const { toast, notify } = useToast();
   const [tax, setTax] = useState("");
   const [show, setShow] = useState(false);
@@ -58,6 +58,7 @@ export default function CaiDat() {
   const [editField, setEditField] = useState(null);
   const [newBrand, setNewBrand] = useState("");
   const [reg, setReg] = useState(null);
+  const [db, setDb] = useState(null);
   const [hook, setHook] = useState(null);
   const [bk, setBk] = useState(null);
   const [pf, setPf] = useState(null); // phieu in
@@ -147,6 +148,18 @@ export default function CaiDat() {
     if (error) return notify(errMsg(error), "err");
     notify("Đã lưu danh sách khu vực. Khu vực đang gắn với kho cũ vẫn hiển thị bình thường.");
     setReg(null); refresh();
+  };
+
+  const saveDiaBan = async () => {
+    const clean = db.split(/\n+/).map((l) => l.trim()).filter(Boolean).map((l) => {
+      const [tinh, ps] = l.split("|");
+      const phuongs = (ps || "").split(/[,;]+/).map((x) => x.trim()).filter(Boolean).join(", ");
+      return { tinh: (tinh || "").trim(), line: (tinh || "").trim() + (phuongs ? " | " + phuongs : "") };
+    }).filter((x) => x.tinh).map((x) => x.line).join("\n");
+    const { error } = await supabase.rpc("fn_set_setting", { p_key: "dia_ban", p_value: clean });
+    if (error) return notify(errMsg(error), "err");
+    notify("Đã lưu danh sách Tỉnh/Thành phố & Phường/Xã.");
+    setDb(null); refresh();
   };
 
   const addBrand = async () => {
@@ -397,6 +410,27 @@ export default function CaiDat() {
             <div className="flex gap-2 mt-2">
               <button className="btn-ok !py-2 !text-xs" onClick={saveRegions}>Lưu</button>
               <button className="btn-ghost !py-2 !text-xs" onClick={() => setReg(null)}>Hủy</button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="card">
+        <div className="font-extrabold mb-1">Tỉnh/Thành phố & Phường/Xã (dùng khi xuất hóa đơn)</div>
+        <p className="text-xs text-[#5A6572] mb-3">Mỗi dòng 1 Tỉnh/Thành phố, theo định dạng <b>Tên tỉnh/TP | Phường 1, Phường 2, …</b>. Danh sách này hiện trong ô chọn "Tỉnh/Thành phố" và "Phường/Xã" ở bước xuất hóa đơn khi tạo đơn bán.</p>
+        {db === null ? (
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="text-xs">
+              {Object.keys(diaBan).length === 0 ? "Chưa cấu hình." : <><b>{Object.keys(diaBan).length}</b> Tỉnh/Thành phố đã cấu hình</>}
+            </div>
+            <button className="btn-ghost !py-1.5 !text-xs" onClick={() => setDb(settings.dia_ban || "")}>✎ Sửa danh sách</button>
+          </div>
+        ) : (
+          <div className="max-w-2xl">
+            <textarea className="inp !h-40 !text-xs font-mono" value={db} onChange={(e) => setDb(e.target.value)} placeholder={"Hà Nội | Phường Ba Đình, Phường Hoàn Kiếm\nTP. Hồ Chí Minh | Phường Bến Nghé, Phường Bến Thành"} />
+            <div className="flex gap-2 mt-2">
+              <button className="btn-ok !py-2 !text-xs" onClick={saveDiaBan}>Lưu</button>
+              <button className="btn-ghost !py-2 !text-xs" onClick={() => setDb(null)}>Hủy</button>
             </div>
           </div>
         )}

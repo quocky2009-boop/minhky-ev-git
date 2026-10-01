@@ -50,7 +50,7 @@ const BangGiaPanel = ({ picked, bangGiaCu, bangGiaLoi, busy, tinhBangGia, bangGi
 );
 
 export default function TaoDonWizard() {
-  const { supabase, vehicles, locations, brands, profile, loading, settings } = useCatalog();
+  const { supabase, vehicles, locations, brands, profile, loading, settings, diaBan } = useCatalog();
   const { toast, notify } = useToast();
   const [step, setStep] = useState(1);
   const [busy, setBusy] = useState(false);
@@ -165,7 +165,9 @@ export default function TaoDonWizard() {
   const [hinhThucTT, setHinhThucTT] = useState("thang"); // "thang" | "gop"
   const [donViTraGop, setDonViTraGop] = useState("");
   const [soTienVay, setSoTienVay] = useState(0);
-  const [hd, setHd] = useState({ phone: "", email: "", tinh_tp: "", phuong_xa: "", dia_chi: "" });
+  const [hd, setHd] = useState({ tinh_tp: "", phuong_xa: "", dia_chi: "" });
+  const tinhList = Object.keys(diaBan);
+  const phuongList = diaBan[hd.tinh_tp] || [];
 
   if (loading || !profile) return <div className="card">Đang tải dữ liệu…</div>;
 
@@ -388,10 +390,18 @@ export default function TaoDonWizard() {
             <div className="card">
               <div className="font-extrabold mb-2.5">Thông tin xuất hóa đơn</div>
               <div className="flex flex-col gap-2.5">
-                <Field label="Số điện thoại"><input className="inp" value={hd.phone} onChange={(e) => setHd((p) => ({ ...p, phone: e.target.value }))} /></Field>
-                <Field label="Email"><input className="inp" value={hd.email} onChange={(e) => setHd((p) => ({ ...p, email: e.target.value }))} /></Field>
-                <Field label="Tỉnh / Thành phố"><input className="inp" value={hd.tinh_tp} onChange={(e) => setHd((p) => ({ ...p, tinh_tp: e.target.value }))} /></Field>
-                <Field label="Phường / Xã"><input className="inp" value={hd.phuong_xa} onChange={(e) => setHd((p) => ({ ...p, phuong_xa: e.target.value }))} /></Field>
+                <Field label="Tỉnh / Thành phố">
+                  <select className="inp" value={hd.tinh_tp} onChange={(e) => setHd((p) => ({ ...p, tinh_tp: e.target.value, phuong_xa: "" }))} disabled={tinhList.length === 0}>
+                    <option value="">{tinhList.length === 0 ? "— Chưa cấu hình (vào Cài đặt) —" : "— Chọn —"}</option>
+                    {tinhList.map((t) => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </Field>
+                <Field label="Phường / Xã">
+                  <select className="inp" value={hd.phuong_xa} onChange={(e) => setHd((p) => ({ ...p, phuong_xa: e.target.value }))} disabled={!hd.tinh_tp || phuongList.length === 0}>
+                    <option value="">{!hd.tinh_tp ? "— Chọn Tỉnh/TP trước —" : phuongList.length === 0 ? "— Chưa có Phường/Xã nào —" : "— Chọn —"}</option>
+                    {phuongList.map((p) => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                </Field>
                 <Field label="Địa chỉ chi tiết"><input className="inp" value={hd.dia_chi} onChange={(e) => setHd((p) => ({ ...p, dia_chi: e.target.value }))} /></Field>
               </div>
             </div>
@@ -426,7 +436,7 @@ export default function TaoDonWizard() {
               <div className="mt-3 pt-3 border-t border-dashed border-[#E3E8EF] text-[13px]">
                 <div>Thanh toán: {hinhThucTT === "gop" ? `Trả góp qua ${donViTraGop || "—"} (vay ${fmtVND(soTienVay)})` : "Trả thẳng"}</div>
                 <div>Đã đặt cọc: {fmtVND(coc)}</div>
-                {(hd.phone || hd.email || hd.dia_chi) && <div className="text-[#5A6572]">Xuất HĐ: {hd.phone} {hd.email} {[hd.dia_chi, hd.phuong_xa, hd.tinh_tp].filter(Boolean).join(", ")}</div>}
+                {(hd.dia_chi || hd.phuong_xa || hd.tinh_tp) && <div className="text-[#5A6572]">Xuất HĐ: {[hd.dia_chi, hd.phuong_xa, hd.tinh_tp].filter(Boolean).join(", ")}</div>}
               </div>
             </div>
             <div className="card">
