@@ -50,10 +50,11 @@ const BangGiaPanel = ({ picked, bangGiaCu, bangGiaLoi, busy, tinhBangGia, bangGi
 );
 
 export default function TaoDonWizard() {
-  const { supabase, vehicles, locations, brands, profile, loading, settings, diaBan } = useCatalog();
+  const { supabase, vehicles, locations, brands, profile, loading, settings, diaBan, customFields, paymentMethods, refresh } = useCatalog();
   const { toast, notify } = useToast();
   const [step, setStep] = useState(1);
   const [busy, setBusy] = useState(false);
+  const [ketQua, setKetQua] = useState(null);
 
   // ===== BƯỚC 1: Đơn hàng & khách hàng =====
   const [cocDatTruoc, setCocDatTruoc] = useState(false);
@@ -110,7 +111,12 @@ export default function TaoDonWizard() {
   const [bangGiaLoi, setBangGiaLoi] = useState("");
   const [bangGiaCu, setBangGiaCu] = useState(true); // true = vua doi lua chon, can bam Lam moi
 
-  useEffect(() => { if (!loading) supabase.from("promotions").select("*").eq("status", "Đang áp dụng").then(({ data }) => setPromos(data || [])); }, [loading]);
+  const [bankAccounts, setBankAccounts] = useState([]);
+  useEffect(() => {
+    if (loading) return;
+    supabase.from("promotions").select("*").eq("status", "Đang áp dụng").then(({ data }) => setPromos(data || []));
+    supabase.from("cash_accounts").select("id, name, company_id, bank_info").eq("status", "Hoạt động").eq("type", "Ngân hàng").then(({ data }) => setBankAccounts(data || []));
+  }, [loading]);
 
   const vehicleObj = vehicles.find((v) => v.id === picked?.vehicle_id);
   const giaXe = vehicleObj?.list_price || 0;
@@ -162,12 +168,22 @@ export default function TaoDonWizard() {
   };
 
   // ===== BƯỚC 3: Thanh toán & xuất HĐ =====
-  const [hinhThucTT, setHinhThucTT] = useState("thang"); // "thang" | "gop"
-  const [donViTraGop, setDonViTraGop] = useState("");
-  const [soTienVay, setSoTienVay] = useState(0);
+  const [pays, setPays] = useState([]); // {method, amount, account_id, tra_gop_ct, note}
+  const [extra, setExtra] = useState({}); // trường tùy chỉnh (Cài đặt > Trường tùy chỉnh)
   const [hd, setHd] = useState({ tinh_tp: "", phuong_xa: "", dia_chi: "" });
   const tinhList = Object.keys(diaBan);
   const phuongList = diaBan[hd.tinh_tp] || [];
+
+  const cfields = (customFields || []).filter((c) => c.entity === "sales_order");
+  const PTTT = paymentMethods.length > 0 ? paymentMethods.map((m) => m.code) : ["Tiền mặt", "Chuyển khoản", "Trả góp"];
+  const quyTypeOf = (method) => paymentMethods.find((m) => m.code === method)?.quy_type;
+  const companyIdCuaDon = vehicleObj ? brands.find((b) => b.name === vehicleObj.brand)?.company_id || null : null;
+  const banksHopLe = companyIdCuaDon ? bankAccounts.filter((a) => a.company_id === companyIdCuaDon) : [];
+
+  const phaiTra = bangGia?.gia_can_thanh_toan || 0;
+  const tongCoc = Number(coc) || 0;
+  const daTra = tongCoc + pays.reduce((s, p) => s + (Number(p.amount) || 0), 0);
+  const conLai = Math.max(phaiTra - daTra, 0);
 
   if (loading || !profile) return <div className="card">Đang tải dữ liệu…</div>;
 
@@ -175,16 +191,98 @@ export default function TaoDonWizard() {
   const canNext1 = kh.customer_name && kh.customer_phone;
   const canNext2 = picked && Number(giaXe) > 0 && !bangGiaCu && bangGia;
 
-  const luu = () => {
-    notify("Tính năng ghi đơn thật đang chờ hoàn thiện Giai đoạn 2 (đồng bộ công nợ/báo cáo tài chính theo khuyến mại có giá trị). Hiện tại Bước 4 chỉ để xem trước Bảng giá — vào màn \"Bán hàng\" (form hiện tại) để tạo đơn thật trong lúc chờ.", "err");
+  const canhBaoMotPTTT = () => {
+    const cacDong = pays.filter((p) => Number(p.amount) > 0);
+    if (cacDong.length !== 1) return true;
+    const d = cacDong[0];
+    return confirm(`⚠️ Đơn này chỉ chọn ĐÚNG 1 phương thức thanh toán duy nhất:\n\n${d.method}: ${Number(d.amount).toLocaleString("vi-VN")}đ\n\nNếu khách thực tế trả bằng NHIỀU phương thức khác nhau (VD: một phần tiền mặt + một phần chuyển khoản), hạch toán thu-chi vào sổ quỹ sẽ SAI theo từng tài khoản.\n\nBấm OK nếu chắc chắn khách CHỈ trả bằng đúng 1 phương thức này.\nBấm Hủy để quay lại sửa cho đúng.`);
   };
+
+  const luu = async () => {
+    if (!picked) return notify("Chưa chọn xe.", "err");
+    if (!bangGia || bangGiaCu) return notify('Bảng giá chưa cập nhật — quay lại Bước 2 bấm "Làm mới Bảng giá".', "err");
+    if (!diemBan) return notify("Chọn điểm bán.", "err");
+    if (vehicleObj?.model_pin === "Xe đổi pin" && !batteryOption) return notify("Xe Đổi pin bắt buộc chọn Hình thức kinh doanh pin.", "err");
+    const tgThieu = pays.find((p) => p.method === "Trả góp" && Number(p.amount) > 0 && !p.tra_gop_ct);
+    if (tgThieu) return notify("Chọn đơn vị trả góp.", "err");
+    const nhThieu = pays.find((p) => Number(p.amount) > 0 && quyTypeOf(p.method) === "Ngân hàng" && !p.account_id);
+    if (nhThieu) return notify(`Chọn tài khoản Ngân hàng nhận tiền cho phương thức "${nhThieu.method}".`, "err");
+    const cfThieu = cfields.find((c) => c.required && c.field_type !== "formula" && !extra[c.field_key]);
+    if (cfThieu) return notify(`Nhập "${cfThieu.label}".`, "err");
+    if (!canhBaoMotPTTT()) return;
+
+    setBusy(true);
+    const { data, error } = await supabase.rpc("fn_ban_hang_v2", { p: {
+      customer_name: kh.customer_name, customer_phone: kh.customer_phone,
+      customer_cccd: kh.customer_cccd, customer_address: kh.customer_address,
+      customer_source: nguonDon,
+      sale_date: ngayLayGia, location_code: diemBan, note: ghiChu1,
+      seller_id: tuVanId, seller_name: tuVanName, battery_option: batteryOption || null,
+      frames: [{
+        frame_number: picked.frame_number, unit_price: Number(bangGia.gia_xe) || 0,
+        discount_type: "amount", discount_value: Number(bangGia.tong_uu_dai) || 0,
+        promo_amount: Number(bangGia.tong_uu_dai) || 0, invoice_total: Number(bangGia.tong_xuat_hd) || 0,
+        price_snapshot: bangGia,
+      }],
+      items: [],
+      payments: pays.filter((p) => Number(p.amount) > 0).map((p) => ({
+        method: p.method, amount: Number(p.amount), account_id: p.account_id || null,
+        note: p.method === "Trả góp" && p.tra_gop_ct ? `Trả góp qua ${p.tra_gop_ct}` : (p.note || ""),
+      })),
+      extra: {
+        ...extra,
+        hd_tinh_tp: hd.tinh_tp || "", hd_phuong_xa: hd.phuong_xa || "", hd_dia_chi: hd.dia_chi || "",
+        ...(pays.find((p) => p.method === "Trả góp" && p.tra_gop_ct)
+          ? { tra_gop_cong_ty: pays.find((p) => p.method === "Trả góp").tra_gop_ct,
+              tra_gop_so_tien: Number(pays.find((p) => p.method === "Trả góp").amount) || 0 }
+          : {}),
+      },
+    } });
+    if (error) { setBusy(false); return notify(errMsg(error), "err"); }
+
+    if (promoChon.length > 0 && data?.first) {
+      const km = (bangGia.khuyen_mai || []).filter((k) => promoChon.includes(k.id));
+      const { error: e2 } = await supabase.rpc("fn_gan_khuyen_mai_don_v2", { p_sale_code: data.first, p_promotions: km });
+      if (e2) notify("Đã tạo đơn nhưng gắn khuyến mại lỗi: " + errMsg(e2), "err");
+    }
+    setBusy(false);
+    setKetQua(data);
+    notify(`Đã tạo đơn ${data.first}.`);
+    refresh();
+  };
+
+  const lamMoi = () => {
+    setKetQua(null); setStep(1);
+    setCocDatTruoc(false); setBanCheo(false); setGhiChu1("");
+    setCustId(""); setNewC(null); setKh({ customer_name: "", customer_phone: "", customer_cccd: "", customer_address: "" });
+    setPicked(null); setBatteryOption(""); setCoc(0); setPromoChon([]); setBangGia(null); setBangGiaLoi(""); setBangGiaCu(true);
+    setPays([]); setExtra({}); setHd({ tinh_tp: "", phuong_xa: "", dia_chi: "" });
+    if (profile) { setTuVanId(profile.id); setTuVanName(profile.name); }
+  };
+
+  if (ketQua) {
+    return (
+      <div className="flex flex-col gap-4">
+        <Toast toast={toast} />
+        <div className="card text-center py-8">
+          <div className="text-5xl mb-2">✅</div>
+          <div className="font-extrabold text-xl mb-1">Đã tạo đơn bán {ketQua.first}</div>
+          <div className="flex gap-2 justify-center flex-wrap mt-4">
+            <Link href={`/don-ban?q=${encodeURIComponent(ketQua.first)}`} className="btn-primary">Xem chi tiết & in phiếu</Link>
+            <button className="btn-ok" onClick={lamMoi}>+ Tạo đơn khác</button>
+            <Link href="/don-ban" className="btn-ghost">Về danh sách đơn</Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4 pb-10">
       <Toast toast={toast} />
       <div className="flex items-center gap-2 flex-wrap">
         <Link href="/ban-hang" className="btn-ghost !text-xs">← Về màn Bán hàng (form cũ)</Link>
-        <div className="font-extrabold text-lg mr-auto">🧪 Tạo đơn bán — Wizard 4 bước (đang hoàn thiện)</div>
+        <div className="font-extrabold text-lg mr-auto">Tạo đơn bán — Wizard 4 bước</div>
       </div>
 
       <div className="card !py-3">
@@ -368,23 +466,67 @@ export default function TaoDonWizard() {
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="flex flex-col gap-4">
             <div className="card">
-              <div className="font-extrabold mb-2.5">Hình thức thanh toán</div>
-              <div className="flex gap-2 mb-3">
-                <button className={`btn-ghost !text-xs ${hinhThucTT === "thang" ? "!bg-brand !text-white" : ""}`} onClick={() => setHinhThucTT("thang")}>Trả thẳng</button>
-                <button className={`btn-ghost !text-xs ${hinhThucTT === "gop" ? "!bg-brand !text-white" : ""}`} onClick={() => setHinhThucTT("gop")}>Trả góp</button>
-              </div>
-              {hinhThucTT === "gop" && (
-                <div className="flex flex-col gap-2.5 p-3 rounded-xl bg-[#FDF6E3] mb-3">
-                  <Field label="Đơn vị trả góp" required>
-                    <select className="inp" value={donViTraGop} onChange={(e) => setDonViTraGop(e.target.value)}>
-                      <option value="">— Chọn đơn vị —</option>
-                      {(settings?.cong_ty_tra_gop || "Home Credit\nShinhanbank\nHD Saison\nFE Credit").split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean).map((x) => <option key={x}>{x}</option>)}
-                    </select>
-                  </Field>
-                  <Field label="Số tiền vay"><MoneyInput value={soTienVay} onChange={setSoTienVay} /></Field>
+              <div className="font-extrabold mb-2.5">Thanh toán</div>
+              {coc > 0 && (
+                <div className="flex items-center justify-between px-3 py-2 mb-2.5 rounded-lg bg-[#FDF6E3] text-[13.5px]">
+                  <span className="text-[#A25F00] font-semibold">🔒 Đã nhận cọc (từ phiếu giữ xe)</span>
+                  <b className="text-[#A25F00]">{fmtVND(coc)}</b>
                 </div>
               )}
-              <Field label="Số tiền khách đã đặt cọc"><MoneyInput value={coc} onChange={setCoc} /></Field>
+              <div className="flex flex-col gap-1.5 mb-2">
+                {pays.map((p, i) => (
+                  <div key={i} className="flex gap-1.5 items-center">
+                    <select className="inp !py-1.5 !text-xs !w-auto" value={p.method} onChange={(e) => setPays((x) => x.map((y, j) => j === i ? { ...y, method: e.target.value } : y))}>
+                      {PTTT.map((m) => <option key={m}>{m}</option>)}
+                    </select>
+                    <div className="flex-1"><MoneyInput className="!py-1.5 !text-xs" value={p.amount} onChange={(v) => setPays((x) => x.map((y, j) => j === i ? { ...y, amount: v } : y))} /></div>
+                    <button className="text-danger font-bold px-1" onClick={() => setPays((x) => x.filter((_, j) => j !== i))}>✕</button>
+                  </div>
+                ))}
+                {pays.map((p, i) => p.method === "Trả góp" ? (
+                  <div key={"tg" + i} className="flex items-center gap-2 flex-wrap bg-[#FDF6E3] rounded-lg px-2.5 py-2 -mt-0.5">
+                    <span className="text-[11px] font-bold text-[#A25F00]">Đơn vị trả góp:</span>
+                    <select className="inp !w-auto !py-1 !text-xs" value={p.tra_gop_ct || ""}
+                      onChange={(e) => setPays((x) => x.map((y, j) => j === i ? { ...y, tra_gop_ct: e.target.value } : y))}>
+                      <option value="">— Chọn đơn vị —</option>
+                      {(settings?.cong_ty_tra_gop || "Home Credit\nShinhanbank\nHD Saison\nFE Credit")
+                        .split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean).map((x) => <option key={x}>{x}</option>)}
+                    </select>
+                  </div>
+                ) : quyTypeOf(p.method) === "Ngân hàng" ? (
+                  <div key={"nh" + i} className="flex items-center gap-2 flex-wrap bg-[#EAF2FF] rounded-lg px-2.5 py-2 -mt-0.5">
+                    <span className="text-[11px] font-bold text-brand">Tài khoản nhận tiền:</span>
+                    <select className="inp !w-auto !py-1 !text-xs" value={p.account_id || ""}
+                      onChange={(e) => setPays((x) => x.map((y, j) => j === i ? { ...y, account_id: e.target.value } : y))}>
+                      <option value="">— Chọn đúng tài khoản khách đã chuyển vào —</option>
+                      {banksHopLe.map((a) => <option key={a.id} value={a.id}>{a.name}{a.bank_info ? ` (${a.bank_info})` : ""}</option>)}
+                    </select>
+                    {banksHopLe.length === 0 && <span className="text-[10.5px] text-danger">Chưa có tài khoản Ngân hàng nào cho đúng pháp nhân của hãng xe này — vào Sổ quỹ tạo trước.</span>}
+                  </div>
+                ) : null)}
+              </div>
+              <div className="flex gap-1.5 flex-wrap mb-3">
+                <button className="btn-ghost !text-xs" onClick={() => setPays((p) => [...p, { method: "Tiền mặt", amount: "" }])}>⊕ Thêm phương thức</button>
+                {conLai > 0 && pays.length > 0 && (
+                  <button className="btn-ghost !text-xs" onClick={() => setPays((p) => p.map((x, j) => j === p.length - 1 ? { ...x, amount: (Number(x.amount) || 0) + conLai } : x))}>
+                    Điền nốt {fmtVND(conLai)}
+                  </button>
+                )}
+                {pays.length === 0 && (
+                  <button className="btn-ghost !text-xs" onClick={() => setPays([{ method: "Tiền mặt", amount: Math.max(phaiTra - tongCoc, 0) }])}>
+                    {tongCoc > 0 ? `Trả nốt ${fmtVND(Math.max(phaiTra - tongCoc, 0))} tiền mặt` : "Trả đủ tiền mặt"}
+                  </button>
+                )}
+              </div>
+              <div className="rounded-xl border border-[#E3E8EF] overflow-hidden">
+                <div className="flex items-center justify-between px-3 py-2 border-b border-dashed border-[#E3E8EF] text-[13.5px]">
+                  <span className="text-[#5A6572]">Khách đã trả{tongCoc > 0 ? ` (gồm cọc ${fmtVND(tongCoc)})` : ""}</span><span className="font-bold text-[#0E7A4A]">{fmtVND(daTra)}</span>
+                </div>
+                <div className={`flex items-center justify-between px-3 py-2.5 ${conLai > 0 ? "bg-[#FFF6E5]" : "bg-[#E7F6EE]"}`}>
+                  <span className="font-bold text-[13.5px]">Còn phải trả</span>
+                  <span className={`text-[18px] font-extrabold ${conLai > 0 ? "text-[#A25F00]" : "text-[#0E7A4A]"}`}>{fmtVND(conLai)}</span>
+                </div>
+              </div>
             </div>
 
             <div className="card">
@@ -405,6 +547,34 @@ export default function TaoDonWizard() {
                 <Field label="Địa chỉ chi tiết"><input className="inp" value={hd.dia_chi} onChange={(e) => setHd((p) => ({ ...p, dia_chi: e.target.value }))} /></Field>
               </div>
             </div>
+
+            {cfields.length > 0 && (
+              <div className="card">
+                <div className="font-extrabold mb-2.5">Thông tin bổ sung</div>
+                <div className="flex flex-col gap-2.5">
+                  {cfields.map((c) => {
+                    if (c.field_type === "dropdown") return <Field key={c.id} label={c.label} required={c.required}>
+                      <select className="inp" value={extra[c.field_key] || ""} onChange={(e) => setExtra((p) => ({ ...p, [c.field_key]: e.target.value }))}>
+                        <option value="">— Chọn —</option>
+                        {(c.options || []).map((o) => <option key={o}>{o}</option>)}
+                      </select>
+                    </Field>;
+                    if (c.field_type === "checkbox") return <Field key={c.id} label={c.label}>
+                      <label className="flex items-center gap-2 text-sm py-2">
+                        <input type="checkbox" className="w-4 h-4" checked={!!extra[c.field_key]} onChange={(e) => setExtra((p) => ({ ...p, [c.field_key]: e.target.checked }))} /> Có
+                      </label>
+                    </Field>;
+                    if (c.field_type === "number" || c.field_type === "money") return <Field key={c.id} label={c.label} required={c.required}>
+                      <MoneyInput value={extra[c.field_key] || ""} onChange={(v) => setExtra((p) => ({ ...p, [c.field_key]: v }))} />
+                    </Field>;
+                    if (c.field_type === "formula") return null; // can gia_xe/tongXe theo kieu don cu, khong ap dung o day
+                    return <Field key={c.id} label={c.label} required={c.required}>
+                      <input className="inp" value={extra[c.field_key] || ""} onChange={(e) => setExtra((p) => ({ ...p, [c.field_key]: e.target.value }))} />
+                    </Field>;
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           <BangGiaPanel picked={picked} bangGiaCu={bangGiaCu} bangGiaLoi={bangGiaLoi} busy={busy} tinhBangGia={tinhBangGia} bangGia={bangGia} coc={coc} />
@@ -414,9 +584,6 @@ export default function TaoDonWizard() {
       {/* ===== BƯỚC 4: XÁC NHẬN ===== */}
       {step === 4 && (
         <div className="flex flex-col gap-4">
-          <div className="p-3 rounded-xl bg-[#FFF8E5] text-[#A25F00] text-[13px]">
-            ⏳ Giai đoạn 2 (ghi đơn thật — đồng bộ promo_amount/invoice_total vào công nợ & báo cáo) đang chờ duyệt. Nút "Lưu" bên dưới hiện chỉ để xem trước Bảng giá, <b>chưa tạo đơn bán thật</b>. Muốn tạo đơn thật ngay, dùng màn "Bán hàng" hiện tại.
-          </div>
           <div className="grid gap-4 lg:grid-cols-2">
             <div className="card">
               <div className="font-extrabold mb-2">Khách hàng & đơn hàng</div>
@@ -434,8 +601,11 @@ export default function TaoDonWizard() {
                 </div>
               )}
               <div className="mt-3 pt-3 border-t border-dashed border-[#E3E8EF] text-[13px]">
-                <div>Thanh toán: {hinhThucTT === "gop" ? `Trả góp qua ${donViTraGop || "—"} (vay ${fmtVND(soTienVay)})` : "Trả thẳng"}</div>
-                <div>Đã đặt cọc: {fmtVND(coc)}</div>
+                {pays.filter((p) => Number(p.amount) > 0).map((p, i) => (
+                  <div key={i}>{p.method}: {fmtVND(p.amount)}{p.method === "Trả góp" && p.tra_gop_ct ? ` (qua ${p.tra_gop_ct})` : ""}</div>
+                ))}
+                {pays.filter((p) => Number(p.amount) > 0).length === 0 && <div className="text-[#8A93A0]">Chưa thêm phương thức thanh toán nào.</div>}
+                {coc > 0 && <div>Đã đặt cọc: {fmtVND(coc)}</div>}
                 {(hd.dia_chi || hd.phuong_xa || hd.tinh_tp) && <div className="text-[#5A6572]">Xuất HĐ: {[hd.dia_chi, hd.phuong_xa, hd.tinh_tp].filter(Boolean).join(", ")}</div>}
               </div>
             </div>
@@ -446,7 +616,7 @@ export default function TaoDonWizard() {
                   <div className="flex justify-between px-3 py-2 border-b border-dashed border-[#E3E8EF]"><span className="text-[#5A6572]">Giá niêm yết</span><b>{fmtVND(bangGia.gia_xe)}</b></div>
                   <div className="flex justify-between px-3 py-2 border-b border-dashed border-[#E3E8EF] bg-[#EAF2FF]"><span className="font-bold">Giá cần thanh toán</span><b className="text-brand">{fmtVND(bangGia.gia_can_thanh_toan)}</b></div>
                   <div className="flex justify-between px-3 py-2 border-b border-dashed border-[#E3E8EF]"><span className="text-[#5A6572]">Tổng xuất hóa đơn</span><b>{fmtVND(bangGia.tong_xuat_hd)}</b></div>
-                  <div className="flex justify-between px-3 py-2.5 bg-[#FFF6E5]"><span className="font-bold">Còn lại phải thu</span><b className="text-[18px] text-[#A25F00]">{fmtVND(Math.max((bangGia.gia_can_thanh_toan || 0) - (Number(coc) || 0), 0))}</b></div>
+                  <div className="flex justify-between px-3 py-2.5 bg-[#FFF6E5]"><span className="font-bold">Còn lại phải thu</span><b className="text-[18px] text-[#A25F00]">{fmtVND(conLai)}</b></div>
                 </div>
               )}
             </div>
