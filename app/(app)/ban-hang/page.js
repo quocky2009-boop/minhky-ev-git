@@ -463,8 +463,8 @@ function TaoDonInner() {
       <Toast toast={toast} />
 
       <div className="flex items-center gap-2 flex-wrap">
-        <div className="font-extrabold text-lg mr-auto">{suaId ? "Sửa đơn bán" : "Tạo đơn bán"}</div>
-        {!suaId && <Link href="/ban-hang/wizard" className="btn-ghost !text-xs" title="Form mới theo 4 bước, có Bảng giá tự động theo khuyến mại">✨ Thử Wizard 4 bước (mới)</Link>}
+        <div className="font-extrabold text-lg mr-auto">{suaId ? "Sửa đơn bán" : "Tạo đơn bán buôn (nhiều xe)"}</div>
+        {!suaId && <Link href="/ban-hang/wizard" className="btn-ghost !text-xs" title="Form mới theo 4 bước, bán 1 xe/đơn, có Bảng giá tự động theo khuyến mại">✨ Tạo đơn bán lẻ (Wizard 4 bước)</Link>}
         <Link href="/don-ban" className="btn-ghost !text-xs">← Danh sách đơn</Link>
       </div>
 

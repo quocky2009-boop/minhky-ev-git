@@ -420,7 +420,8 @@ export default function DonBan() {
       <div className="card">
         <div className="flex gap-2 flex-wrap items-center mb-3">
           <div className="font-extrabold mr-auto">Danh sách đơn bán ({sorted.length})</div>
-          <Link href="/ban-hang?new=1" className="btn-primary !text-xs">+ Tạo đơn bán mới</Link>
+          <Link href="/ban-hang/wizard" className="btn-primary !text-xs">+ Tạo đơn bán mới</Link>
+          <Link href="/ban-hang?new=1" className="btn-ghost !text-xs" title="Chọn nhiều xe trong 1 đơn, tự tách thành từng đơn theo từng xe">+ Tạo đơn bán buôn</Link>
           <input type="date" className="inp !w-auto" value={from} onChange={(e) => setFrom(e.target.value)} />
           <input type="date" className="inp !w-auto" value={to} onChange={(e) => setTo(e.target.value)} />
           <div className="!w-52"><LocSearch locations={locations} value={fLoc} onChange={setFLoc} placeholder="Lọc kho…" /></div>

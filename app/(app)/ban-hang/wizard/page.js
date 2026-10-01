@@ -281,7 +281,7 @@ export default function TaoDonWizard() {
     <div className="flex flex-col gap-4 pb-10">
       <Toast toast={toast} />
       <div className="flex items-center gap-2 flex-wrap">
-        <Link href="/ban-hang" className="btn-ghost !text-xs">← Về màn Bán hàng (form cũ)</Link>
+        <Link href="/ban-hang?new=1" className="btn-ghost !text-xs" title="Chọn nhiều xe trong 1 đơn, tự tách thành từng đơn theo từng xe">Tạo đơn bán buôn (nhiều xe) →</Link>
         <div className="font-extrabold text-lg mr-auto">Tạo đơn bán — Wizard 4 bước</div>
       </div>
 
