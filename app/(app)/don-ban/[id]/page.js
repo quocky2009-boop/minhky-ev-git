@@ -6,6 +6,7 @@ import { useCatalog, useToast } from "@/lib/useData";
 import { Badge, Toast, Field } from "@/components/ui";
 import { fmtVND, fmtDate, fmtTime, errMsg } from "@/lib/format";
 import { printOrder, printOrderBill } from "@/lib/print";
+import BangGiaDon from "@/components/BangGiaDon";
 
 export default function DonBanChiTiet() {
   const { id } = useParams();
@@ -132,7 +133,7 @@ export default function DonBanChiTiet() {
             <button className="btn-ghost !text-xs hover:!text-danger" disabled={busy} onClick={huyDon}>Hủy đơn hàng</button>
           )}
           {!isClosed && !isDone && (
-            <Link href={`/ban-hang?sua=${o.id}`} className="btn-primary !text-xs">Sửa đơn hàng</Link>
+            <Link href={o.price_snapshot ? `/ban-hang/wizard?sua=${o.id}` : `/ban-hang?sua=${o.id}`} className="btn-primary !text-xs">Sửa đơn hàng</Link>
           )}
           {isDone && profile.role === "CEO" && (
             <button className="btn-primary !text-xs bg-danger border-danger" disabled={busy} onClick={traHang}>↩ Đổi trả hàng</button>
@@ -145,7 +146,7 @@ export default function DonBanChiTiet() {
         <span className="text-xl font-extrabold">{o.code}</span>
         <Badge tone={statusBadge}>{statusLabel}</Badge>
         {promoTags.map((t) => <Badge key={t.id} tone="purple">🏷 {t.name}</Badge>)}
-        {canSuaKM && <button className="btn-ghost !px-2 !py-1 !text-xs" onClick={() => setEditPromo(!editPromo)}>✎ Sửa khuyến mại</button>}
+        {canSuaKM && !o.price_snapshot && <button className="btn-ghost !px-2 !py-1 !text-xs" onClick={() => setEditPromo(!editPromo)}>✎ Sửa khuyến mại</button>}
       </div>
 
       {editPromo && canSuaKM && (
@@ -206,6 +207,9 @@ export default function DonBanChiTiet() {
             <div className="text-[13px]">{o.customer_phone}</div>
             {o.customer_address && <div className="text-[13px]">{o.customer_address}</div>}
           </div>
+
+          {/* BẢNG GIÁ + KHUYẾN MẠI + ĐỊA CHỈ HĐ (đơn tạo từ Wizard) */}
+          <BangGiaDon o={o} />
 
           {/* THANH TOÁN */}
           <div className="card">

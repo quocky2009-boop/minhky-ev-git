@@ -145,6 +145,7 @@ function TaoDonInner() {
         supabase.from("sale_payments").select("*").eq("sale_code", (await supabase.from("sales_orders").select("code").eq("id", id).single()).data?.code || ""),
       ]);
       if (!o) return notify("Không tìm thấy đơn.", "err");
+      if (o.price_snapshot) { router.replace(`/ban-hang/wizard?sua=${o.id}`); return; }
       setSuaId(o.id);
       setKh({ customer_name: o.customer_name, customer_phone: o.customer_phone, customer_cccd: o.customer_cccd || "",
         customer_address: o.customer_address || "", customer_type: o.customer_type, customer_source: o.customer_source });

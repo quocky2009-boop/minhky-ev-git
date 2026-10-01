@@ -174,7 +174,7 @@ export default function DatCoc() {
                 <button className="btn-ghost !px-2 !py-1 !text-xs" onClick={() => setDetail(d)}>👁</button>
                 <button className="btn-ghost !px-2 !py-1 !text-xs" title="In biên nhận cọc" onClick={() => printBienNhanCoc({ coc: d, vehicles, locations, settings })}>🖨</button>
                 {d.status === "DANG_GIU" && (
-                  <Link href={`/ban-hang?new=1&sk=${encodeURIComponent(d.frame_number)}&kh=${encodeURIComponent(d.customer_phone)}&coc=${d.amount}`}
+                  <Link href={`/ban-hang/wizard?sk=${encodeURIComponent(d.frame_number)}&kh=${encodeURIComponent(d.customer_phone)}&coc=${d.amount}`}
                     className="btn-ok !px-2.5 !py-1 !text-xs whitespace-nowrap">→ Tạo đơn bán</Link>
                 )}
                 {d.status === "DANG_GIU" && <button className="btn-ghost !px-2 !py-1 !text-xs !text-danger" onClick={() => huyCoc(d)}>Hủy giữ</button>}
@@ -220,7 +220,7 @@ export default function DatCoc() {
                 <div className="flex gap-2 flex-wrap">
                   {detail.status === "DANG_GIU" && (
                     <>
-                      <Link href={`/ban-hang?new=1&sk=${encodeURIComponent(detail.frame_number)}&kh=${encodeURIComponent(detail.customer_phone)}&coc=${detail.amount}`}
+                      <Link href={`/ban-hang/wizard?sk=${encodeURIComponent(detail.frame_number)}&kh=${encodeURIComponent(detail.customer_phone)}&coc=${detail.amount}`}
                         className="btn-ok !text-xs">→ Tạo đơn bán</Link>
                       <button className="btn-ghost !text-xs !text-danger" onClick={() => { huyCoc(detail); setDetail(null); }}>Hủy giữ xe</button>
                     </>

@@ -1,6 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Field, Badge, Toast, LocSearch, CustomerSearch, MoneyInput, FrameSearch, VehicleSearch } from "@/components/ui";
 import { fmtVND, fmtDate, errMsg } from "@/lib/format";
@@ -15,7 +16,7 @@ const KIND_LABELS = { GIAM_GIA: "Giảm giá", QUY_DOI_TIEN_MAT: "Quy đổi ti�
 // "coc" luon lay truc tiep tu state hien tai (khong phai gia tri da
 // snapshot trong bangGia) de "Con lai phai thu" nhay theo ngay khi go,
 // khong can bam Lam moi (coc khong lam doi KM nao ap dung/so tien).
-const BangGiaPanel = ({ picked, bangGiaCu, bangGiaLoi, busy, tinhBangGia, bangGia, coc }) => (
+const BangGiaPanel = ({ picked, bangGiaCu, bangGiaLoi, busy, tinhBangGia, bangGia, coc, cocLabel = "Đã đặt cọc" }) => (
   <div className="card self-start">
     <div className="font-extrabold mb-2.5">💰 Bảng giá</div>
     {!picked ? (
@@ -40,7 +41,7 @@ const BangGiaPanel = ({ picked, bangGiaCu, bangGiaLoi, busy, tinhBangGia, bangGi
             ))}
             <div className="flex justify-between px-3 py-2 border-b border-dashed border-[#E3E8EF] bg-[#EAF2FF]"><span className="font-bold">Giá cần thanh toán</span><b className="text-brand">{fmtVND(bangGia.gia_can_thanh_toan)}</b></div>
             <div className="flex justify-between px-3 py-2 border-b border-dashed border-[#E3E8EF]"><span className="text-[#5A6572]">Tổng tiền xuất hóa đơn</span><b>{fmtVND(bangGia.tong_xuat_hd)}</b></div>
-            {Number(coc) > 0 && <div className="flex justify-between px-3 py-2 border-b border-dashed border-[#E3E8EF]"><span className="text-[#5A6572]">Đã đặt cọc</span><span>{fmtVND(coc)}</span></div>}
+            {Number(coc) > 0 && <div className="flex justify-between px-3 py-2 border-b border-dashed border-[#E3E8EF]"><span className="text-[#5A6572]">{cocLabel}</span><span>{fmtVND(coc)}</span></div>}
             <div className="flex justify-between px-3 py-2.5 bg-[#FFF6E5]"><span className="font-bold">Còn lại phải thu</span><b className="text-[18px] text-[#A25F00]">{fmtVND(Math.max((bangGia.gia_can_thanh_toan || 0) - (Number(coc) || 0), 0))}</b></div>
           </div>
         )}
@@ -49,12 +50,20 @@ const BangGiaPanel = ({ picked, bangGiaCu, bangGiaLoi, busy, tinhBangGia, bangGi
   </div>
 );
 
-export default function TaoDonWizard() {
+function TaoDonWizardInner() {
+  const params = useSearchParams();
+  const router = useRouter();
   const { supabase, vehicles, locations, brands, profile, loading, settings, diaBan, customFields, paymentMethods, refresh } = useCatalog();
   const { toast, notify } = useToast();
   const [step, setStep] = useState(1);
   const [busy, setBusy] = useState(false);
   const [ketQua, setKetQua] = useState(null);
+  const [suaId, setSuaId] = useState(null);     // id don dang sua (che do sua)
+  const [suaCode, setSuaCode] = useState("");
+  const [lyDo, setLyDo] = useState("");
+  const [itemsGoc, setItemsGoc] = useState([]); // ban kem cua don (giu nguyen khi sua)
+  const [dTongGoc, setDTongGoc] = useState({ type: "amount", value: 0 });
+  const [giaGoc, setGiaGoc] = useState(null);   // gia niem yet ghi tren snapshot (khi sua, chua doi xe)
 
   // ===== BƯỚC 1: Đơn hàng & khách hàng =====
   const [cocDatTruoc, setCocDatTruoc] = useState(false);
@@ -109,7 +118,7 @@ export default function TaoDonWizard() {
   const [showPromoDrawer, setShowPromoDrawer] = useState(false);
   const [bangGia, setBangGia] = useState(null);
   const [bangGiaLoi, setBangGiaLoi] = useState("");
-  const [bangGiaCu, setBangGiaCu] = useState(true); // true = vua doi lua chon, can bam Lam moi
+  const [bangGiaKey, setBangGiaKey] = useState(null); // khoa lua chon luc tinh Bang gia gan nhat
 
   const [bankAccounts, setBankAccounts] = useState([]);
   useEffect(() => {
@@ -119,16 +128,19 @@ export default function TaoDonWizard() {
   }, [loading]);
 
   const vehicleObj = vehicles.find((v) => v.id === picked?.vehicle_id);
-  const giaXe = vehicleObj?.list_price || 0;
+  const giaXe = giaGoc ?? (vehicleObj?.list_price || 0);
+  // Bang gia "cu" khi lua chon hien tai khac lua chon luc tinh (so sanh theo gia tri)
+  const keyHienTai = JSON.stringify([[...promoChon].sort(), giaXe, ngayLayGia, batteryOption]);
+  const bangGiaCu = bangGiaKey !== keyHienTai;
   // Luu y: KHONG dua coc vao day — coc doi khong lam thay doi KM nao ap
   // dung hay so tien cua tung KM, chi tru vao "con lai" hien thi truc tiep
   // o client (xem BangGiaPanel) — khong can goi lai RPC/danh dau cu.
-  useEffect(() => { setBangGiaCu(true); }, [promoChon, giaXe, ngayLayGia]);
 
   const chonXe = async (u) => {
     setPicked(u);
     setBatteryOption("");
-    setPromoChon([]); setBangGia(null); setBangGiaLoi(""); setBangGiaCu(true);
+    setPromoChon([]); setBangGia(null); setBangGiaLoi(""); setBangGiaKey(null); setGiaGoc(null);
+    if (suaId) return; // sua don: giu nguyen so da thu (coc + cac khoan thu truoc)
     if (u.status === "GIU_CHO") {
       const { data: deps } = await supabase.from("deposits").select("amount").eq("frame_number", u.frame_number).eq("status", "DANG_GIU");
       setCoc((deps || []).reduce((t, d) => t + (Number(d.amount) || 0), 0));
@@ -144,6 +156,68 @@ export default function TaoDonWizard() {
       .eq("vehicle_id", vehicleId).in("status", ["TON_KHO", "GIU_CHO"]).order("frame_number");
     setXeTheoModel(data || []);
   };
+
+  // ===== SUA DON (?sua=id) =====
+  const [suaDone, setSuaDone] = useState(false);
+  useEffect(() => {
+    const id = params.get("sua");
+    if (!id || suaDone || loading || custs.length === 0 || vehicles.length === 0) return;
+    setSuaDone(true);
+    (async () => {
+      const chk = await supabase.rpc("fn_don_co_sua_duoc", { p_id: Number(id) });
+      if (chk.error) return notify(errMsg(chk.error), "err");
+      if (!chk.data.ok) return notify(chk.data.ly_do, "err");
+      const { data: o } = await supabase.from("sales_orders").select("*").eq("id", id).single();
+      if (!o) return notify("Không tìm thấy đơn.", "err");
+      if (!o.price_snapshot) { router.replace(`/ban-hang?sua=${o.id}`); return; }
+      const sk0 = String(o.frame_number || "").split(",")[0].trim();
+      const [{ data: its }, { data: sop }, { data: unit }] = await Promise.all([
+        supabase.from("sale_items").select("*").eq("sale_code", o.code),
+        supabase.from("sale_order_promotions").select("promotion_id").eq("sale_code", o.code),
+        supabase.from("vehicle_units").select("frame_number, vehicle_id, location_code, status").eq("frame_number", sk0).maybeSingle(),
+      ]);
+      const ids = (sop || []).map((x) => x.promotion_id);
+      const gia = Number(o.price_snapshot.gia_xe) || 0;
+      setSuaId(o.id); setSuaCode(o.code);
+      setKh({ customer_name: o.customer_name || "", customer_phone: o.customer_phone || "", customer_cccd: o.customer_cccd || "", customer_address: o.customer_address || "" });
+      const c = custs.find((x) => (x.phone || "").replace(/\D/g, "") === (o.customer_phone || "").replace(/\D/g, ""));
+      if (c) setCustId(c.id);
+      setNgayLayGia(o.sale_date); setTuVanId(o.seller_id || ""); setTuVanName(o.seller_name || "");
+      setNguonDon(o.customer_source || "Khách vãng lai"); setGhiChu1(o.note || "");
+      setDiemBan(o.location_code); setBatteryOption(o.battery_option || "");
+      setPicked({ frame_number: sk0, vehicle_id: o.vehicle_id, location_code: unit?.location_code || o.location_code, status: "DA_BAN" });
+      setGiaGoc(gia || null); setBangGia(o.price_snapshot); setPromoChon(ids);
+      setBangGiaKey(JSON.stringify([[...ids].sort(), gia, o.sale_date, o.battery_option || ""]));
+      setCoc(Number(o.paid_amount) || 0);
+      setItemsGoc(its || []); setDTongGoc({ type: o.discount_type || "amount", value: o.discount_value || 0 });
+      setExtra(o.extra || {});
+      setHd({ tinh_tp: o.extra?.hd_tinh_tp || "", phuong_xa: o.extra?.hd_phuong_xa || "", dia_chi: o.extra?.hd_dia_chi || "" });
+      notify(`Đang sửa đơn ${o.code}.`);
+    })();
+  }, [params, custs, vehicles, loading]);
+
+  // ===== DIEN SAN tu Tra cuu xe (?xe=) / Dat coc (?sk=&kh=) =====
+  const [preDone, setPreDone] = useState(false);
+  useEffect(() => {
+    if (preDone || params.get("sua") || loading || custs.length === 0 || vehicles.length === 0) return;
+    setPreDone(true);
+    const sk = (params.get("sk") || "").trim().toUpperCase(), phone = params.get("kh"), xe = params.get("xe");
+    if (!sk && !phone && !xe) return;
+    (async () => {
+      let coKhach = false;
+      if (phone) {
+        const c = custs.find((x) => (x.phone || "").replace(/\D/g, "") === String(phone).replace(/\D/g, ""));
+        if (c) { pickCust(c); coKhach = true; }
+      }
+      if (sk) {
+        const { data: u } = await supabase.from("vehicle_units").select("frame_number, vehicle_id, location_code, status").eq("frame_number", sk).maybeSingle();
+        if (!u) notify(`Không tìm thấy số khung ${sk}.`, "err");
+        else if (!["TON_KHO", "GIU_CHO"].includes(u.status)) notify(`Xe ${sk} đang ở trạng thái ${u.status}, không bán được.`, "err");
+        else { await chonXe(u); if (coKhach) setStep(2); }
+      }
+      if (xe) { setCheDoTim("model"); await timXeTheoModel(xe); }
+    })();
+  }, [params, custs, vehicles, loading]);
 
   const today = iso(new Date());
   const promosHopLe = vehicleObj ? promos.filter((p) =>
@@ -164,7 +238,7 @@ export default function TaoDonWizard() {
     } });
     setBusy(false);
     if (error) { setBangGiaLoi(errMsg(error)); setBangGia(null); return; }
-    setBangGia(data); setBangGiaCu(false);
+    setBangGia(data); setBangGiaKey(keyHienTai);
   };
 
   // ===== BƯỚC 3: Thanh toán & xuất HĐ =====
@@ -209,34 +283,57 @@ export default function TaoDonWizard() {
     if (nhThieu) return notify(`Chọn tài khoản Ngân hàng nhận tiền cho phương thức "${nhThieu.method}".`, "err");
     const cfThieu = cfields.find((c) => c.required && c.field_type !== "formula" && !extra[c.field_key]);
     if (cfThieu) return notify(`Nhập "${cfThieu.label}".`, "err");
+    if (suaId && phaiTra < tongCoc) return notify(`Tổng đơn mới (${fmtVND(phaiTra)}) không được nhỏ hơn số đã thu (${fmtVND(tongCoc)}). Muốn giảm hãy hoàn tiền cho khách trước.`, "err");
     if (!canhBaoMotPTTT()) return;
 
-    setBusy(true);
-    const { data, error } = await supabase.rpc("fn_ban_hang_v2", { p: {
+    const frame = {
+      frame_number: picked.frame_number, unit_price: Number(bangGia.gia_xe) || 0,
+      discount_type: "amount", discount_value: Number(bangGia.tong_uu_dai) || 0,
+      promo_amount: Number(bangGia.tong_uu_dai) || 0, invoice_total: Number(bangGia.tong_xuat_hd) || 0,
+      price_snapshot: bangGia,
+    };
+    const tg = pays.find((p) => p.method === "Trả góp" && p.tra_gop_ct);
+    const extraOut = {
+      ...extra,
+      hd_tinh_tp: hd.tinh_tp || "", hd_phuong_xa: hd.phuong_xa || "", hd_dia_chi: hd.dia_chi || "",
+      ...(tg ? { tra_gop_cong_ty: tg.tra_gop_ct, tra_gop_so_tien: Number(tg.amount) || 0 } : {}),
+    };
+    const khOut = {
       customer_name: kh.customer_name, customer_phone: kh.customer_phone,
       customer_cccd: kh.customer_cccd, customer_address: kh.customer_address,
-      customer_source: nguonDon,
-      sale_date: ngayLayGia, location_code: diemBan, note: ghiChu1,
+      customer_source: nguonDon, sale_date: ngayLayGia, location_code: diemBan,
       seller_id: tuVanId, seller_name: tuVanName, battery_option: batteryOption || null,
-      frames: [{
-        frame_number: picked.frame_number, unit_price: Number(bangGia.gia_xe) || 0,
-        discount_type: "amount", discount_value: Number(bangGia.tong_uu_dai) || 0,
-        promo_amount: Number(bangGia.tong_uu_dai) || 0, invoice_total: Number(bangGia.tong_xuat_hd) || 0,
-        price_snapshot: bangGia,
-      }],
+    };
+    const paysOut = pays.filter((p) => Number(p.amount) > 0).map((p) => ({
+      method: p.method, amount: Number(p.amount), account_id: p.account_id || null, tra_gop_ct: p.tra_gop_ct || "",
+      note: p.method === "Trả góp" && p.tra_gop_ct ? `Trả góp qua ${p.tra_gop_ct}` : (p.note || ""),
+    }));
+
+    setBusy(true);
+    if (suaId) {
+      const { data, error } = await supabase.rpc("fn_sua_don_ban_v2", { p: {
+        id: suaId, ...khOut, ly_do: lyDo,
+        frames: [frame],
+        items: itemsGoc.map((x) => ({ item_type: x.item_type, name: x.name, qty: x.qty, unit_price: x.unit_price,
+          discount_type: x.discount_type || "amount", discount_value: x.discount_value || 0 })),
+        new_payments: paysOut,
+        discount_type: dTongGoc.type, discount_value: Number(dTongGoc.value) || 0,
+        extra: extraOut,
+      } });
+      setBusy(false);
+      if (error) return notify(errMsg(error), "err");
+      setKetQua({ first: data?.code || suaCode, edited: true });
+      notify(`Đã sửa đơn ${data?.code || suaCode}.`);
+      refresh();
+      return;
+    }
+
+    const { data, error } = await supabase.rpc("fn_ban_hang_v2", { p: {
+      ...khOut, note: ghiChu1,
+      frames: [frame],
       items: [],
-      payments: pays.filter((p) => Number(p.amount) > 0).map((p) => ({
-        method: p.method, amount: Number(p.amount), account_id: p.account_id || null,
-        note: p.method === "Trả góp" && p.tra_gop_ct ? `Trả góp qua ${p.tra_gop_ct}` : (p.note || ""),
-      })),
-      extra: {
-        ...extra,
-        hd_tinh_tp: hd.tinh_tp || "", hd_phuong_xa: hd.phuong_xa || "", hd_dia_chi: hd.dia_chi || "",
-        ...(pays.find((p) => p.method === "Trả góp" && p.tra_gop_ct)
-          ? { tra_gop_cong_ty: pays.find((p) => p.method === "Trả góp").tra_gop_ct,
-              tra_gop_so_tien: Number(pays.find((p) => p.method === "Trả góp").amount) || 0 }
-          : {}),
-      },
+      payments: paysOut,
+      extra: extraOut,
     } });
     if (error) { setBusy(false); return notify(errMsg(error), "err"); }
 
@@ -255,7 +352,8 @@ export default function TaoDonWizard() {
     setKetQua(null); setStep(1);
     setCocDatTruoc(false); setBanCheo(false); setGhiChu1("");
     setCustId(""); setNewC(null); setKh({ customer_name: "", customer_phone: "", customer_cccd: "", customer_address: "" });
-    setPicked(null); setBatteryOption(""); setCoc(0); setPromoChon([]); setBangGia(null); setBangGiaLoi(""); setBangGiaCu(true);
+    setPicked(null); setBatteryOption(""); setCoc(0); setPromoChon([]); setBangGia(null); setBangGiaLoi(""); setBangGiaKey(null); setGiaGoc(null);
+    setSuaId(null); setSuaCode(""); setLyDo(""); setItemsGoc([]); setDTongGoc({ type: "amount", value: 0 });
     setPays([]); setExtra({}); setHd({ tinh_tp: "", phuong_xa: "", dia_chi: "" });
     if (profile) { setTuVanId(profile.id); setTuVanName(profile.name); }
   };
@@ -266,7 +364,7 @@ export default function TaoDonWizard() {
         <Toast toast={toast} />
         <div className="card text-center py-8">
           <div className="text-5xl mb-2">✅</div>
-          <div className="font-extrabold text-xl mb-1">Đã tạo đơn bán {ketQua.first}</div>
+          <div className="font-extrabold text-xl mb-1">{ketQua.edited ? "Đã cập nhật đơn bán" : "Đã tạo đơn bán"} {ketQua.first}</div>
           <div className="flex gap-2 justify-center flex-wrap mt-4">
             <Link href={`/don-ban?q=${encodeURIComponent(ketQua.first)}`} className="btn-primary">Xem chi tiết & in phiếu</Link>
             <button className="btn-ok" onClick={lamMoi}>+ Tạo đơn khác</button>
@@ -282,7 +380,7 @@ export default function TaoDonWizard() {
       <Toast toast={toast} />
       <div className="flex items-center gap-2 flex-wrap">
         <Link href="/ban-hang?new=1" className="btn-ghost !text-xs" title="Chọn nhiều xe trong 1 đơn, tự tách thành từng đơn theo từng xe">Tạo đơn bán buôn (nhiều xe) →</Link>
-        <div className="font-extrabold text-lg mr-auto">Tạo đơn bán — Wizard 4 bước</div>
+        <div className="font-extrabold text-lg mr-auto">{suaId ? `Sửa đơn bán ${suaCode}` : "Tạo đơn bán — Wizard 4 bước"}</div>
       </div>
 
       <div className="card !py-3">
@@ -327,7 +425,7 @@ export default function TaoDonWizard() {
                   {CUSTOMER_SOURCES.map((s) => <option key={s}>{s}</option>)}
                 </select>
               </Field>
-              <Field label="Ghi chú"><textarea className="inp !h-20" value={ghiChu1} onChange={(e) => setGhiChu1(e.target.value)} /></Field>
+              {!suaId && <Field label="Ghi chú"><textarea className="inp !h-20" value={ghiChu1} onChange={(e) => setGhiChu1(e.target.value)} /></Field>}
             </div>
           </div>
 
@@ -405,7 +503,7 @@ export default function TaoDonWizard() {
                 <div className="mt-3 p-3 rounded-xl bg-[#F8FAFC]">
                   <div className="font-bold">{vehicleObj ? `${vehicleObj.brand} · ${vehicleObj.name} · ${vehicleObj.color}` : picked.vehicle_id}</div>
                   <div className="font-mono text-[11px] text-[#8A93A0]">SK {picked.frame_number} · {locName(picked.location_code)}</div>
-                  {coc > 0 && <div className="text-[12px] text-[#A25F00] font-bold mt-1">🔒 Đã nhận cọc {fmtVND(coc)}</div>}
+                  {coc > 0 && <div className="text-[12px] text-[#A25F00] font-bold mt-1">{suaId ? "🔒 Đã thu trước đó" : "🔒 Đã nhận cọc"} {fmtVND(coc)}</div>}
                   <Field label="Giá niêm yết">
                     <div className="inp bg-[#F3F5F8] font-bold text-[15px]">{fmtVND(giaXe)}</div>
                   </Field>
@@ -457,7 +555,7 @@ export default function TaoDonWizard() {
             )}
           </div>
 
-          <BangGiaPanel picked={picked} bangGiaCu={bangGiaCu} bangGiaLoi={bangGiaLoi} busy={busy} tinhBangGia={tinhBangGia} bangGia={bangGia} coc={coc} />
+          <BangGiaPanel picked={picked} bangGiaCu={bangGiaCu} bangGiaLoi={bangGiaLoi} busy={busy} tinhBangGia={tinhBangGia} bangGia={bangGia} coc={coc} cocLabel={suaId ? "Đã thu trước đó" : "Đã đặt cọc"} />
         </div>
       )}
 
@@ -469,7 +567,7 @@ export default function TaoDonWizard() {
               <div className="font-extrabold mb-2.5">Thanh toán</div>
               {coc > 0 && (
                 <div className="flex items-center justify-between px-3 py-2 mb-2.5 rounded-lg bg-[#FDF6E3] text-[13.5px]">
-                  <span className="text-[#A25F00] font-semibold">🔒 Đã nhận cọc (từ phiếu giữ xe)</span>
+                  <span className="text-[#A25F00] font-semibold">{suaId ? "🔒 Đã thu trước đó (gồm cọc & các khoản đã thu)" : "🔒 Đã nhận cọc (từ phiếu giữ xe)"}</span>
                   <b className="text-[#A25F00]">{fmtVND(coc)}</b>
                 </div>
               )}
@@ -520,7 +618,7 @@ export default function TaoDonWizard() {
               </div>
               <div className="rounded-xl border border-[#E3E8EF] overflow-hidden">
                 <div className="flex items-center justify-between px-3 py-2 border-b border-dashed border-[#E3E8EF] text-[13.5px]">
-                  <span className="text-[#5A6572]">Khách đã trả{tongCoc > 0 ? ` (gồm cọc ${fmtVND(tongCoc)})` : ""}</span><span className="font-bold text-[#0E7A4A]">{fmtVND(daTra)}</span>
+                  <span className="text-[#5A6572]">Khách đã trả{tongCoc > 0 ? (suaId ? ` (đã thu trước đó ${fmtVND(tongCoc)})` : ` (gồm cọc ${fmtVND(tongCoc)})`) : ""}</span><span className="font-bold text-[#0E7A4A]">{fmtVND(daTra)}</span>
                 </div>
                 <div className={`flex items-center justify-between px-3 py-2.5 ${conLai > 0 ? "bg-[#FFF6E5]" : "bg-[#E7F6EE]"}`}>
                   <span className="font-bold text-[13.5px]">Còn phải trả</span>
@@ -577,13 +675,20 @@ export default function TaoDonWizard() {
             )}
           </div>
 
-          <BangGiaPanel picked={picked} bangGiaCu={bangGiaCu} bangGiaLoi={bangGiaLoi} busy={busy} tinhBangGia={tinhBangGia} bangGia={bangGia} coc={coc} />
+          <BangGiaPanel picked={picked} bangGiaCu={bangGiaCu} bangGiaLoi={bangGiaLoi} busy={busy} tinhBangGia={tinhBangGia} bangGia={bangGia} coc={coc} cocLabel={suaId ? "Đã thu trước đó" : "Đã đặt cọc"} />
         </div>
       )}
 
       {/* ===== BƯỚC 4: XÁC NHẬN ===== */}
       {step === 4 && (
         <div className="flex flex-col gap-4">
+          {suaId && (
+            <div className="card !py-3">
+              <Field label="Lý do sửa đơn" hint="Ghi vào ghi chú đơn để truy vết.">
+                <input className="inp" value={lyDo} onChange={(e) => setLyDo(e.target.value)} placeholder="VD: Đổi khuyến mại theo thỏa thuận mới" />
+              </Field>
+            </div>
+          )}
           <div className="grid gap-4 lg:grid-cols-2">
             <div className="card">
               <div className="font-extrabold mb-2">Khách hàng & đơn hàng</div>
@@ -605,7 +710,7 @@ export default function TaoDonWizard() {
                   <div key={i}>{p.method}: {fmtVND(p.amount)}{p.method === "Trả góp" && p.tra_gop_ct ? ` (qua ${p.tra_gop_ct})` : ""}</div>
                 ))}
                 {pays.filter((p) => Number(p.amount) > 0).length === 0 && <div className="text-[#8A93A0]">Chưa thêm phương thức thanh toán nào.</div>}
-                {coc > 0 && <div>Đã đặt cọc: {fmtVND(coc)}</div>}
+                {coc > 0 && <div>{suaId ? "Đã thu trước đó" : "Đã đặt cọc"}: {fmtVND(coc)}</div>}
                 {(hd.dia_chi || hd.phuong_xa || hd.tinh_tp) && <div className="text-[#5A6572]">Xuất HĐ: {[hd.dia_chi, hd.phuong_xa, hd.tinh_tp].filter(Boolean).join(", ")}</div>}
               </div>
             </div>
@@ -637,9 +742,13 @@ export default function TaoDonWizard() {
                 setStep(step + 1);
               }}>Tiếp theo →</button>
           )}
-          {step === 4 && <button className="btn-ok" disabled={busy} onClick={luu}>💾 Lưu đơn</button>}
+          {step === 4 && <button className="btn-ok" disabled={busy} onClick={luu}>{suaId ? "💾 Lưu thay đổi" : "💾 Lưu đơn"}</button>}
         </div>
       </div>
     </div>
   );
+}
+
+export default function TaoDonWizard() {
+  return <Suspense fallback={<div className="card">Đang tải…</div>}><TaoDonWizardInner /></Suspense>;
 }

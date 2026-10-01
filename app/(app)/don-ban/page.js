@@ -5,6 +5,7 @@ import { useCatalog, useToast } from "@/lib/useData";
 import { Badge, Toast, KPI, Pager, pageSlice, pageClamp, useSortable, Th, LocSearch, MoneyInput, useSelection, ThCheck, TdCheck, SelectionBar } from "@/components/ui";
 import { fmtVND, fmtDate, fmtTime, errMsg, downloadCSV, downloadXLSX } from "@/lib/format";
 import { printOrder, printOrderBill } from "@/lib/print";
+import BangGiaDon from "@/components/BangGiaDon";
 import { InfoRows, MoneyRows } from "@/components/detail";
 import Link from "next/link";
 import { CUSTOMER_TYPES } from "@/lib/const";
@@ -590,7 +591,7 @@ export default function DonBan() {
                   {canSuaTT && (tong - (detail.paid_amount || 0)) > 0 && <button className="btn-ok !px-3 !py-1.5 !text-xs" onClick={() => setPayEdit({ paid: detail.paid_amount || 0, note: "", method: "Tiền mặt" })}>💵 Thu tiền</button>}
                   {canSuaTT && (detail.paid_amount || 0) > 0 && <button className="btn-ghost !px-3 !py-1.5 !text-xs !text-danger" disabled={busy} onClick={() => hoanTien(detail)}>↩ Hoàn tiền</button>}
                   {detail.invoice_status !== "Đã xuất HĐ"
-                    ? <Link href={`/ban-hang?sua=${detail.id}`} className="btn-primary !px-3 !py-1.5 !text-xs">✎ Sửa đơn</Link>
+                    ? <Link href={detail.price_snapshot ? `/ban-hang/wizard?sua=${detail.id}` : `/ban-hang?sua=${detail.id}`} className="btn-primary !px-3 !py-1.5 !text-xs">✎ Sửa đơn</Link>
                     : <span className="text-[10.5px] text-[#8A93A0] px-1">Đã xuất HĐ — hủy xác nhận mới sửa được</span>}
                   <button className="btn-primary !px-3 !py-1.5 !text-xs" onClick={() => printOrder({ supabase, o: detail, vehicles, locations, settings, notify })}>🖨 In phiếu</button>
                   <button className="btn-ghost !px-3 !py-1.5 !text-xs" title="In khổ nhiệt 80mm (máy in bill)" onClick={() => printOrderBill({ supabase, o: detail, vehicles, locations, settings, notify })}>🧾 In bill</button>
@@ -604,9 +605,10 @@ export default function DonBan() {
                 {(detail._promos && detail._promos.length > 0) || canSuaKM ? (
                   <div className="flex flex-wrap gap-1.5 items-center mb-3">
                     {(detail._promos || []).map((t) => <Badge key={t.id} tone="purple">🏷 {t.name}</Badge>)}
-                    {canSuaKM && <button className="btn-ghost !px-2 !py-1 !text-xs" onClick={() => { setEditPromo(!editPromo); setPromoQ(""); }}>✎ Sửa khuyến mại</button>}
+                    {canSuaKM && !detail.price_snapshot && <button className="btn-ghost !px-2 !py-1 !text-xs" onClick={() => { setEditPromo(!editPromo); setPromoQ(""); }}>✎ Sửa khuyến mại</button>}
                   </div>
                 ) : null}
+                <BangGiaDon o={detail} />
                 {editPromo && canSuaKM && (() => {
                   const vXe = vehicles.find((v) => v.id === detail.vehicle_id);
                   const today = iso(new Date());

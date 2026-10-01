@@ -76,7 +76,7 @@ export default function TraCuu() {
               )}
               <div className="flex gap-1.5 mt-2 flex-wrap">
                 <button className="btn-ghost !px-3 !py-1.5 !text-xs" onClick={() => setOpen(isOpen ? null : v.id)}>{isOpen ? "Thu gọn" : "Tồn từng kho"}</button>
-                <button className="btn-primary !px-3 !py-1.5 !text-xs" onClick={() => router.push(`/ban-hang?xe=${encodeURIComponent(v.id)}`)}>Tạo đơn bán</button>
+                <button className="btn-primary !px-3 !py-1.5 !text-xs" onClick={() => router.push(`/ban-hang/wizard?xe=${encodeURIComponent(v.id)}`)}>Tạo đơn bán</button>
                 <button className="btn !px-3 !py-1.5 !text-xs bg-[#E7EFFD] text-brand" onClick={() => router.push(`/dieu-chuyen?xe=${encodeURIComponent(v.id)}`)}>Điều chuyển</button>
               </div>
             </div>
