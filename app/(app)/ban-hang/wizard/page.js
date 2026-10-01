@@ -10,6 +10,45 @@ const iso = (d) => d.toLocaleDateString("sv-SE");
 const STEPS = ["Đơn hàng & khách hàng", "Xe & ưu đãi", "Thanh toán & xuất HĐ", "Xác nhận"];
 const KIND_LABELS = { GIAM_GIA: "Giảm giá", QUY_DOI_TIEN_MAT: "Quy đổi tiền mặt", HO_TRO_SAU_BAN: "Hỗ trợ sau bán" };
 
+// Dat o MODULE-LEVEL (giong RowCK trong ban-hang/page.js) de khong bi
+// unmount/remount gay mat trang thai moi lan component cha re-render.
+// "coc" luon lay truc tiep tu state hien tai (khong phai gia tri da
+// snapshot trong bangGia) de "Con lai phai thu" nhay theo ngay khi go,
+// khong can bam Lam moi (coc khong lam doi KM nao ap dung/so tien).
+const BangGiaPanel = ({ picked, bangGiaCu, bangGiaLoi, busy, tinhBangGia, bangGia, coc }) => (
+  <div className="card self-start">
+    <div className="font-extrabold mb-2.5">💰 Bảng giá</div>
+    {!picked ? (
+      <div className="text-xs text-[#8A93A0]">Chọn xe để xem bảng giá.</div>
+    ) : (
+      <>
+        {bangGiaCu && (
+          <div className="flex items-center gap-2 p-2.5 rounded-lg bg-[#FFF8E5] text-[#A25F00] text-[12.5px] mb-3">
+            ⚠ Bạn vừa thay đổi ưu đãi/giá — bấm "Làm mới" để cập nhật Bảng giá.
+          </div>
+        )}
+        {bangGiaLoi && <div className="p-2.5 rounded-lg bg-[#FDE8EA] text-[#B01E2C] text-[12.5px] mb-3">{bangGiaLoi}</div>}
+        <button className="btn-primary !text-xs w-full mb-3" disabled={busy} onClick={tinhBangGia}>{busy ? "Đang tính…" : "🔄 Làm mới Bảng giá"}</button>
+        {bangGia && (
+          <div className="rounded-xl border border-[#E3E8EF] overflow-hidden text-[13px]">
+            <div className="flex justify-between px-3 py-2 border-b border-dashed border-[#E3E8EF]"><span className="text-[#5A6572]">Giá niêm yết</span><b>{fmtVND(bangGia.gia_xe)}</b></div>
+            {(bangGia.khuyen_mai || []).map((k) => (
+              <div key={k.id} className="flex justify-between px-3 py-1.5 border-b border-dashed border-[#F0F2F5] text-[12px]">
+                <span className="text-[#5A6572]">🏷 {k.name} <span className="text-[10.5px]">({KIND_LABELS[k.kind]})</span></span>
+                <span className={k.amount > 0 ? "text-danger font-semibold" : "text-[#8A93A0]"}>{k.amount > 0 ? `-${fmtVND(k.amount)}` : "—"}</span>
+              </div>
+            ))}
+            <div className="flex justify-between px-3 py-2 border-b border-dashed border-[#E3E8EF] bg-[#EAF2FF]"><span className="font-bold">Giá cần thanh toán</span><b className="text-brand">{fmtVND(bangGia.gia_can_thanh_toan)}</b></div>
+            <div className="flex justify-between px-3 py-2 border-b border-dashed border-[#E3E8EF]"><span className="text-[#5A6572]">Tổng tiền xuất hóa đơn</span><b>{fmtVND(bangGia.tong_xuat_hd)}</b></div>
+            {Number(coc) > 0 && <div className="flex justify-between px-3 py-2 border-b border-dashed border-[#E3E8EF]"><span className="text-[#5A6572]">Đã đặt cọc</span><span>{fmtVND(coc)}</span></div>}
+            <div className="flex justify-between px-3 py-2.5 bg-[#FFF6E5]"><span className="font-bold">Còn lại phải thu</span><b className="text-[18px] text-[#A25F00]">{fmtVND(Math.max((bangGia.gia_can_thanh_toan || 0) - (Number(coc) || 0), 0))}</b></div>
+          </div>
+        )}
+      </>
+    )}
+  </div>
+);
+
 export default function TaoDonWizard() {
   const { supabase, vehicles, locations, brands, profile, loading, settings } = useCatalog();
   const { toast, notify } = useToast();
@@ -62,7 +101,6 @@ export default function TaoDonWizard() {
   const [modelChon, setModelChon] = useState("");
   const [xeTheoModel, setXeTheoModel] = useState([]);
   const [picked, setPicked] = useState(null); // {frame_number, vehicle_id, location_code, status}
-  const [giaXe, setGiaXe] = useState(0);
   const [batteryOption, setBatteryOption] = useState("");
   const [coc, setCoc] = useState(0);
   const [promos, setPromos] = useState([]);
@@ -75,12 +113,14 @@ export default function TaoDonWizard() {
   useEffect(() => { if (!loading) supabase.from("promotions").select("*").eq("status", "Đang áp dụng").then(({ data }) => setPromos(data || [])); }, [loading]);
 
   const vehicleObj = vehicles.find((v) => v.id === picked?.vehicle_id);
-  useEffect(() => { setBangGiaCu(true); }, [promoChon, giaXe, ngayLayGia, coc]);
+  const giaXe = vehicleObj?.list_price || 0;
+  // Luu y: KHONG dua coc vao day — coc doi khong lam thay doi KM nao ap
+  // dung hay so tien cua tung KM, chi tru vao "con lai" hien thi truc tiep
+  // o client (xem BangGiaPanel) — khong can goi lai RPC/danh dau cu.
+  useEffect(() => { setBangGiaCu(true); }, [promoChon, giaXe, ngayLayGia]);
 
   const chonXe = async (u) => {
     setPicked(u);
-    const v = vehicles.find((x) => x.id === u.vehicle_id);
-    setGiaXe(v?.list_price || 0);
     setBatteryOption("");
     setPromoChon([]); setBangGia(null); setBangGiaLoi(""); setBangGiaCu(true);
     if (u.status === "GIU_CHO") {
@@ -94,7 +134,7 @@ export default function TaoDonWizard() {
   const timXeTheoModel = async (vehicleId) => {
     setModelChon(vehicleId);
     if (!vehicleId) { setXeTheoModel([]); return; }
-    const { data } = await supabase.from("vehicle_units").select("frame_number, location_code, status")
+    const { data } = await supabase.from("vehicle_units").select("frame_number, vehicle_id, location_code, status")
       .eq("vehicle_id", vehicleId).in("status", ["TON_KHO", "GIU_CHO"]).order("frame_number");
     setXeTheoModel(data || []);
   };
@@ -251,7 +291,7 @@ export default function TaoDonWizard() {
                       {xeTheoModel.length === 0 && <div className="text-xs text-[#8A93A0] py-2">Không còn xe sẵn sàng bán ở model này.</div>}
                       {xeTheoModel.map((u) => (
                         <label key={u.frame_number} className={`flex items-center gap-2 text-xs px-2 py-1.5 rounded-lg cursor-pointer hover:bg-[#F8FAFC] ${picked?.frame_number === u.frame_number ? "bg-[#EAF2FF]" : ""}`}>
-                          <input type="radio" name="xe" checked={picked?.frame_number === u.frame_number} onChange={() => chonXe(u)} />
+                          <input type="radio" name="xe" checked={picked?.frame_number === u.frame_number} onChange={() => chonXe({ ...u, vehicle_id: u.vehicle_id || modelChon })} />
                           <span className="font-mono font-bold">{u.frame_number}</span>
                           <span className="text-[#8A93A0]">{locName(u.location_code)}</span>
                           {u.status === "GIU_CHO" && <Badge tone="amber">Đang giữ chỗ</Badge>}
@@ -266,7 +306,10 @@ export default function TaoDonWizard() {
                   <div className="font-bold">{vehicleObj ? `${vehicleObj.brand} · ${vehicleObj.name} · ${vehicleObj.color}` : picked.vehicle_id}</div>
                   <div className="font-mono text-[11px] text-[#8A93A0]">SK {picked.frame_number} · {locName(picked.location_code)}</div>
                   {coc > 0 && <div className="text-[12px] text-[#A25F00] font-bold mt-1">🔒 Đã nhận cọc {fmtVND(coc)}</div>}
-                  <Field label="Giá niêm yết (có thể sửa)" required><MoneyInput value={giaXe} onChange={setGiaXe} /></Field>
+                  <Field label="Giá niêm yết">
+                    <div className="inp bg-[#F3F5F8] font-bold text-[15px]">{fmtVND(giaXe)}</div>
+                  </Field>
+                  {giaXe === 0 && <div className="text-[11px] text-danger -mt-2 mb-2">Xe này chưa có giá niêm yết trong danh mục xe — vào Danh mục xe cập nhật trước.</div>}
                   {vehicleObj?.model_pin === "Xe đổi pin" && (
                     <Field label="Hình thức kinh doanh pin" required>
                       <select className="inp" value={batteryOption} onChange={(e) => setBatteryOption(e.target.value)}>
@@ -314,74 +357,47 @@ export default function TaoDonWizard() {
             )}
           </div>
 
-          <div className="card self-start">
-            <div className="font-extrabold mb-2.5">💰 Bảng giá</div>
-            {!picked ? (
-              <div className="text-xs text-[#8A93A0]">Chọn xe để xem bảng giá.</div>
-            ) : (
-              <>
-                {bangGiaCu && (
-                  <div className="flex items-center gap-2 p-2.5 rounded-lg bg-[#FFF8E5] text-[#A25F00] text-[12.5px] mb-3">
-                    ⚠ Bạn vừa thay đổi ưu đãi/giá — bấm "Làm mới" để cập nhật Bảng giá.
-                  </div>
-                )}
-                {bangGiaLoi && <div className="p-2.5 rounded-lg bg-[#FDE8EA] text-[#B01E2C] text-[12.5px] mb-3">{bangGiaLoi}</div>}
-                <button className="btn-primary !text-xs w-full mb-3" disabled={busy} onClick={tinhBangGia}>{busy ? "Đang tính…" : "🔄 Làm mới Bảng giá"}</button>
-                {bangGia && (
-                  <div className="rounded-xl border border-[#E3E8EF] overflow-hidden text-[13px]">
-                    <div className="flex justify-between px-3 py-2 border-b border-dashed border-[#E3E8EF]"><span className="text-[#5A6572]">Giá niêm yết</span><b>{fmtVND(bangGia.gia_xe)}</b></div>
-                    {(bangGia.khuyen_mai || []).map((k) => (
-                      <div key={k.id} className="flex justify-between px-3 py-1.5 border-b border-dashed border-[#F0F2F5] text-[12px]">
-                        <span className="text-[#5A6572]">🏷 {k.name} <span className="text-[10.5px]">({KIND_LABELS[k.kind]})</span></span>
-                        <span className={k.amount > 0 ? "text-danger font-semibold" : "text-[#8A93A0]"}>{k.amount > 0 ? `-${fmtVND(k.amount)}` : "—"}</span>
-                      </div>
-                    ))}
-                    <div className="flex justify-between px-3 py-2 border-b border-dashed border-[#E3E8EF] bg-[#EAF2FF]"><span className="font-bold">Giá cần thanh toán</span><b className="text-brand">{fmtVND(bangGia.gia_can_thanh_toan)}</b></div>
-                    <div className="flex justify-between px-3 py-2 border-b border-dashed border-[#E3E8EF]"><span className="text-[#5A6572]">Tổng tiền xuất hóa đơn</span><b>{fmtVND(bangGia.tong_xuat_hd)}</b></div>
-                    {bangGia.so_tien_coc > 0 && <div className="flex justify-between px-3 py-2 border-b border-dashed border-[#E3E8EF]"><span className="text-[#5A6572]">Đã đặt cọc</span><span>{fmtVND(bangGia.so_tien_coc)}</span></div>}
-                    <div className="flex justify-between px-3 py-2.5 bg-[#FFF6E5]"><span className="font-bold">Còn lại phải thu</span><b className="text-[18px] text-[#A25F00]">{fmtVND(bangGia.con_lai)}</b></div>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
+          <BangGiaPanel picked={picked} bangGiaCu={bangGiaCu} bangGiaLoi={bangGiaLoi} busy={busy} tinhBangGia={tinhBangGia} bangGia={bangGia} coc={coc} />
         </div>
       )}
 
       {/* ===== BƯỚC 3 ===== */}
       {step === 3 && (
         <div className="grid gap-4 lg:grid-cols-2">
-          <div className="card">
-            <div className="font-extrabold mb-2.5">Hình thức thanh toán</div>
-            <div className="flex gap-2 mb-3">
-              <button className={`btn-ghost !text-xs ${hinhThucTT === "thang" ? "!bg-brand !text-white" : ""}`} onClick={() => setHinhThucTT("thang")}>Trả thẳng</button>
-              <button className={`btn-ghost !text-xs ${hinhThucTT === "gop" ? "!bg-brand !text-white" : ""}`} onClick={() => setHinhThucTT("gop")}>Trả góp</button>
-            </div>
-            {hinhThucTT === "gop" && (
-              <div className="flex flex-col gap-2.5 p-3 rounded-xl bg-[#FDF6E3] mb-3">
-                <Field label="Đơn vị trả góp" required>
-                  <select className="inp" value={donViTraGop} onChange={(e) => setDonViTraGop(e.target.value)}>
-                    <option value="">— Chọn đơn vị —</option>
-                    {(settings?.cong_ty_tra_gop || "Home Credit\nShinhanbank\nHD Saison\nFE Credit").split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean).map((x) => <option key={x}>{x}</option>)}
-                  </select>
-                </Field>
-                <Field label="Số tiền vay"><MoneyInput value={soTienVay} onChange={setSoTienVay} /></Field>
+          <div className="flex flex-col gap-4">
+            <div className="card">
+              <div className="font-extrabold mb-2.5">Hình thức thanh toán</div>
+              <div className="flex gap-2 mb-3">
+                <button className={`btn-ghost !text-xs ${hinhThucTT === "thang" ? "!bg-brand !text-white" : ""}`} onClick={() => setHinhThucTT("thang")}>Trả thẳng</button>
+                <button className={`btn-ghost !text-xs ${hinhThucTT === "gop" ? "!bg-brand !text-white" : ""}`} onClick={() => setHinhThucTT("gop")}>Trả góp</button>
               </div>
-            )}
-            <Field label="Số tiền khách đã đặt cọc"><MoneyInput value={coc} onChange={setCoc} /></Field>
-            {bangGia && <div className="text-[12.5px] text-[#5A6572]">Dựa trên Bảng giá ở Bước 2, khách còn phải thu: <b className="text-[#A25F00]">{fmtVND(Math.max((bangGia.gia_can_thanh_toan || 0) - (Number(coc) || 0), 0))}</b></div>}
+              {hinhThucTT === "gop" && (
+                <div className="flex flex-col gap-2.5 p-3 rounded-xl bg-[#FDF6E3] mb-3">
+                  <Field label="Đơn vị trả góp" required>
+                    <select className="inp" value={donViTraGop} onChange={(e) => setDonViTraGop(e.target.value)}>
+                      <option value="">— Chọn đơn vị —</option>
+                      {(settings?.cong_ty_tra_gop || "Home Credit\nShinhanbank\nHD Saison\nFE Credit").split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean).map((x) => <option key={x}>{x}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="Số tiền vay"><MoneyInput value={soTienVay} onChange={setSoTienVay} /></Field>
+                </div>
+              )}
+              <Field label="Số tiền khách đã đặt cọc"><MoneyInput value={coc} onChange={setCoc} /></Field>
+            </div>
+
+            <div className="card">
+              <div className="font-extrabold mb-2.5">Thông tin xuất hóa đơn</div>
+              <div className="flex flex-col gap-2.5">
+                <Field label="Số điện thoại"><input className="inp" value={hd.phone} onChange={(e) => setHd((p) => ({ ...p, phone: e.target.value }))} /></Field>
+                <Field label="Email"><input className="inp" value={hd.email} onChange={(e) => setHd((p) => ({ ...p, email: e.target.value }))} /></Field>
+                <Field label="Tỉnh / Thành phố"><input className="inp" value={hd.tinh_tp} onChange={(e) => setHd((p) => ({ ...p, tinh_tp: e.target.value }))} /></Field>
+                <Field label="Phường / Xã"><input className="inp" value={hd.phuong_xa} onChange={(e) => setHd((p) => ({ ...p, phuong_xa: e.target.value }))} /></Field>
+                <Field label="Địa chỉ chi tiết"><input className="inp" value={hd.dia_chi} onChange={(e) => setHd((p) => ({ ...p, dia_chi: e.target.value }))} /></Field>
+              </div>
+            </div>
           </div>
 
-          <div className="card">
-            <div className="font-extrabold mb-2.5">Thông tin xuất hóa đơn</div>
-            <div className="flex flex-col gap-2.5">
-              <Field label="Số điện thoại"><input className="inp" value={hd.phone} onChange={(e) => setHd((p) => ({ ...p, phone: e.target.value }))} /></Field>
-              <Field label="Email"><input className="inp" value={hd.email} onChange={(e) => setHd((p) => ({ ...p, email: e.target.value }))} /></Field>
-              <Field label="Tỉnh / Thành phố"><input className="inp" value={hd.tinh_tp} onChange={(e) => setHd((p) => ({ ...p, tinh_tp: e.target.value }))} /></Field>
-              <Field label="Phường / Xã"><input className="inp" value={hd.phuong_xa} onChange={(e) => setHd((p) => ({ ...p, phuong_xa: e.target.value }))} /></Field>
-              <Field label="Địa chỉ chi tiết"><input className="inp" value={hd.dia_chi} onChange={(e) => setHd((p) => ({ ...p, dia_chi: e.target.value }))} /></Field>
-            </div>
-          </div>
+          <BangGiaPanel picked={picked} bangGiaCu={bangGiaCu} bangGiaLoi={bangGiaLoi} busy={busy} tinhBangGia={tinhBangGia} bangGia={bangGia} coc={coc} />
         </div>
       )}
 
@@ -420,7 +436,7 @@ export default function TaoDonWizard() {
                   <div className="flex justify-between px-3 py-2 border-b border-dashed border-[#E3E8EF]"><span className="text-[#5A6572]">Giá niêm yết</span><b>{fmtVND(bangGia.gia_xe)}</b></div>
                   <div className="flex justify-between px-3 py-2 border-b border-dashed border-[#E3E8EF] bg-[#EAF2FF]"><span className="font-bold">Giá cần thanh toán</span><b className="text-brand">{fmtVND(bangGia.gia_can_thanh_toan)}</b></div>
                   <div className="flex justify-between px-3 py-2 border-b border-dashed border-[#E3E8EF]"><span className="text-[#5A6572]">Tổng xuất hóa đơn</span><b>{fmtVND(bangGia.tong_xuat_hd)}</b></div>
-                  <div className="flex justify-between px-3 py-2.5 bg-[#FFF6E5]"><span className="font-bold">Còn lại phải thu</span><b className="text-[18px] text-[#A25F00]">{fmtVND(bangGia.con_lai)}</b></div>
+                  <div className="flex justify-between px-3 py-2.5 bg-[#FFF6E5]"><span className="font-bold">Còn lại phải thu</span><b className="text-[18px] text-[#A25F00]">{fmtVND(Math.max((bangGia.gia_can_thanh_toan || 0) - (Number(coc) || 0), 0))}</b></div>
                 </div>
               )}
             </div>
