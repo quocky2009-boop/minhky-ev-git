@@ -142,7 +142,7 @@ export default function AppShell({ profile, children }) {
           <GlobalSearch />
           <div className="text-xs text-[#8A93A0] whitespace-nowrap hidden md:block">{new Date().toLocaleDateString("vi-VN")}</div>
         </header>
-        <div className="p-5 max-w-[1180px] mx-auto pb-16">{children}</div>
+        <div className="p-5 pb-16">{children}</div>
       </main>
     </div>
   );
