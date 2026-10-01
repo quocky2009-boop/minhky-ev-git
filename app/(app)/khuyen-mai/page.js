@@ -1,12 +1,25 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Field, Badge, Toast, Pager, pageSlice, useSortable, Th } from "@/components/ui";
-import { fmtDate, errMsg } from "@/lib/format";
+import { Field, Badge, Toast, Pager, pageSlice, useSortable, Th, MoneyInput } from "@/components/ui";
+import { fmtDate, fmtVND, errMsg } from "@/lib/format";
 
 const iso = (d) => d.toLocaleDateString("sv-SE");
-const empty = { brand: "VinFast", name: "", vehicle_names: [], start_date: iso(new Date()), end_date: iso(new Date()), note: "", status: "Đang áp dụng", battery_options: [] };
+const empty = { brand: "VinFast", name: "", vehicle_names: [], start_date: iso(new Date()), end_date: iso(new Date()), note: "", status: "Đang áp dụng", battery_options: [],
+  kind: "GIAM_GIA", value_type: "amount", value: 0, percent_base: "list", apply_order: 100, no_stack: false };
 const BATTERY_OPTIONS = ["Kèm pin", "Thuê pin"];
+const KIND_LABELS = {
+  GIAM_GIA: "Giảm giá — trừ cả giá thanh toán & hóa đơn",
+  QUY_DOI_TIEN_MAT: "Quy đổi tiền mặt — chỉ trừ giá thanh toán, HĐ giữ nguyên",
+  HO_TRO_SAU_BAN: "Hỗ trợ sau bán — không trừ tiền (quà tặng/dịch vụ)",
+};
+const uuDaiLabel = (r) => {
+  if (r.kind === "HO_TRO_SAU_BAN") return "Hỗ trợ sau bán";
+  const gt = r.value_type === "percent"
+    ? `-${r.value}%${r.percent_base === "after_other" ? " giá sau KM khác" : ""}`
+    : `-${fmtVND(r.value)}`;
+  return r.kind === "QUY_DOI_TIEN_MAT" ? `${gt} (quy đổi)` : gt;
+};
 
 export default function KhuyenMai() {
   const { supabase, vehicles, brands, profile, loading, refresh } = useCatalog();
@@ -41,11 +54,18 @@ export default function KhuyenMai() {
 
   const openNew = () => { setEditId(null); setF(empty); setShow(true); };
   const openEdit = (r) => { setEditId(r.id); setF({ brand: r.brand, name: r.name, vehicle_names: r.vehicle_names || [],
-    start_date: r.start_date, end_date: r.end_date, note: r.note || "", status: r.status, battery_options: r.battery_options || [] }); setShow(true); };
+    start_date: r.start_date, end_date: r.end_date, note: r.note || "", status: r.status, battery_options: r.battery_options || [],
+    kind: r.kind || "GIAM_GIA", value_type: r.value_type || "amount", value: r.value ?? 0,
+    percent_base: r.percent_base || "list", apply_order: r.apply_order ?? 100, no_stack: r.no_stack || false }); setShow(true); };
 
   const luu = async () => {
     if (!f.name.trim()) return notify("Nhập tên chương trình.", "err");
     if (!f.brand) return notify("Chọn hãng áp dụng.", "err");
+    if (f.kind !== "HO_TRO_SAU_BAN") {
+      const v = Number(f.value) || 0;
+      if (v <= 0) return notify("Nhập giá trị ưu đãi lớn hơn 0 (hoặc chọn loại Hỗ trợ sau bán nếu không trừ tiền).", "err");
+      if (f.value_type === "percent" && v > 100) return notify("Phần trăm ưu đãi không được vượt quá 100%.", "err");
+    }
     setBusy(true);
     const { error } = await supabase.rpc("fn_luu_khuyen_mai", { p: { id: editId, ...f } });
     setBusy(false);
@@ -89,6 +109,45 @@ export default function KhuyenMai() {
             </Field>
             <Field label="Từ ngày" required><input type="date" className="inp" value={f.start_date} onChange={(e) => set("start_date", e.target.value)} /></Field>
             <Field label="Đến ngày" required><input type="date" className="inp" value={f.end_date} onChange={(e) => set("end_date", e.target.value)} /></Field>
+            <Field label="Loại ưu đãi" required>
+              <select className="inp" value={f.kind} onChange={(e) => set("kind", e.target.value)}>
+                {Object.entries(KIND_LABELS).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+              </select>
+            </Field>
+            {f.kind !== "HO_TRO_SAU_BAN" && (<>
+              <Field label="Kiểu giá trị" required>
+                <select className="inp" value={f.value_type} onChange={(e) => set("value_type", e.target.value)}>
+                  <option value="amount">Số tiền</option>
+                  <option value="percent">Phần trăm (%)</option>
+                </select>
+              </Field>
+              {f.value_type === "percent" ? (
+                <Field label="Giá trị (%)" required>
+                  <input type="number" min="0" max="100" className="inp" value={f.value} onChange={(e) => set("value", e.target.value)} />
+                </Field>
+              ) : (
+                <Field label="Giá trị (đ)" required>
+                  <MoneyInput className="inp" value={f.value} onChange={(v) => set("value", v)} />
+                </Field>
+              )}
+              {f.value_type === "percent" && (
+                <Field label="Cơ sở tính %" required>
+                  <select className="inp" value={f.percent_base} onChange={(e) => set("percent_base", e.target.value)}>
+                    <option value="list">Giá niêm yết</option>
+                    <option value="after_other">Giá niêm yết đã trừ KM đứng trước</option>
+                  </select>
+                </Field>
+              )}
+              <Field label="Thứ tự áp dụng" required>
+                <input type="number" className="inp" value={f.apply_order} onChange={(e) => set("apply_order", e.target.value)} placeholder="Nhỏ áp trước, mặc định 100" />
+              </Field>
+              <div className="flex items-end pb-2.5">
+                <label className="flex items-center gap-1.5 text-xs font-medium cursor-pointer">
+                  <input type="checkbox" className="w-4 h-4" checked={f.no_stack} onChange={(e) => set("no_stack", e.target.checked)} />
+                  Không cộng dồn (chỉ được chọn một mình, không dùng kèm CT khác)
+                </label>
+              </div>
+            </>)}
             <div className="md:col-span-3 sm:col-span-2">
               <label className="lbl">Tên xe (Model) áp dụng — bỏ trống = áp dụng mọi model của hãng</label>
               <div className="flex flex-wrap gap-1.5 p-2 rounded-lg border border-[#E3E8EF]">
@@ -132,6 +191,7 @@ export default function KhuyenMai() {
             <Th label="Mã CT" k="code" sort={sort} />
             <Th label="Tên chương trình" k="name" sort={sort} />
             <Th label="Hãng" k="brand" sort={sort} />
+            <th className="th">Ưu đãi</th>
             <th className="th">Model áp dụng</th>
             <th className="th">Pin áp dụng</th>
             <Th label="Từ ngày" k="tu" sort={sort} />
@@ -144,6 +204,7 @@ export default function KhuyenMai() {
               <td className="td font-bold text-brand">{r.code}</td>
               <td className="td">{r.name}</td>
               <td className="td text-[13px]">{r.brand}</td>
+              <td className="td text-[13px] font-semibold text-brand whitespace-nowrap" title={KIND_LABELS[r.kind] || ""}>{uuDaiLabel(r)}</td>
               <td className="td text-[12px]">{(r.vehicle_names || []).length === 0 ? <span className="text-[#8A93A0]">Mọi model</span> : r.vehicle_names.join(", ")}</td>
               <td className="td text-[12px]">{(r.battery_options || []).length === 0 ? <span className="text-[#8A93A0]">Mọi hình thức</span> : r.battery_options.join(", ")}</td>
               <td className="td text-xs">{fmtDate(r.start_date)}</td>
@@ -152,7 +213,7 @@ export default function KhuyenMai() {
               {canQuan && <td className="td"><button className="btn-ghost !px-2 !py-1 !text-xs" onClick={() => openEdit(r)}>Sửa</button></td>}
             </tr>
           ))}
-          {sorted.length === 0 && <tr><td className="td" colSpan={9}>Chưa có chương trình khuyến mại nào.</td></tr>}
+          {sorted.length === 0 && <tr><td className="td" colSpan={10}>Chưa có chương trình khuyến mại nào.</td></tr>}
           </tbody>
         </table></div>
         <Pager total={sorted.length} page={page} setPage={setPage} pageSize={20} setPageSize={() => {}} />
