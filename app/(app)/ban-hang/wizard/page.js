@@ -128,7 +128,8 @@ function TaoDonWizardInner() {
   }, [loading]);
 
   const vehicleObj = vehicles.find((v) => v.id === picked?.vehicle_id);
-  const giaXe = giaGoc ?? (vehicleObj?.list_price || 0);
+  const giaTheoPin = vehicleObj?.model_pin === "Xe đổi pin" && batteryOption === "Thuê pin" ? (vehicleObj?.list_price_thue_pin || 0) : (vehicleObj?.list_price || 0);
+  const giaXe = giaGoc ?? giaTheoPin;
   // Bang gia "cu" khi lua chon hien tai khac lua chon luc tinh (so sanh theo gia tri)
   const keyHienTai = JSON.stringify([[...promoChon].sort(), giaXe, ngayLayGia, batteryOption]);
   const bangGiaCu = bangGiaKey !== keyHienTai;
@@ -266,6 +267,7 @@ function TaoDonWizardInner() {
   const locName = (c) => locations.find((l) => l.code === c)?.name || c || "—";
   const canNext1 = kh.customer_name && kh.customer_phone;
   const canNext2 = picked && Number(giaXe) > 0 && !bangGiaCu && bangGia;
+  const thieuHD = !hd.tinh_tp ? "Tỉnh / Thành phố" : !hd.phuong_xa ? "Phường / Xã" : !hd.dia_chi.trim() ? "Địa chỉ chi tiết" : "";
 
   const canhBaoMotPTTT = () => {
     const cacDong = pays.filter((p) => Number(p.amount) > 0);
@@ -278,6 +280,7 @@ function TaoDonWizardInner() {
     if (!picked) return notify("Chưa chọn xe.", "err");
     if (!bangGia || bangGiaCu) return notify('Bảng giá chưa cập nhật — quay lại Bước 2 bấm "Làm mới Bảng giá".', "err");
     if (!diemBan) return notify("Chọn điểm bán.", "err");
+    if (thieuHD) return notify(`Thông tin xuất hóa đơn: bắt buộc nhập "${thieuHD}".`, "err");
     if (vehicleObj?.model_pin === "Xe đổi pin" && !batteryOption) return notify("Xe Đổi pin bắt buộc chọn Hình thức kinh doanh pin.", "err");
     const tgThieu = pays.find((p) => p.method === "Trả góp" && Number(p.amount) > 0 && !p.tra_gop_ct);
     if (tgThieu) return notify("Chọn đơn vị trả góp.", "err");
@@ -385,7 +388,6 @@ function TaoDonWizardInner() {
     <div className="flex flex-col gap-4 pb-10">
       <Toast toast={toast} />
       <div className="flex items-center gap-2 flex-wrap">
-        <Link href="/ban-hang?new=1" className="btn-ghost !text-xs" title="Chọn nhiều xe trong 1 đơn, tự tách thành từng đơn theo từng xe">Tạo đơn bán buôn (nhiều xe) →</Link>
         <div className="font-extrabold text-lg mr-auto">{suaId ? `Sửa đơn bán ${suaCode}` : "Tạo đơn bán — Wizard 4 bước"}</div>
       </div>
 
@@ -510,13 +512,13 @@ function TaoDonWizardInner() {
                   <div className="font-bold">{vehicleObj ? `${vehicleObj.brand} · ${vehicleObj.name} · ${vehicleObj.color}` : picked.vehicle_id}</div>
                   <div className="font-mono text-[11px] text-[#8A93A0]">SK {picked.frame_number} · {locName(picked.location_code)}</div>
                   {coc > 0 && <div className="text-[12px] text-[#A25F00] font-bold mt-1">{suaId ? "🔒 Đã thu trước đó" : "🔒 Đã nhận cọc"} {fmtVND(coc)}</div>}
-                  <Field label="Giá niêm yết">
+                  <Field label={vehicleObj?.model_pin === "Xe đổi pin" && batteryOption ? `Giá niêm yết (${batteryOption})` : "Giá niêm yết"}>
                     <div className="inp bg-[#F3F5F8] font-bold text-[15px]">{fmtVND(giaXe)}</div>
                   </Field>
-                  {giaXe === 0 && <div className="text-[11px] text-danger -mt-2 mb-2">Xe này chưa có giá niêm yết trong danh mục xe — vào Danh mục xe cập nhật trước.</div>}
+                  {giaXe === 0 && <div className="text-[11px] text-danger -mt-2 mb-2">{vehicleObj?.model_pin === "Xe đổi pin" && batteryOption === "Thuê pin" ? "Xe này chưa có giá niêm yết Thuê pin — vào Danh mục xe → Sửa xe để nhập." : "Xe này chưa có giá niêm yết trong danh mục xe — vào Danh mục xe cập nhật trước."}</div>}
                   {vehicleObj?.model_pin === "Xe đổi pin" && (
                     <Field label="Hình thức kinh doanh pin" required>
-                      <select className="inp" value={batteryOption} onChange={(e) => setBatteryOption(e.target.value)}>
+                      <select className="inp" value={batteryOption} onChange={(e) => { setBatteryOption(e.target.value); setGiaGoc(null); }}>
                         <option value="">— Chọn —</option><option value="Kèm pin">Kèm pin</option><option value="Thuê pin">Thuê pin</option>
                       </select>
                     </Field>
@@ -657,26 +659,27 @@ function TaoDonWizardInner() {
             <div className="card">
               <div className="font-extrabold mb-2.5">Thông tin xuất hóa đơn</div>
               <div className="flex flex-col gap-2.5">
-                <Field label="Tỉnh / Thành phố">
+                <Field label="Tỉnh / Thành phố" required>
                   <select className="inp" value={hd.tinh_tp} onChange={(e) => setHd((p) => ({ ...p, tinh_tp: e.target.value, phuong_xa: "" }))} disabled={tinhList.length === 0}>
                     <option value="">{tinhList.length === 0 ? "— Chưa cấu hình (vào Cài đặt) —" : "— Chọn —"}</option>
                     {tinhList.map((t) => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </Field>
-                <Field label="Phường / Xã">
+                <Field label="Phường / Xã" required>
                   <select className="inp" value={hd.phuong_xa} onChange={(e) => setHd((p) => ({ ...p, phuong_xa: e.target.value }))} disabled={!hd.tinh_tp || phuongList.length === 0}>
                     <option value="">{!hd.tinh_tp ? "— Chọn Tỉnh/TP trước —" : phuongList.length === 0 ? "— Chưa có Phường/Xã nào —" : "— Chọn —"}</option>
                     {phuongList.map((p) => <option key={p} value={p}>{p}</option>)}
                   </select>
                 </Field>
-                <Field label="Địa chỉ chi tiết"><input className="inp" value={hd.dia_chi} onChange={(e) => setHd((p) => ({ ...p, dia_chi: e.target.value }))} /></Field>
+                <Field label="Địa chỉ chi tiết" required><input className="inp" value={hd.dia_chi} onChange={(e) => setHd((p) => ({ ...p, dia_chi: e.target.value }))} /></Field>
               </div>
             </div>
 
-            {cfields.length > 0 && (
+            {(cfields.length > 0 || !suaId) && (
               <div className="card">
                 <div className="font-extrabold mb-2.5">Thông tin bổ sung</div>
                 <div className="flex flex-col gap-2.5">
+                  {!suaId && <Field label="Ghi chú" hint="Ghi chú thêm cho đơn (cùng nội dung với ô Ghi chú ở Bước 1)."><textarea className="inp !h-20" value={ghiChu1} onChange={(e) => setGhiChu1(e.target.value)} placeholder="Nhập ghi chú nếu cần…" /></Field>}
                   {cfields.map((c) => {
                     if (c.field_type === "dropdown") return <Field key={c.id} label={c.label} required={c.required}>
                       <select className="inp" value={extra[c.field_key] || ""} onChange={(e) => setExtra((p) => ({ ...p, [c.field_key]: e.target.value }))}>
@@ -766,6 +769,7 @@ function TaoDonWizardInner() {
             <button className="btn-primary" disabled={(step === 1 && !canNext1) || (step === 2 && !canNext2)}
               onClick={() => {
                 if (step === 1 && !canNext1) return notify("Chọn hoặc nhập khách hàng.", "err");
+                if (step === 3 && thieuHD) return notify(`Thông tin xuất hóa đơn: bắt buộc nhập "${thieuHD}".`, "err");
                 if (step === 2 && !canNext2) return notify("Chọn xe và bấm \"Làm mới Bảng giá\" trước khi tiếp tục.", "err");
                 setStep(step + 1);
               }}>Tiếp theo →</button>

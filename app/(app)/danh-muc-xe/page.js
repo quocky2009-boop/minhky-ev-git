@@ -22,7 +22,7 @@ export default function DMXe() {
     tam_hoat_dong_km: "", toc_do_toi_da_kmh: "", so_luong_pin_ac_quy: "", model_pin: "" });
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
-  const empty = { brand: "VinFast", name: "", color: "", mfr_code: "", list_price: "", min_stock: 2,
+  const empty = { brand: "VinFast", name: "", color: "", mfr_code: "", list_price: "", list_price_thue_pin: "", min_stock: 2,
     cong_suat_dong_co_w: "", dung_luong_pin: "", tam_hoat_dong_km: "", toc_do_toi_da_kmh: "",
     so_luong_pin_ac_quy: "", model_pin: "" };
   const [f, setF] = useState(empty);
@@ -84,7 +84,7 @@ export default function DMXe() {
   const startEdit = (v) => {
     setNewId("");
     setEditId(v.id);
-    setF({ brand: v.brand, name: v.name, color: v.color, mfr_code: v.mfr_code || "", list_price: v.list_price, min_stock: v.min_stock,
+    setF({ brand: v.brand, name: v.name, color: v.color, mfr_code: v.mfr_code || "", list_price: v.list_price, list_price_thue_pin: v.list_price_thue_pin ?? "", min_stock: v.min_stock,
       cong_suat_dong_co_w: v.cong_suat_dong_co_w ?? "", dung_luong_pin: v.dung_luong_pin || "",
       tam_hoat_dong_km: v.tam_hoat_dong_km ?? "", toc_do_toi_da_kmh: v.toc_do_toi_da_kmh ?? "",
       so_luong_pin_ac_quy: v.so_luong_pin_ac_quy ?? "", model_pin: v.model_pin || "" });
@@ -99,6 +99,8 @@ export default function DMXe() {
       toc_do_toi_da_kmh: f.toc_do_toi_da_kmh === "" ? null : Number(f.toc_do_toi_da_kmh),
       so_luong_pin_ac_quy: f.so_luong_pin_ac_quy === "" ? null : Number(f.so_luong_pin_ac_quy) } });
     if (error) return notify(errMsg(error), "err");
+    const { error: eg } = await supabase.rpc("fn_set_gia_thue_pin", { p_id: editId, p_gia: f.model_pin === "Xe đổi pin" ? Number(f.list_price_thue_pin) || 0 : 0 });
+    if (eg) return notify("Đã lưu xe nhưng lỗi lưu giá Thuê pin: " + errMsg(eg), "err");
     notify("Đã cập nhật thông tin xe.");
     setF(empty); setEditId(null); setShow(false); refresh();
   };
@@ -111,6 +113,9 @@ export default function DMXe() {
       tam_hoat_dong_km: f.tam_hoat_dong_km === "" ? null : Number(f.tam_hoat_dong_km),
       toc_do_toi_da_kmh: f.toc_do_toi_da_kmh === "" ? null : Number(f.toc_do_toi_da_kmh),
       so_luong_pin_ac_quy: f.so_luong_pin_ac_quy === "" ? null : Number(f.so_luong_pin_ac_quy) } });
+    if (!error && f.model_pin === "Xe đổi pin" && Number(f.list_price_thue_pin) > 0) {
+      await supabase.rpc("fn_set_gia_thue_pin", { p_id: data, p_gia: Number(f.list_price_thue_pin) });
+    }
     setBusy(false);
     if (error) return notify(errMsg(error), "err");
     notify(`Đã thêm xe với mã chuẩn: ${data}`);
@@ -351,7 +356,10 @@ export default function DMXe() {
               <ComboFree value={f.color} onChange={(v) => set("color", v)} options={goiYMau} placeholder="Gõ để tìm hoặc tạo mới, VD: Xanh Oliu" />
             </Field>
             <Field label="Mã hãng"><input className="inp" value={f.mfr_code} onChange={(e) => set("mfr_code", e.target.value)} /></Field>
-            <Field label="Giá niêm yết"><MoneyInput value={f.list_price} onChange={(v) => set("list_price", v)} /></Field>
+            <Field label={f.model_pin === "Xe đổi pin" ? "Giá niêm yết — Kèm pin" : "Giá niêm yết"}><MoneyInput value={f.list_price} onChange={(v) => set("list_price", v)} /></Field>
+            {f.model_pin === "Xe đổi pin" && (
+              <Field label="Giá niêm yết — Thuê pin" hint="Đơn bán chọn Thuê pin sẽ lấy giá này."><MoneyInput value={f.list_price_thue_pin} onChange={(v) => set("list_price_thue_pin", v)} /></Field>
+            )}
             <Field label="Tồn tối thiểu"><input type="number" className="inp" value={f.min_stock} onChange={(e) => set("min_stock", e.target.value)} /></Field>
           </div>
           <div className="font-bold text-xs text-[#5A6572] mt-3 mb-1.5">Thông số kỹ thuật (hiển thị cho Bot Minh Trí tra cứu)</div>
@@ -414,7 +422,7 @@ export default function DMXe() {
                 <td className="td text-xs">{v.id}</td><td className="td text-xs">{v.mfr_code || "—"}</td>
                 <td className="td"><Badge tone={v.brand === "VinFast" ? "blue" : "purple"}>{v.brand}</Badge></td>
                 <td className="td font-bold">{v.name}</td><td className="td">{v.color}</td>
-                <td className="td">{fmtVND(v.list_price)}</td><td className="td">{v.min_stock}</td><td className="td font-bold">{qty}</td>
+                <td className="td">{fmtVND(v.list_price)}{v.model_pin === "Xe đổi pin" && <div className="text-[10.5px] text-[#8A93A0]">Thuê pin: {v.list_price_thue_pin ? fmtVND(v.list_price_thue_pin) : "chưa nhập"}</div>}</td><td className="td">{v.min_stock}</td><td className="td font-bold">{qty}</td>
                 <td className="td">{stockBadge(qty, v.min_stock)}</td>
                 <td className="td"><button className="btn-ghost !px-2.5 !py-1 !text-xs" onClick={() => startEdit(v)}>✎ Sửa</button></td>
               </tr>

@@ -48,6 +48,125 @@ const PERM_LIST = [
   ] },
 ];
 
+function WebhookCard({ supabase, settings, refresh, notify, title, keyName, testRpc, desc }) {
+  const [val, setVal] = useState(null);
+  const cur = settings[keyName] || "";
+  const save = async () => {
+    const v = val.trim();
+    if (v && !v.startsWith("https://discord.com/api/webhooks/") && !v.startsWith("https://discordapp.com/api/webhooks/"))
+      return notify("URL không đúng dạng webhook Discord (bắt đầu bằng https://discord.com/api/webhooks/...).", "err");
+    const { error } = await supabase.rpc("fn_set_setting", { p_key: keyName, p_value: v });
+    if (error) return notify(errMsg(error), "err");
+    notify(v ? "Đã lưu webhook. Bấm Gửi thử để kiểm tra." : "Đã tắt thông báo kênh này.");
+    setVal(null); refresh();
+  };
+  const test = async () => {
+    const { error } = await supabase.rpc(testRpc);
+    if (error) return notify(errMsg(error), "err");
+    notify("Đã gửi tin thử — kiểm tra channel Discord trong vài giây.");
+  };
+  return (
+    <div className="card">
+      <div className="font-extrabold mb-1">{title} {cur ? <Badge tone="green">Đang bật</Badge> : <Badge tone="gray">Chưa bật</Badge>}</div>
+      <p className="text-xs text-[#5A6572] mb-3">{desc} Tạo webhook trong đúng channel: chuột phải channel → Chỉnh sửa kênh → Tích hợp → Webhook → Tạo webhook → Sao chép URL. Chưa nhập thì <b>không gửi</b>.</p>
+      {val === null ? (
+        <div className="flex gap-2 items-center flex-wrap">
+          <span className="text-sm font-mono text-[#5A6572]">{cur ? cur.slice(0, 45) + "…" : "Chưa cấu hình webhook."}</span>
+          <button className="btn-ghost !py-1.5 !text-xs" onClick={() => setVal(cur)}>✎ {cur ? "Sửa" : "Thêm webhook"}</button>
+          {cur && <button className="btn-primary !py-1.5 !text-xs" onClick={test}>📨 Gửi thử</button>}
+        </div>
+      ) : (
+        <div className="max-w-xl">
+          <input className="inp font-mono !text-xs" placeholder="https://discord.com/api/webhooks/…" value={val} onChange={(e) => setVal(e.target.value)} />
+          <div className="flex gap-2 mt-2">
+            <button className="btn-ok !py-2 !text-xs" onClick={save}>Lưu</button>
+            <button className="btn-ghost !py-2 !text-xs" onClick={() => setVal(null)}>Hủy</button>
+            {cur && <button className="btn-danger !py-2 !text-xs" onClick={() => setVal("")}>Xóa URL (rồi bấm Lưu để tắt)</button>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const EMPTY_ACC = { id: null, name: "", type: "Ngân hàng", location_code: "", company_id: "", bank_info: "", opening_balance: 0, status: "Hoạt động" };
+function QuyTaiKhoan({ supabase, notify, locations }) {
+  const [accs, setAccs] = useState([]);
+  const [cos, setCos] = useState([]);
+  const [f, setF] = useState(null);
+  const load = async () => {
+    const [{ data: a }, { data: c }] = await Promise.all([
+      supabase.from("cash_accounts").select("*").order("type").order("name"),
+      supabase.from("companies").select("id,name").eq("status", "Hoạt động").order("name"),
+    ]);
+    setAccs(a || []); setCos(c || []);
+  };
+  useEffect(() => { load(); }, []);
+  const luu = async (acc) => {
+    const a = acc || f;
+    if (!a.name.trim()) return notify("Nhập tên tài khoản/quỹ.", "err");
+    if (a.type === "Ngân hàng" && !a.company_id) return notify("Tài khoản ngân hàng bắt buộc chọn Pháp nhân sở hữu.", "err");
+    const { error } = await supabase.rpc("fn_them_quy", { p: { ...a, company_id: a.company_id || "", location_code: a.location_code || "", opening_balance: Number(a.opening_balance) || 0 } });
+    if (error) return notify(errMsg(error), "err");
+    notify(acc ? (acc.status === "Hoạt động" ? "Đã mở lại tài khoản." : "Đã khóa tài khoản — không còn hiện khi chọn nơi nhận tiền.") : "Đã lưu tài khoản.");
+    setF(null); load();
+  };
+  const bank = accs.filter((a) => a.type === "Ngân hàng");
+  const coName = (id) => cos.find((c) => c.id === id)?.name || "—";
+  return (
+    <div className="card">
+      <div className="flex items-center mb-1">
+        <div className="font-extrabold mr-auto">Tài khoản nhận tiền (Ngân hàng) & Quỹ tiền mặt ({accs.length})</div>
+        <button className="btn-primary !py-1.5 !text-xs" onClick={() => setF({ ...EMPTY_ACC })}>+ Thêm tài khoản</button>
+      </div>
+      <p className="text-xs text-[#5A6572] mb-3">Danh sách này hiện ở ô "Tài khoản nhận tiền" khi lập đơn bán (lọc theo <b>pháp nhân của hãng xe</b>). Tài khoản đã phát sinh giao dịch thì <b>không xóa được</b> — dùng "Khóa" để ẩn. Số dư và chốt quỹ xem ở mục Tài chính → Thu chi.</p>
+      {f && (
+        <div className="bg-[#F8FAFC] rounded-xl p-3 mb-3">
+          <div className="grid gap-x-3 md:grid-cols-3 sm:grid-cols-2">
+            <Field label="Tên tài khoản / quỹ" required><input className="inp" value={f.name} onChange={(e) => setF((p) => ({ ...p, name: e.target.value }))} placeholder="VD: TK SHB Cty Ngân Thái Sơn" /></Field>
+            <Field label="Loại">
+              <select className="inp" disabled={!!f.id} value={f.type} onChange={(e) => setF((p) => ({ ...p, type: e.target.value, company_id: "", location_code: "" }))}>
+                <option>Ngân hàng</option><option>Tiền mặt</option>
+              </select>
+            </Field>
+            {f.type === "Ngân hàng" ? (
+              <Field label="Pháp nhân sở hữu" required>
+                <select className="inp" value={f.company_id || ""} onChange={(e) => setF((p) => ({ ...p, company_id: e.target.value }))}>
+                  <option value="">— Chọn pháp nhân —</option>
+                  {cos.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </Field>
+            ) : (
+              <Field label="Gắn với điểm">
+                <select className="inp" value={f.location_code || ""} onChange={(e) => setF((p) => ({ ...p, location_code: e.target.value }))}>
+                  <option value="">— Không gắn —</option>
+                  {locations.map((l) => <option key={l.code} value={l.code}>{l.name}</option>)}
+                </select>
+              </Field>
+            )}
+            <Field label="Thông tin ngân hàng (hiện cho nhân viên chọn)"><input className="inp" value={f.bank_info || ""} onChange={(e) => setF((p) => ({ ...p, bank_info: e.target.value }))} placeholder="VD: SHB 888999 - Cty Ngân Thái Sơn" /></Field>
+            {!f.id && <Field label="Số dư đầu kỳ"><MoneyInput value={f.opening_balance} onChange={(v) => setF((p) => ({ ...p, opening_balance: v || 0 }))} /></Field>}
+          </div>
+          <div className="flex gap-2"><button className="btn-ok !text-xs" onClick={() => luu()}>Lưu</button><button className="btn-ghost !text-xs" onClick={() => setF(null)}>Hủy</button></div>
+        </div>
+      )}
+      <div className="flex flex-col gap-1.5">
+        {[...bank, ...accs.filter((a) => a.type !== "Ngân hàng")].map((a) => (
+          <div key={a.id} className={`flex items-center gap-2 p-2 rounded-lg border text-[13px] flex-wrap ${a.status === "Hoạt động" ? "border-[#E3E8EF]" : "border-[#EEE] bg-[#FAFAFA] opacity-70"}`}>
+            <Badge tone={a.type === "Ngân hàng" ? "blue" : "amber"}>{a.type}</Badge>
+            <b className="mr-auto">{a.name}</b>
+            <span className="text-xs text-[#5A6572]">{a.type === "Ngân hàng" ? `${coName(a.company_id)}${a.bank_info ? " · " + a.bank_info : ""}` : (locations.find((l) => l.code === a.location_code)?.name || "")}</span>
+            {a.status !== "Hoạt động" && <Badge tone="dark">Đã khóa</Badge>}
+            <button className="btn-ghost !px-2 !py-1 !text-xs" onClick={() => setF({ ...a, company_id: a.company_id || "", location_code: a.location_code || "" })}>✎ Sửa</button>
+            <button className="btn-ghost !px-2 !py-1 !text-xs" onClick={() => luu({ ...a, company_id: a.company_id || "", status: a.status === "Hoạt động" ? "Đã khóa" : "Hoạt động" })}>{a.status === "Hoạt động" ? "Khóa" : "Mở lại"}</button>
+          </div>
+        ))}
+        {accs.length === 0 && <div className="text-sm text-[#8A93A0]">Chưa có tài khoản nào.</div>}
+      </div>
+    </div>
+  );
+}
+
 export default function CaiDat() {
   const { supabase, profile, loading, settings, customFields, brands, locations, refresh, taxRate, regions, diaBan } = useCatalog();
   const { toast, notify } = useToast();
@@ -60,7 +179,6 @@ export default function CaiDat() {
   const [reg, setReg] = useState(null);
   const [db, setDb] = useState(null);
   const [hook, setHook] = useState(null);
-  const [hookDon, setHookDon] = useState(null);
   const [bk, setBk] = useState(null);
   const [pf, setPf] = useState(null); // phieu in
   const [perms, setPerms] = useState(null);
@@ -134,22 +252,6 @@ export default function CaiDat() {
     if (error) return notify(errMsg(error), "err");
     notify(v ? "Đã lưu webhook. Bấm Gửi thử để kiểm tra." : "Đã tắt thông báo Discord.");
     setHook(null); refresh();
-  };
-
-  const saveHookDon = async () => {
-    const v = hookDon.trim();
-    if (v && !v.startsWith("https://discord.com/api/webhooks/") && !v.startsWith("https://discordapp.com/api/webhooks/"))
-      return notify("URL không đúng dạng webhook Discord (bắt đầu bằng https://discord.com/api/webhooks/...).", "err");
-    const { error } = await supabase.rpc("fn_set_setting", { p_key: "discord_webhook_don_ban", p_value: v });
-    if (error) return notify(errMsg(error), "err");
-    notify(v ? "Đã lưu webhook kênh Đơn bán. Bấm Gửi thử để kiểm tra." : "Đã tắt thông báo Đơn bán.");
-    setHookDon(null); refresh();
-  };
-
-  const testHookDon = async () => {
-    const { error } = await supabase.rpc("fn_test_discord_don_ban");
-    if (error) return notify(errMsg(error), "err");
-    notify("Đã gửi tin thử — kiểm tra channel Đơn bán trong vài giây.");
   };
 
   const testHook = async () => {
@@ -283,26 +385,17 @@ export default function CaiDat() {
         )}
       </div>
 
-      <div className="card">
-        <div className="font-extrabold mb-1">Thông báo Discord — Đơn bán {settings.discord_webhook_don_ban ? <Badge tone="green">Đang bật</Badge> : <Badge tone="gray">Chưa bật</Badge>}</div>
-        <p className="text-xs text-[#5A6572] mb-3">Gửi chi tiết (khách, xe, khuyến mại, bảng giá, thanh toán) mỗi khi <b>tạo / sửa / hủy / hoàn trả đơn</b>, đổi khuyến mại, bổ sung khách lẻ cuối — cho cả Wizard và Bán buôn. Tạo webhook trong đúng channel đơn bán (ID 1529504082837114990): chuột phải channel → Chỉnh sửa kênh → Tích hợp → Webhook → Tạo webhook → Sao chép URL. Chưa nhập thì <b>không gửi</b> (không lẫn sang kênh tồn kho).</p>
-        {hookDon === null ? (
-          <div className="flex gap-2 items-center flex-wrap">
-            <span className="text-sm font-mono text-[#5A6572]">{settings.discord_webhook_don_ban ? settings.discord_webhook_don_ban.slice(0, 45) + "…" : "Chưa cấu hình webhook."}</span>
-            <button className="btn-ghost !py-1.5 !text-xs" onClick={() => setHookDon(settings.discord_webhook_don_ban || "")}>✎ {settings.discord_webhook_don_ban ? "Sửa" : "Thêm webhook"}</button>
-            {settings.discord_webhook_don_ban && <button className="btn-primary !py-1.5 !text-xs" onClick={testHookDon}>📨 Gửi thử</button>}
-          </div>
-        ) : (
-          <div className="max-w-xl">
-            <input className="inp font-mono !text-xs" placeholder="https://discord.com/api/webhooks/…" value={hookDon} onChange={(e) => setHookDon(e.target.value)} />
-            <div className="flex gap-2 mt-2">
-              <button className="btn-ok !py-2 !text-xs" onClick={saveHookDon}>Lưu</button>
-              <button className="btn-ghost !py-2 !text-xs" onClick={() => setHookDon(null)}>Hủy</button>
-              {settings.discord_webhook_don_ban && <button className="btn-danger !py-2 !text-xs" onClick={() => setHookDon("")}>Xóa URL (rồi bấm Lưu để tắt)</button>}
-            </div>
-          </div>
-        )}
-      </div>
+      <WebhookCard supabase={supabase} settings={settings} refresh={refresh} notify={notify} keyName="discord_webhook_don_ban" testRpc="fn_test_discord_don_ban"
+        title="Thông báo Discord — Đơn bán"
+        desc="Chi tiết (khách, xe, khuyến mại, bảng giá, thanh toán) mỗi khi tạo / sửa / hủy / hoàn trả đơn, đổi khuyến mại, bổ sung khách lẻ cuối — cho cả Wizard và Bán buôn." />
+      <WebhookCard supabase={supabase} settings={settings} refresh={refresh} notify={notify} keyName="discord_webhook_thuchi" testRpc="fn_test_discord_thuchi"
+        title="Thông báo Discord — Tài chính"
+        desc="Báo cáo quỹ 21h hằng ngày, đảo ngược khoản thu, chốt đối soát và các biến động Tài chính." />
+      <WebhookCard supabase={supabase} settings={settings} refresh={refresh} notify={notify} keyName="discord_webhook_dichvu" testRpc="fn_test_discord_dichvu"
+        title="Thông báo Discord — Dịch vụ"
+        desc="Module Dịch vụ: tiếp nhận xe, thu tiền, hoàn tất, giao xe, chốt công nợ cuối ngày (EOD)." />
+
+      <QuyTaiKhoan supabase={supabase} notify={notify} locations={locations} />
 
       {["CEO","ADMIN","MANAGER"].includes(profile.role) && (
         <div className="card">

@@ -260,7 +260,7 @@ export default function SoQuy() {
                   {can("thu_chi_chot") && (
                     <div className="flex gap-1.5 mt-2">
                       <button className="btn-ghost !px-2.5 !py-1 !text-xs" onClick={() => chotQuy(a)}>Chốt quỹ</button>
-                      <button className="btn-ghost !px-2 !py-1 !text-xs" onClick={() => { setAf({ id: a.id, name: a.name, type: a.type, location_code: a.location_code || "", bank_info: a.bank_info || "", opening_balance: a.opening_balance }); setShowAcc(true); }}>✎</button>
+                      <button className="btn-ghost !px-2 !py-1 !text-xs" onClick={() => { setAf({ id: a.id, name: a.name, type: a.type, location_code: a.location_code || "", company_id: a.company_id || "", bank_info: a.bank_info || "", opening_balance: a.opening_balance }); setShowAcc(true); }}>✎</button>
                     </div>
                   )}
                 </div>
