@@ -243,6 +243,7 @@ function TaoDonWizardInner() {
 
   // ===== BƯỚC 3: Thanh toán & xuất HĐ =====
   const [pays, setPays] = useState([]); // {method, amount, account_id, tra_gop_ct, note}
+  const [cocRow, setCocRow] = useState({ method: "Tiền mặt", amount: "", account_id: "" }); // đặt cọc nhập tay (khi xe chưa có phiếu giữ xe)
   const [extra, setExtra] = useState({}); // trường tùy chỉnh (Cài đặt > Trường tùy chỉnh)
   const [hd, setHd] = useState({ tinh_tp: "", phuong_xa: "", dia_chi: "" });
   const tinhList = Object.keys(diaBan);
@@ -256,7 +257,8 @@ function TaoDonWizardInner() {
 
   const phaiTra = bangGia?.gia_can_thanh_toan || 0;
   const tongCoc = Number(coc) || 0;
-  const daTra = tongCoc + pays.reduce((s, p) => s + (Number(p.amount) || 0), 0);
+  const cocTay = !suaId && !(tongCoc > 0) ? Number(cocRow.amount) || 0 : 0;
+  const daTra = tongCoc + cocTay + pays.reduce((s, p) => s + (Number(p.amount) || 0), 0);
   const conLai = Math.max(phaiTra - daTra, 0);
 
   if (loading || !profile) return <div className="card">Đang tải dữ liệu…</div>;
@@ -281,6 +283,7 @@ function TaoDonWizardInner() {
     if (tgThieu) return notify("Chọn đơn vị trả góp.", "err");
     const nhThieu = pays.find((p) => Number(p.amount) > 0 && quyTypeOf(p.method) === "Ngân hàng" && !p.account_id);
     if (nhThieu) return notify(`Chọn tài khoản Ngân hàng nhận tiền cho phương thức "${nhThieu.method}".`, "err");
+    if (cocTay > 0 && quyTypeOf(cocRow.method) === "Ngân hàng" && !cocRow.account_id) return notify(`Chọn tài khoản Ngân hàng nhận tiền cọc cho phương thức "${cocRow.method}".`, "err");
     const cfThieu = cfields.find((c) => c.required && c.field_type !== "formula" && !extra[c.field_key]);
     if (cfThieu) return notify(`Nhập "${cfThieu.label}".`, "err");
     if (suaId && phaiTra < tongCoc) return notify(`Tổng đơn mới (${fmtVND(phaiTra)}) không được nhỏ hơn số đã thu (${fmtVND(tongCoc)}). Muốn giảm hãy hoàn tiền cho khách trước.`, "err");
@@ -304,7 +307,10 @@ function TaoDonWizardInner() {
       customer_source: nguonDon, sale_date: ngayLayGia, location_code: diemBan,
       seller_id: tuVanId, seller_name: tuVanName, battery_option: batteryOption || null,
     };
-    const paysOut = pays.filter((p) => Number(p.amount) > 0).map((p) => ({
+    const paysOut = [
+      ...(cocTay > 0 ? [{ method: cocRow.method, amount: cocTay, account_id: cocRow.account_id || null, tra_gop_ct: "", note: "Đặt cọc (khách đã đặt trước)" }] : []),
+      ...pays.filter((p) => Number(p.amount) > 0),
+    ].map((p) => ({
       method: p.method, amount: Number(p.amount), account_id: p.account_id || null, tra_gop_ct: p.tra_gop_ct || "",
       note: p.method === "Trả góp" && p.tra_gop_ct ? `Trả góp qua ${p.tra_gop_ct}` : (p.note || ""),
     }));
@@ -354,7 +360,7 @@ function TaoDonWizardInner() {
     setCustId(""); setNewC(null); setKh({ customer_name: "", customer_phone: "", customer_cccd: "", customer_address: "" });
     setPicked(null); setBatteryOption(""); setCoc(0); setPromoChon([]); setBangGia(null); setBangGiaLoi(""); setBangGiaKey(null); setGiaGoc(null);
     setSuaId(null); setSuaCode(""); setLyDo(""); setItemsGoc([]); setDTongGoc({ type: "amount", value: 0 });
-    setPays([]); setExtra({}); setHd({ tinh_tp: "", phuong_xa: "", dia_chi: "" });
+    setPays([]); setCocRow({ method: "Tiền mặt", amount: "", account_id: "" }); setExtra({}); setHd({ tinh_tp: "", phuong_xa: "", dia_chi: "" });
     if (profile) { setTuVanId(profile.id); setTuVanName(profile.name); }
   };
 
@@ -571,37 +577,58 @@ function TaoDonWizardInner() {
                   <b className="text-[#A25F00]">{fmtVND(coc)}</b>
                 </div>
               )}
-              <div className="flex flex-col gap-1.5 mb-2">
-                {pays.map((p, i) => (
-                  <div key={i} className="flex gap-1.5 items-center">
-                    <select className="inp !py-1.5 !text-xs !w-auto" value={p.method} onChange={(e) => setPays((x) => x.map((y, j) => j === i ? { ...y, method: e.target.value } : y))}>
-                      {PTTT.map((m) => <option key={m}>{m}</option>)}
+              {!suaId && !(coc > 0) && (
+                <div className="rounded-lg border border-[#F0D9A8] bg-[#FDF6E3] p-2 mb-2">
+                  <div className="text-[11px] font-bold text-[#A25F00] mb-1">Số tiền khách đã đặt cọc <span className="font-normal text-[#8A93A0]">(xe không có phiếu giữ xe — nhập tay nếu khách đã cọc)</span></div>
+                  <div className="flex gap-1.5 items-center flex-wrap">
+                    <select className="inp !py-1.5 !text-xs !w-auto" value={cocRow.method} onChange={(e) => setCocRow((r) => ({ ...r, method: e.target.value, account_id: "" }))}>
+                      {PTTT.filter((m) => m !== "Trả góp").map((m) => <option key={m}>{m}</option>)}
                     </select>
-                    <div className="flex-1"><MoneyInput className="!py-1.5 !text-xs" value={p.amount} onChange={(v) => setPays((x) => x.map((y, j) => j === i ? { ...y, amount: v } : y))} /></div>
-                    <button className="text-danger font-bold px-1" onClick={() => setPays((x) => x.filter((_, j) => j !== i))}>✕</button>
+                    <div className="flex-1 min-w-[120px]"><MoneyInput className="!py-1.5 !text-xs" value={cocRow.amount} onChange={(v) => setCocRow((r) => ({ ...r, amount: v }))} /></div>
+                    {quyTypeOf(cocRow.method) === "Ngân hàng" && (
+                      <select className="inp !w-auto !py-1.5 !text-xs max-w-full" value={cocRow.account_id || ""} onChange={(e) => setCocRow((r) => ({ ...r, account_id: e.target.value }))}>
+                        <option value="">— Tài khoản nhận tiền —</option>
+                        {banksHopLe.map((a) => <option key={a.id} value={a.id}>{a.name}{a.bank_info ? ` (${a.bank_info})` : ""}</option>)}
+                      </select>
+                    )}
+                  </div>
+                  {quyTypeOf(cocRow.method) === "Ngân hàng" && banksHopLe.length === 0 && <div className="text-[10.5px] text-danger mt-1">Chưa có tài khoản Ngân hàng nào cho đúng pháp nhân của hãng xe này — vào Sổ quỹ tạo trước.</div>}
+                </div>
+              )}
+              <div className="flex flex-col gap-2 mb-2">
+                {pays.map((p, i) => (
+                  <div key={i} className="rounded-lg border border-[#E3E8EF] p-2 flex flex-col gap-1.5">
+                    <div className="flex gap-1.5 items-center">
+                      <span className="text-[11px] font-bold text-[#8A93A0] w-4 shrink-0">{i + 1}.</span>
+                      <select className="inp !py-1.5 !text-xs !w-auto" value={p.method} onChange={(e) => setPays((x) => x.map((y, j) => j === i ? { ...y, method: e.target.value, account_id: "", tra_gop_ct: "" } : y))}>
+                        {PTTT.map((m) => <option key={m}>{m}</option>)}
+                      </select>
+                      <div className="flex-1"><MoneyInput className="!py-1.5 !text-xs" value={p.amount} onChange={(v) => setPays((x) => x.map((y, j) => j === i ? { ...y, amount: v } : y))} /></div>
+                      <button className="text-danger font-bold px-1" onClick={() => setPays((x) => x.filter((_, j) => j !== i))}>✕</button>
+                    </div>
+                    {p.method === "Trả góp" ? (
+                      <div className="flex items-center gap-2 flex-wrap bg-[#FDF6E3] rounded-md px-2 py-1.5 ml-5">
+                        <span className="text-[11px] font-bold text-[#A25F00]">Đơn vị trả góp:</span>
+                        <select className="inp !w-auto !py-1 !text-xs" value={p.tra_gop_ct || ""}
+                          onChange={(e) => setPays((x) => x.map((y, j) => j === i ? { ...y, tra_gop_ct: e.target.value } : y))}>
+                          <option value="">— Chọn đơn vị —</option>
+                          {(settings?.cong_ty_tra_gop || "Home Credit\nShinhanbank\nHD Saison\nFE Credit")
+                            .split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean).map((x) => <option key={x}>{x}</option>)}
+                        </select>
+                      </div>
+                    ) : quyTypeOf(p.method) === "Ngân hàng" ? (
+                      <div className="flex items-center gap-2 flex-wrap bg-[#EAF2FF] rounded-md px-2 py-1.5 ml-5">
+                        <span className="text-[11px] font-bold text-brand">Tài khoản nhận tiền:</span>
+                        <select className="inp !w-auto !py-1 !text-xs max-w-full" value={p.account_id || ""}
+                          onChange={(e) => setPays((x) => x.map((y, j) => j === i ? { ...y, account_id: e.target.value } : y))}>
+                          <option value="">— Chọn đúng tài khoản khách đã chuyển vào —</option>
+                          {banksHopLe.map((a) => <option key={a.id} value={a.id}>{a.name}{a.bank_info ? ` (${a.bank_info})` : ""}</option>)}
+                        </select>
+                        {banksHopLe.length === 0 && <span className="text-[10.5px] text-danger">Chưa có tài khoản Ngân hàng nào cho đúng pháp nhân của hãng xe này — vào Sổ quỹ tạo trước.</span>}
+                      </div>
+                    ) : null}
                   </div>
                 ))}
-                {pays.map((p, i) => p.method === "Trả góp" ? (
-                  <div key={"tg" + i} className="flex items-center gap-2 flex-wrap bg-[#FDF6E3] rounded-lg px-2.5 py-2 -mt-0.5">
-                    <span className="text-[11px] font-bold text-[#A25F00]">Đơn vị trả góp:</span>
-                    <select className="inp !w-auto !py-1 !text-xs" value={p.tra_gop_ct || ""}
-                      onChange={(e) => setPays((x) => x.map((y, j) => j === i ? { ...y, tra_gop_ct: e.target.value } : y))}>
-                      <option value="">— Chọn đơn vị —</option>
-                      {(settings?.cong_ty_tra_gop || "Home Credit\nShinhanbank\nHD Saison\nFE Credit")
-                        .split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean).map((x) => <option key={x}>{x}</option>)}
-                    </select>
-                  </div>
-                ) : quyTypeOf(p.method) === "Ngân hàng" ? (
-                  <div key={"nh" + i} className="flex items-center gap-2 flex-wrap bg-[#EAF2FF] rounded-lg px-2.5 py-2 -mt-0.5">
-                    <span className="text-[11px] font-bold text-brand">Tài khoản nhận tiền:</span>
-                    <select className="inp !w-auto !py-1 !text-xs" value={p.account_id || ""}
-                      onChange={(e) => setPays((x) => x.map((y, j) => j === i ? { ...y, account_id: e.target.value } : y))}>
-                      <option value="">— Chọn đúng tài khoản khách đã chuyển vào —</option>
-                      {banksHopLe.map((a) => <option key={a.id} value={a.id}>{a.name}{a.bank_info ? ` (${a.bank_info})` : ""}</option>)}
-                    </select>
-                    {banksHopLe.length === 0 && <span className="text-[10.5px] text-danger">Chưa có tài khoản Ngân hàng nào cho đúng pháp nhân của hãng xe này — vào Sổ quỹ tạo trước.</span>}
-                  </div>
-                ) : null)}
               </div>
               <div className="flex gap-1.5 flex-wrap mb-3">
                 <button className="btn-ghost !text-xs" onClick={() => setPays((p) => [...p, { method: "Tiền mặt", amount: "" }])}>⊕ Thêm phương thức</button>
@@ -611,8 +638,8 @@ function TaoDonWizardInner() {
                   </button>
                 )}
                 {pays.length === 0 && (
-                  <button className="btn-ghost !text-xs" onClick={() => setPays([{ method: "Tiền mặt", amount: Math.max(phaiTra - tongCoc, 0) }])}>
-                    {tongCoc > 0 ? `Trả nốt ${fmtVND(Math.max(phaiTra - tongCoc, 0))} tiền mặt` : "Trả đủ tiền mặt"}
+                  <button className="btn-ghost !text-xs" onClick={() => setPays([{ method: "Tiền mặt", amount: Math.max(phaiTra - tongCoc - cocTay, 0) }])}>
+                    {tongCoc + cocTay > 0 ? `Trả nốt ${fmtVND(Math.max(phaiTra - tongCoc - cocTay, 0))} tiền mặt` : "Trả đủ tiền mặt"}
                   </button>
                 )}
               </div>
@@ -711,6 +738,7 @@ function TaoDonWizardInner() {
                 ))}
                 {pays.filter((p) => Number(p.amount) > 0).length === 0 && <div className="text-[#8A93A0]">Chưa thêm phương thức thanh toán nào.</div>}
                 {coc > 0 && <div>{suaId ? "Đã thu trước đó" : "Đã đặt cọc"}: {fmtVND(coc)}</div>}
+                {cocTay > 0 && <div>Đặt cọc ({cocRow.method}): {fmtVND(cocTay)}</div>}
                 {(hd.dia_chi || hd.phuong_xa || hd.tinh_tp) && <div className="text-[#5A6572]">Xuất HĐ: {[hd.dia_chi, hd.phuong_xa, hd.tinh_tp].filter(Boolean).join(", ")}</div>}
               </div>
             </div>

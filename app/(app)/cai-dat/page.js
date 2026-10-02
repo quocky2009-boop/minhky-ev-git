@@ -263,8 +263,8 @@ export default function CaiDat() {
       </div>
 
       <div className="card">
-        <div className="font-extrabold mb-1">Thông báo Discord {settings.discord_webhook ? <Badge tone="green">Đang bật</Badge> : <Badge tone="gray">Chưa bật</Badge>}</div>
-        <p className="text-xs text-[#5A6572] mb-3">Mọi biến động tồn kho (nhập, bán, điều chuyển, điều chỉnh, kiểm kê) sẽ gửi ngay vào channel Discord, kèm xe, kho, tồn trước → sau, người thao tác, số phiếu. Lấy URL: mở Discord → chuột phải channel → Chỉnh sửa kênh → Tích hợp (Integrations) → Webhook → Tạo webhook → Sao chép URL.</p>
+        <div className="font-extrabold mb-1">Thông báo Discord — Kênh Tồn kho {settings.discord_webhook ? <Badge tone="green">Đang bật</Badge> : <Badge tone="gray">Chưa bật</Badge>}</div>
+        <p className="text-xs text-[#5A6572] mb-3"><b>Kênh riêng cho Xuất–Nhập–Tồn</b> (tách khỏi kênh Đơn bán bên dưới). Mọi biến động tồn kho (nhập, bán, điều chuyển, điều chỉnh, kiểm kê) sẽ gửi ngay vào channel Discord, kèm xe, kho, tồn trước → sau, người thao tác, số phiếu. Lấy URL: mở Discord → chuột phải channel → Chỉnh sửa kênh → Tích hợp (Integrations) → Webhook → Tạo webhook → Sao chép URL.</p>
         {hook === null ? (
           <div className="flex gap-2 items-center flex-wrap">
             <span className="text-sm font-mono text-[#5A6572]">{settings.discord_webhook ? settings.discord_webhook.slice(0, 45) + "…" : "Chưa cấu hình webhook."}</span>
