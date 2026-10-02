@@ -89,8 +89,75 @@ function WebhookCard({ supabase, settings, refresh, notify, title, keyName, test
   );
 }
 
+function PhapNhan({ supabase, notify, brands, refresh, onChanged }) {
+  const [cos, setCos] = useState([]);
+  const [f, setF] = useState(null);
+  const load = async () => {
+    const { data } = await supabase.from("companies").select("*").order("name");
+    setCos(data || []);
+  };
+  useEffect(() => { load(); }, []);
+  const luu = async (c) => {
+    const a = c || f;
+    if (!a.name.trim()) return notify("Nhập tên pháp nhân.", "err");
+    const { error } = await supabase.rpc("fn_luu_phap_nhan", { p: { id: a.id || "", name: a.name, note: a.note || "", status: a.status || "Hoạt động" } });
+    if (error) return notify(errMsg(error), "err");
+    notify(c ? (a.status === "Hoạt động" ? "Đã mở lại pháp nhân." : "Đã khóa pháp nhân.") : "Đã lưu pháp nhân.");
+    setF(null); load(); onChanged && onChanged();
+  };
+  const ganHang = async (brand, companyId) => {
+    const { error } = await supabase.rpc("fn_gan_phap_nhan_hang", { p_brand: brand, p_company: companyId ? Number(companyId) : null });
+    if (error) return notify(errMsg(error), "err");
+    notify(`Đã gán pháp nhân cho hãng ${brand}.`); refresh();
+  };
+  const hoatDong = cos.filter((c) => c.status === "Hoạt động");
+  return (
+    <div className="card">
+      <div className="flex items-center mb-1">
+        <div className="font-extrabold mr-auto">Pháp nhân sở hữu ({cos.length})</div>
+        <button className="btn-primary !py-1.5 !text-xs" onClick={() => setF({ id: null, name: "", note: "", status: "Hoạt động" })}>+ Thêm pháp nhân</button>
+      </div>
+      <p className="text-xs text-[#5A6572] mb-3">Pháp nhân (công ty) sở hữu tài khoản ngân hàng. <b>Mỗi hãng xe gán cho 1 pháp nhân</b> — khi lập đơn bán, hệ thống chỉ cho chọn tài khoản nhận tiền của đúng pháp nhân của hãng xe đó.</p>
+      {f && (
+        <div className="bg-[#F8FAFC] rounded-xl p-3 mb-3">
+          <div className="grid gap-x-3 md:grid-cols-2">
+            <Field label="Tên pháp nhân" required><input className="inp" value={f.name} onChange={(e) => setF((p) => ({ ...p, name: e.target.value }))} placeholder="VD: Công ty TNHH Minh Kỳ" /></Field>
+            <Field label="Ghi chú"><input className="inp" value={f.note || ""} onChange={(e) => setF((p) => ({ ...p, note: e.target.value }))} placeholder="MST, địa chỉ… (không bắt buộc)" /></Field>
+          </div>
+          <div className="flex gap-2"><button className="btn-ok !text-xs" onClick={() => luu()}>Lưu</button><button className="btn-ghost !text-xs" onClick={() => setF(null)}>Hủy</button></div>
+        </div>
+      )}
+      <div className="flex flex-col gap-1.5 mb-4">
+        {cos.map((c) => (
+          <div key={c.id} className={`flex items-center gap-2 p-2 rounded-lg border text-[13px] flex-wrap ${c.status === "Hoạt động" ? "border-[#E3E8EF]" : "border-[#EEE] bg-[#FAFAFA] opacity-70"}`}>
+            <b className="mr-auto">{c.name}</b>
+            <span className="text-xs text-[#5A6572]">{c.note}</span>
+            <span className="text-[11px] text-[#8A93A0]">Hãng: {brands.filter((b) => b.company_id === c.id).map((b) => b.name).join(", ") || "—"}</span>
+            {c.status !== "Hoạt động" && <Badge tone="dark">Đã khóa</Badge>}
+            <button className="btn-ghost !px-2 !py-1 !text-xs" onClick={() => setF({ ...c })}>✎ Sửa</button>
+            <button className="btn-ghost !px-2 !py-1 !text-xs" onClick={() => luu({ ...c, status: c.status === "Hoạt động" ? "Đã khóa" : "Hoạt động" })}>{c.status === "Hoạt động" ? "Khóa" : "Mở lại"}</button>
+          </div>
+        ))}
+        {cos.length === 0 && <div className="text-sm text-[#8A93A0]">Chưa có pháp nhân nào.</div>}
+      </div>
+      <div className="font-bold text-[13px] mb-1.5">Hãng xe → pháp nhân phụ trách</div>
+      <div className="flex gap-3 flex-wrap">
+        {brands.map((b) => (
+          <label key={b.name} className="flex items-center gap-2 text-xs">
+            <b className="w-20">{b.name}</b>
+            <select className="inp !w-56 !py-1.5 !text-xs" value={b.company_id || ""} onChange={(e) => ganHang(b.name, e.target.value)}>
+              <option value="">— Chưa gán —</option>
+              {hoatDong.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 const EMPTY_ACC = { id: null, name: "", type: "Ngân hàng", location_code: "", company_id: "", bank_info: "", opening_balance: 0, status: "Hoạt động" };
-function QuyTaiKhoan({ supabase, notify, locations }) {
+function QuyTaiKhoan({ supabase, notify, locations, tick }) {
   const [accs, setAccs] = useState([]);
   const [cos, setCos] = useState([]);
   const [f, setF] = useState(null);
@@ -101,7 +168,7 @@ function QuyTaiKhoan({ supabase, notify, locations }) {
     ]);
     setAccs(a || []); setCos(c || []);
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [tick]);
   const luu = async (acc) => {
     const a = acc || f;
     if (!a.name.trim()) return notify("Nhập tên tài khoản/quỹ.", "err");
@@ -178,6 +245,7 @@ export default function CaiDat() {
   const [newBrand, setNewBrand] = useState("");
   const [reg, setReg] = useState(null);
   const [db, setDb] = useState(null);
+  const [coTick, setCoTick] = useState(0);
   const [hook, setHook] = useState(null);
   const [bk, setBk] = useState(null);
   const [pf, setPf] = useState(null); // phieu in
@@ -395,7 +463,8 @@ export default function CaiDat() {
         title="Thông báo Discord — Dịch vụ"
         desc="Module Dịch vụ: tiếp nhận xe, thu tiền, hoàn tất, giao xe, chốt công nợ cuối ngày (EOD)." />
 
-      <QuyTaiKhoan supabase={supabase} notify={notify} locations={locations} />
+      <PhapNhan supabase={supabase} notify={notify} brands={brands} refresh={refresh} onChanged={() => setCoTick((t) => t + 1)} />
+      <QuyTaiKhoan supabase={supabase} notify={notify} locations={locations} tick={coTick} />
 
       {["CEO","ADMIN","MANAGER"].includes(profile.role) && (
         <div className="card">

@@ -1,13 +1,13 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Badge, Toast, KPI, LocSearch, MoneyInput } from "@/components/ui";
+import { Badge, Toast, KPI, MoneyInput } from "@/components/ui";
 import { fmtVND, fmtDate, fmtTime, errMsg } from "@/lib/format";
 
 const iso = (d) => d.toLocaleDateString("sv-SE");
 
 export default function DoiSoat() {
-  const { supabase, locations, profile, loading } = useCatalog();
+  const { supabase, locations, profile, loading, regions } = useCatalog();
   const { toast, notify } = useToast();
   const [loc, setLoc] = useState("");
   const [ngay, setNgay] = useState(iso(new Date()));
@@ -27,9 +27,11 @@ export default function DoiSoat() {
   if (!["CEO", "MANAGER", "ADMIN"].includes(profile.role)) return <div className="card">Bạn không có quyền xem đối soát.</div>;
 
   const locName = (c) => locations.find((l) => l.code === c)?.name || c;
+  const nhan = (x) => x.khu_vuc ? `Khu vực ${x.khu_vuc}` : locName(x.location_code);
+  const soDiem = (r) => locations.filter((l) => l.region === r && l.status !== "Đã xóa").length;
 
   const tinh = async () => {
-    if (!loc) return notify("Chọn điểm.", "err");
+    if (!loc) return notify("Chọn khu vực.", "err");
     setBusy(true);
     const { data, error } = await supabase.rpc("fn_doi_soat_tinh", { p_loc: loc, p_date: ngay });
     setBusy(false);
@@ -51,7 +53,6 @@ export default function DoiSoat() {
     tinh();
   };
 
-  const tongThu = e ? e.thu_ban_xe + e.thu_dich_vu + e.thu_coc + e.thu_khac : 0;
 
   return (
     <div className="flex flex-col gap-4">
@@ -60,11 +61,15 @@ export default function DoiSoat() {
 
       <div className="card">
         <div className="flex gap-2 flex-wrap items-end">
-          <div className="!w-64"><label className="lbl">Điểm bán / dịch vụ</label><LocSearch locations={locations} value={loc} onChange={setLoc} placeholder="Chọn điểm…" /></div>
+          <div className="!w-72"><label className="lbl">Khu vực (gồm tất cả điểm cửa hàng thuộc khu vực)</label>
+            <select className="inp" value={loc} onChange={(ev) => { setLoc(ev.target.value); setE(null); }}>
+              <option value="">— Chọn khu vực —</option>
+              {regions.map((r) => <option key={r} value={"KV:" + r}>{r} ({soDiem(r)} điểm)</option>)}
+            </select></div>
           <div><label className="lbl">Ngày</label><input type="date" className="inp !w-40" value={ngay} onChange={(e2) => setNgay(e2.target.value)} /></div>
           <button className="btn-primary" disabled={busy || !loc} onClick={tinh}>{busy ? "Đang tính…" : "🔄 Tính số liệu ngày"}</button>
         </div>
-        <p className="text-[11px] text-[#8A93A0] mt-2">Số liệu tự tính từ đơn bán xe, phiếu dịch vụ, tiền cọc và sổ quỹ trong ngày — không nhập tay. Cần <b>2 người xác nhận</b> mới chốt được.</p>
+        <p className="text-[11px] text-[#8A93A0] mt-2">Số liệu tự tính (tổng hợp mọi điểm trong khu vực) từ đơn bán xe, phiếu dịch vụ, tiền cọc và sổ quỹ trong ngày — không nhập tay. Cần <b>2 người xác nhận</b> mới chốt được.</p>
       </div>
 
       {e && (
@@ -101,7 +106,8 @@ export default function DoiSoat() {
 
             <div className="text-[13px] bg-[#F8FAFC] rounded-xl p-3">
               <div className="font-semibold mb-1">Công thức đối soát:</div>
-              <div>Tổng phải thu <b>{fmtVND(tongThu)}</b> = Tiền mặt <b>{fmtVND(e.thu_tien_mat)}</b> + Chuyển khoản <b>{fmtVND(e.thu_chuyen_khoan)}</b>
+              <div className="text-[11.5px] text-[#5A6572] mb-1">So <b>chứng từ thu trong ngày</b> (phiếu thanh toán đơn bán, thu dịch vụ, tiền cọc) với <b>sổ quỹ</b> (tiền mặt + chuyển khoản đã ghi) của khu vực. Chuyển khoản được tính theo điểm của đơn/phiếu tạo ra khoản thu (tài khoản ngân hàng thuộc pháp nhân, không gắn điểm). Trả góp chờ giải ngân chưa tính vì chưa vào quỹ.</div>
+              <div>Chứng từ thu <b>{fmtVND(e.thu_tien_mat + e.thu_chuyen_khoan + e.lech)}</b> • Sổ quỹ: Tiền mặt <b>{fmtVND(e.thu_tien_mat)}</b> + Chuyển khoản <b>{fmtVND(e.thu_chuyen_khoan)}</b>
                 {" "}{e.lech === 0 ? <span className="text-[#0E7A4A] font-bold">✓ khớp</span> : <span className="text-danger font-bold">⚠ lệch {fmtVND(e.lech)}</span>}</div>
             </div>
 
@@ -124,7 +130,7 @@ export default function DoiSoat() {
 
           <div className="card">
             <div className="flex items-center gap-2 mb-2 flex-wrap">
-              <div className="font-extrabold mr-auto">Xác nhận chốt ngày {fmtDate(e.ngay)} · {locName(e.location_code)}</div>
+              <div className="font-extrabold mr-auto">Xác nhận chốt ngày {fmtDate(e.ngay)} · {nhan(e)}</div>
               <Badge tone={e.status === "DA_CHOT" ? "green" : "amber"}>{e.status === "DA_CHOT" ? "Đã chốt" : "Đang mở"}</Badge>
             </div>
             <div className="grid gap-2 md:grid-cols-2">
@@ -150,11 +156,11 @@ export default function DoiSoat() {
         <div className="font-extrabold mb-2">Lịch sử đối soát ({lichSu.length})</div>
         {lichSu.length === 0 ? <div className="text-sm text-[#8A93A0]">Chưa có ngày nào được tính.</div> : (
           <div className="tbl-scroll"><table className="w-full border-collapse tbl-card">
-            <thead><tr><th className="th">Ngày</th><th className="th">Điểm</th><th className="th">Bán xe</th><th className="th">Dịch vụ</th><th className="th">Tiền mặt</th><th className="th">CK</th><th className="th">Lệch</th><th className="th">Trạng thái</th></tr></thead>
+            <thead><tr><th className="th">Ngày</th><th className="th">Khu vực / điểm</th><th className="th">Bán xe</th><th className="th">Dịch vụ</th><th className="th">Tiền mặt</th><th className="th">CK</th><th className="th">Lệch</th><th className="th">Trạng thái</th></tr></thead>
             <tbody>{lichSu.map((x) => (
               <tr key={x.id} className={x.lech !== 0 ? "bg-[#FFF6F6]" : "hover:bg-[#F8FAFC]"}>
                 <td data-label="Ngày" className="td whitespace-nowrap">{fmtDate(x.ngay)}</td>
-                <td data-label="Điểm" className="td text-xs">{locName(x.location_code)}</td>
+                <td data-label="Khu vực / điểm" className="td text-xs">{nhan(x)}</td>
                 <td data-label="Bán xe" className="td">{x.so_don_ban} đơn · {fmtVND(x.dt_ban_xe)}</td>
                 <td data-label="Dịch vụ" className="td">{x.so_phieu_dv} phiếu · {fmtVND(x.dt_dich_vu)}</td>
                 <td data-label="Tiền mặt" className="td">{fmtVND(x.thu_tien_mat)}</td>

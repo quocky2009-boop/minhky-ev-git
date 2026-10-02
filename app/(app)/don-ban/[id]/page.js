@@ -7,6 +7,7 @@ import { Badge, Toast, Field } from "@/components/ui";
 import { fmtVND, fmtDate, fmtTime, errMsg } from "@/lib/format";
 import { printOrder, printOrderBill } from "@/lib/print";
 import BangGiaDon from "@/components/BangGiaDon";
+import PayAccountInfo from "@/components/PayAccountInfo";
 
 export default function DonBanChiTiet() {
   const { id } = useParams();
@@ -16,6 +17,8 @@ export default function DonBanChiTiet() {
   const [o, setO] = useState(null);
   const [items, setItems] = useState([]);
   const [pays, setPays] = useState([]);
+  const [accs, setAccs] = useState([]);
+  const [cos, setCos] = useState([]);
   const [promoTags, setPromoTags] = useState([]); // [{id, name}]
   const [editPromo, setEditPromo] = useState(false);
   const [promoChon, setPromoChon] = useState([]);
@@ -34,12 +37,15 @@ export default function DonBanChiTiet() {
     const { data: ord } = await supabase.from("sales_orders").select("*").eq("id", id).single();
     if (!ord) return;
     const code = ord.code;
-    const [{ data: its }, { data: ps }, { data: sop }, { data: kms }] = await Promise.all([
+    const [{ data: its }, { data: ps }, { data: sop }, { data: kms }, { data: ac }, { data: cp }] = await Promise.all([
       supabase.from("sale_items").select("*").eq("sale_code", code),
       supabase.from("sale_payments").select("*").eq("sale_code", code),
       supabase.from("sale_order_promotions").select("promotion_id, promotions(id, name)").eq("sale_code", code),
       supabase.from("promotions").select("*"),
+      supabase.from("cash_accounts").select("id,name,type,bank_info,company_id,location_code"),
+      supabase.from("companies").select("id,name"),
     ]);
+    setAccs(ac || []); setCos(cp || []);
     setO(ord);
     setItems(its || []);
     setPays(ps || []);
@@ -208,29 +214,6 @@ export default function DonBanChiTiet() {
             {o.customer_address && <div className="text-[13px]">{o.customer_address}</div>}
           </div>
 
-          {/* BẢNG GIÁ + KHUYẾN MẠI + ĐỊA CHỈ HĐ (đơn tạo từ Wizard) */}
-          <BangGiaDon o={o} />
-
-          {/* THANH TOÁN */}
-          <div className="card">
-            <div className={`flex items-center gap-2 mb-3 font-semibold text-[14px] ${conLai === 0 ? "text-[#0E7A4A]" : "text-danger"}`}>
-              <span>{conLai === 0 ? "✓ Đã thanh toán toàn bộ" : `⚠ Còn phải trả ${fmtVND(conLai)}`}</span>
-            </div>
-            <div className="flex flex-wrap gap-6 mb-3 text-[13px]">
-              <div><span className="text-[#8A93A0]">Khách phải trả: </span><b>{fmtVND(tongDon)}</b></div>
-              <div><span className="text-[#8A93A0]">Đã thanh toán: </span><b>{fmtVND(daTra)}</b></div>
-              <div><span className="text-[#8A93A0]">Còn phải trả: </span><b className={conLai > 0 ? "text-danger" : ""}>{fmtVND(conLai)}</b></div>
-            </div>
-            {pays.map((p, i) => (
-              <div key={i} className="flex items-center gap-2 p-2 rounded-lg bg-[#F8FAFC] text-[13px] mb-1">
-                <div className="w-2 h-2 rounded-full bg-brand shrink-0" />
-                <span className="font-semibold">{p.method} {fmtVND(p.amount)}</span>
-                {p.note && <span className="text-[#8A93A0]">— {p.note}</span>}
-                <span className="text-[10.5px] text-[#8A93A0] ml-auto">{fmtTime(p.created_at)}</span>
-              </div>
-            ))}
-          </div>
-
           {/* THÔNG TIN SẢN PHẨM */}
           <div className="card">
             <div className="font-extrabold mb-3">Thông tin sản phẩm</div>
@@ -276,6 +259,34 @@ export default function DonBanChiTiet() {
               </table>
             </div>
           </div>
+
+          {/* BẢNG GIÁ + KHUYẾN MẠI + ĐỊA CHỈ HĐ (đơn tạo từ Wizard) */}
+          <BangGiaDon o={o} />
+
+          {/* THANH TOÁN */}
+          <div className="card">
+            <div className={`flex items-center gap-2 mb-3 font-semibold text-[14px] ${conLai === 0 ? "text-[#0E7A4A]" : "text-danger"}`}>
+              <span>{conLai === 0 ? "✓ Đã thanh toán toàn bộ" : `⚠ Còn phải trả ${fmtVND(conLai)}`}</span>
+            </div>
+            <div className="flex flex-wrap gap-6 mb-3 text-[13px]">
+              <div><span className="text-[#8A93A0]">Khách phải trả: </span><b>{fmtVND(tongDon)}</b></div>
+              <div><span className="text-[#8A93A0]">Đã thanh toán: </span><b>{fmtVND(daTra)}</b></div>
+              <div><span className="text-[#8A93A0]">Còn phải trả: </span><b className={conLai > 0 ? "text-danger" : ""}>{fmtVND(conLai)}</b></div>
+            </div>
+            {pays.map((p, i) => (
+              <div key={i} className={`p-2 rounded-lg text-[13px] mb-1 ${p.is_reversed ? "bg-[#F3F4F6] text-[#8A93A0] line-through" : "bg-[#F8FAFC]"}`}>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-brand shrink-0" />
+                  <span className="font-semibold">{p.method} {fmtVND(p.amount)}</span>
+                  {p.note && <span className="text-[#8A93A0]">— {p.note}</span>}
+                  {p.is_reversed && <Badge tone="dark">Đã đảo ngược</Badge>}
+                  <span className="text-[10.5px] text-[#8A93A0] ml-auto">{fmtTime(p.created_at)}</span>
+                </div>
+                <div className="ml-4 mt-0.5"><PayAccountInfo p={p} accs={accs} cos={cos} locations={locations} extra={o.extra} /></div>
+              </div>
+            ))}
+          </div>
+
         </div>
 
         {/* CỘT PHẢI */}

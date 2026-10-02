@@ -1,11 +1,12 @@
 "use client";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, Fragment } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Badge, Toast, KPI, Pager, pageSlice, pageClamp, useSortable, Th, LocSearch, MoneyInput, useSelection, ThCheck, TdCheck, SelectionBar } from "@/components/ui";
 import { fmtVND, fmtDate, fmtTime, errMsg, downloadCSV, downloadXLSX } from "@/lib/format";
 import { printOrder, printOrderBill } from "@/lib/print";
 import BangGiaDon from "@/components/BangGiaDon";
+import PayAccountInfo from "@/components/PayAccountInfo";
 import { InfoRows, MoneyRows } from "@/components/detail";
 import Link from "next/link";
 import { CUSTOMER_TYPES } from "@/lib/const";
@@ -84,6 +85,8 @@ export default function DonBan() {
   const [editPromo, setEditPromo] = useState(false);
   const [promoChon, setPromoChon] = useState([]);
   const [allPromos, setAllPromos] = useState([]);
+  const [accs, setAccs] = useState([]);
+  const [cos, setCos] = useState([]);
   const [promoQ, setPromoQ] = useState("");
   const [canSuaKM, setCanSuaKM] = useState(false);
   const [payEdit, setPayEdit] = useState(null);
@@ -209,6 +212,13 @@ export default function DonBan() {
     setDetail((d) => (d && d.id === o.id ? { ...d, _items: di || [], _promos: tags, _pays: pl || [] } : d));
     setPromoChon(tags.map((t) => t.id));
     setAllPromos(kms || []);
+    if (accs.length === 0) {
+      const [{ data: ac }, { data: cp }] = await Promise.all([
+        supabase.from("cash_accounts").select("id,name,type,bank_info,company_id,location_code"),
+        supabase.from("companies").select("id,name"),
+      ]);
+      setAccs(ac || []); setCos(cp || []);
+    }
   };
 
   const canSuaTT = ["CEO", "MANAGER", "ADMIN"].includes(profile?.role);
@@ -821,13 +831,16 @@ export default function DonBan() {
                           <div className="text-[12px] text-[#5A6572] mb-1">Chi tiết các lần thanh toán ({detail._pays.length} lần):</div>
                           <div className="flex flex-col gap-1">
                             {detail._pays.map((p) => (
-                              <div key={p.id} className={`flex items-center gap-2 p-1.5 rounded-lg text-[12.5px] ${p.is_reversed ? "bg-[#F3F4F6] text-[#8A93A0] line-through" : "bg-[#F8FAFC]"}`}>
+                              <Fragment key={p.id}>
+                              <div className={`flex items-center gap-2 p-1.5 rounded-lg text-[12.5px] ${p.is_reversed ? "bg-[#F3F4F6] text-[#8A93A0] line-through" : "bg-[#F8FAFC]"}`}>
                                 <div className="w-1.5 h-1.5 rounded-full bg-brand shrink-0" />
                                 <span className="font-semibold">{p.method}</span>
                                 <span className="font-bold ml-auto">{fmtVND(p.amount)}</span>
                                 {p.is_reversed && <Badge tone="dark">Đã đảo ngược</Badge>}
                                 <span className="text-[10.5px] text-[#8A93A0]">{fmtTime(p.created_at)}</span>
                               </div>
+                              <div className="ml-4 -mt-0.5 mb-0.5"><PayAccountInfo p={p} accs={accs} cos={cos} locations={locations} extra={detail.extra} /></div>
+                              </Fragment>
                             ))}
                           </div>
                         </div>
