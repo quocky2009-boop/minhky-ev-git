@@ -60,6 +60,7 @@ export default function CaiDat() {
   const [reg, setReg] = useState(null);
   const [db, setDb] = useState(null);
   const [hook, setHook] = useState(null);
+  const [hookDon, setHookDon] = useState(null);
   const [bk, setBk] = useState(null);
   const [pf, setPf] = useState(null); // phieu in
   const [perms, setPerms] = useState(null);
@@ -133,6 +134,22 @@ export default function CaiDat() {
     if (error) return notify(errMsg(error), "err");
     notify(v ? "Đã lưu webhook. Bấm Gửi thử để kiểm tra." : "Đã tắt thông báo Discord.");
     setHook(null); refresh();
+  };
+
+  const saveHookDon = async () => {
+    const v = hookDon.trim();
+    if (v && !v.startsWith("https://discord.com/api/webhooks/") && !v.startsWith("https://discordapp.com/api/webhooks/"))
+      return notify("URL không đúng dạng webhook Discord (bắt đầu bằng https://discord.com/api/webhooks/...).", "err");
+    const { error } = await supabase.rpc("fn_set_setting", { p_key: "discord_webhook_don_ban", p_value: v });
+    if (error) return notify(errMsg(error), "err");
+    notify(v ? "Đã lưu webhook kênh Đơn bán. Bấm Gửi thử để kiểm tra." : "Đã tắt thông báo Đơn bán.");
+    setHookDon(null); refresh();
+  };
+
+  const testHookDon = async () => {
+    const { error } = await supabase.rpc("fn_test_discord_don_ban");
+    if (error) return notify(errMsg(error), "err");
+    notify("Đã gửi tin thử — kiểm tra channel Đơn bán trong vài giây.");
   };
 
   const testHook = async () => {
@@ -261,6 +278,27 @@ export default function CaiDat() {
               <button className="btn-ok !py-2 !text-xs" onClick={saveHook}>Lưu</button>
               <button className="btn-ghost !py-2 !text-xs" onClick={() => setHook(null)}>Hủy</button>
               {settings.discord_webhook && <button className="btn-danger !py-2 !text-xs" onClick={() => { setHook(""); }}>Xóa URL (rồi bấm Lưu để tắt)</button>}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="card">
+        <div className="font-extrabold mb-1">Thông báo Discord — Đơn bán {settings.discord_webhook_don_ban ? <Badge tone="green">Đang bật</Badge> : <Badge tone="gray">Chưa bật</Badge>}</div>
+        <p className="text-xs text-[#5A6572] mb-3">Gửi chi tiết (khách, xe, khuyến mại, bảng giá, thanh toán) mỗi khi <b>tạo / sửa / hủy / hoàn trả đơn</b>, đổi khuyến mại, bổ sung khách lẻ cuối — cho cả Wizard và Bán buôn. Tạo webhook trong đúng channel đơn bán (ID 1529504082837114990): chuột phải channel → Chỉnh sửa kênh → Tích hợp → Webhook → Tạo webhook → Sao chép URL. Chưa nhập thì <b>không gửi</b> (không lẫn sang kênh tồn kho).</p>
+        {hookDon === null ? (
+          <div className="flex gap-2 items-center flex-wrap">
+            <span className="text-sm font-mono text-[#5A6572]">{settings.discord_webhook_don_ban ? settings.discord_webhook_don_ban.slice(0, 45) + "…" : "Chưa cấu hình webhook."}</span>
+            <button className="btn-ghost !py-1.5 !text-xs" onClick={() => setHookDon(settings.discord_webhook_don_ban || "")}>✎ {settings.discord_webhook_don_ban ? "Sửa" : "Thêm webhook"}</button>
+            {settings.discord_webhook_don_ban && <button className="btn-primary !py-1.5 !text-xs" onClick={testHookDon}>📨 Gửi thử</button>}
+          </div>
+        ) : (
+          <div className="max-w-xl">
+            <input className="inp font-mono !text-xs" placeholder="https://discord.com/api/webhooks/…" value={hookDon} onChange={(e) => setHookDon(e.target.value)} />
+            <div className="flex gap-2 mt-2">
+              <button className="btn-ok !py-2 !text-xs" onClick={saveHookDon}>Lưu</button>
+              <button className="btn-ghost !py-2 !text-xs" onClick={() => setHookDon(null)}>Hủy</button>
+              {settings.discord_webhook_don_ban && <button className="btn-danger !py-2 !text-xs" onClick={() => setHookDon("")}>Xóa URL (rồi bấm Lưu để tắt)</button>}
             </div>
           </div>
         )}
