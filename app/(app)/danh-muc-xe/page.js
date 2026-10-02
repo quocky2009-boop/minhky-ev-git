@@ -16,7 +16,7 @@ export default function DMXe() {
   const [busy, setBusy] = useState(false);
   // Cap nhat gia hang loat
   const [showBulk, setShowBulk] = useState(false);
-  const [bulk, setBulk] = useState({ brand: "", name: "", list_price: "" });
+  const [bulk, setBulk] = useState({ brand: "", name: "", list_price: "", list_price_thue_pin: "" });
   const [showBulkSpecs, setShowBulkSpecs] = useState(false);
   const [bulkSpecs, setBulkSpecs] = useState({ brand: "", name: "", cong_suat_dong_co_w: "", dung_luong_pin: "",
     tam_hoat_dong_km: "", toc_do_toi_da_kmh: "", so_luong_pin_ac_quy: "", model_pin: "" });
@@ -128,23 +128,34 @@ export default function DMXe() {
     }
   };
 
+  const bulkDoiPin = vehicles.some((v) => v.model_pin === "Xe đổi pin" && (!bulk.brand || v.brand === bulk.brand) && (!bulk.name || v.name === bulk.name));
   const capNhatGiaHangLoat = async () => {
     if (!bulk.brand && !bulk.name) return notify("Chọn ít nhất Hãng hoặc Model để giới hạn phạm vi.", "err");
     const gia = Number(bulk.list_price) || 0;
-    if (gia <= 0) return notify("Nhập giá niêm yết mới (> 0).", "err");
-    // So sanh chinh xac ten xe
+    const giaThue = bulkDoiPin ? Number(bulk.list_price_thue_pin) || 0 : 0;
+    if (gia <= 0 && giaThue <= 0) return notify(bulkDoiPin ? "Nhập giá Kèm pin và/hoặc giá Thuê pin mới (> 0)." : "Nhập giá niêm yết mới (> 0).", "err");
     const soKhop = vehicles.filter((v) =>
       (!bulk.brand || v.brand === bulk.brand) &&
       (!bulk.name || v.name === bulk.name)
     ).length;
     if (soKhop === 0) return notify("Không có mã xe nào khớp điều kiện.", "err");
-    if (!confirm(`Cập nhật giá niêm yết = ${fmtVND(gia)} cho ${soKhop} mã xe?\n\nHãng: ${bulk.brand || "tất cả"}\nModel: ${bulk.name || "tất cả"}`)) return;
+    const mo_ta = [gia > 0 ? `giá niêm yết${bulkDoiPin ? " (Kèm pin)" : ""} = ${fmtVND(gia)}` : "", giaThue > 0 ? `giá Thuê pin = ${fmtVND(giaThue)} (chỉ xe Đổi pin)` : ""].filter(Boolean).join("; ");
+    if (!confirm(`Cập nhật ${mo_ta} cho ${soKhop} mã xe?\n\nHãng: ${bulk.brand || "tất cả"}\nModel: ${bulk.name || "tất cả"}`)) return;
     setBusy(true);
-    const { data, error } = await supabase.rpc("fn_cap_nhat_gia_hang_loat", { p: { brand: bulk.brand || null, name: bulk.name || null, list_price: gia } });
+    let soMa = 0;
+    if (gia > 0) {
+      const { data, error } = await supabase.rpc("fn_cap_nhat_gia_hang_loat", { p: { brand: bulk.brand || null, name: bulk.name || null, list_price: gia } });
+      if (error) { setBusy(false); return notify(errMsg(error), "err"); }
+      soMa = data.so_ma_cap_nhat;
+    }
+    if (giaThue > 0) {
+      const { data, error } = await supabase.rpc("fn_cap_nhat_gia_thue_pin_hang_loat", { p: { brand: bulk.brand || null, name: bulk.name || null, list_price_thue_pin: giaThue } });
+      if (error) { setBusy(false); return notify(errMsg(error), "err"); }
+      soMa = Math.max(soMa, data.so_ma_cap_nhat);
+    }
     setBusy(false);
-    if (error) return notify(errMsg(error), "err");
-    notify(`Đã cập nhật giá cho ${data.so_ma_cap_nhat} mã xe.`);
-    setBulk({ brand: "", name: "", list_price: "" }); setShowBulk(false); refresh();
+    notify(`Đã cập nhật giá cho ${soMa} mã xe.`);
+    setBulk({ brand: "", name: "", list_price: "", list_price_thue_pin: "" }); setShowBulk(false); refresh();
   };
 
   const capNhatThongSoHangLoat = async () => {
@@ -256,7 +267,8 @@ export default function DMXe() {
                 {Array.from(new Set(vehicles.filter((v) => !bulk.brand || v.brand === bulk.brand).map((v) => v.name))).sort().map((n) => <option key={n}>{n}</option>)}
               </select>
             </Field>
-            <Field label="Giá niêm yết mới"><MoneyInput value={bulk.list_price} onChange={(v) => setBulk((p) => ({ ...p, list_price: v }))} /></Field>
+            <Field label={bulkDoiPin ? "Giá niêm yết mới — Kèm pin" : "Giá niêm yết mới"}><MoneyInput value={bulk.list_price} onChange={(v) => setBulk((p) => ({ ...p, list_price: v }))} /></Field>
+            {bulkDoiPin && <Field label="Giá niêm yết mới — Thuê pin" hint="Chỉ áp dụng cho xe Đổi pin."><MoneyInput value={bulk.list_price_thue_pin} onChange={(v) => setBulk((p) => ({ ...p, list_price_thue_pin: v }))} /></Field>}
             <div className="pb-3">
               <button className="btn-ok w-full" disabled={busy} onClick={capNhatGiaHangLoat}>Áp dụng</button>
             </div>
@@ -273,7 +285,8 @@ export default function DMXe() {
                 {giaHienTai.length > 0 && (
                   <div className="mb-2 p-2 rounded-lg bg-[#FDF6E3] text-[12.5px]">
                     💰 <b>Giá niêm yết hiện tại</b> của <i>{bulk.name}</i>:{" "}
-                    {giaHienTai.map((g) => fmtVND(g)).join(" / ")}
+                    {giaHienTai.map((g) => fmtVND(g)).join(" / ")}{bulkDoiPin ? " (Kèm pin)" : ""}
+                    {bulkDoiPin && <> · Thuê pin: {[...new Set(kh.filter((v) => v.model_pin === "Xe đổi pin").map((v) => v.list_price_thue_pin ? fmtVND(v.list_price_thue_pin) : "chưa nhập"))].join(" / ")}</>}
                     {giaHienTai.length === 1 && bulk.list_price && Number(bulk.list_price) !== giaHienTai[0] && (
                       <span className="ml-2 text-[#A25F00]">→ sẽ đổi thành <b>{fmtVND(Number(bulk.list_price))}</b></span>
                     )}

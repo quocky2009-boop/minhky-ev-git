@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { NAV, NAV_GROUPS, ROLES } from "@/lib/const";
 import GlobalSearch from "@/components/GlobalSearch";
+import GridEnhancer from "@/components/GridEnhancer";
 
 const base = (href) => href.split("?")[0];
 
@@ -95,6 +96,7 @@ export default function AppShell({ profile, children }) {
 
   return (
     <div className="flex min-h-screen">
+      <GridEnhancer userId={profile.id} />
       {open && <div className="fixed inset-0 bg-black/40 z-40 md:hidden" onClick={() => setOpen(false)} />}
       <aside className={`w-[232px] bg-navy-900 text-[#C8D3E0] flex flex-col shrink-0 fixed md:static z-50 h-screen md:h-auto transition-transform ${open ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}>
         <div className="px-4 py-5 border-b border-navy-700">

@@ -45,3 +45,11 @@ body { @apply bg-[#F3F5F8] text-[#1B2733] font-sans; }
 @media (max-width: 640px) {
   .card { @apply p-3.5 rounded-xl; }
 }
+
+/* ===== Tuy bien cot bang luoi (GridEnhancer) ===== */
+.grid-rs { position: absolute; top: 0; right: -3px; bottom: 0; width: 7px; cursor: col-resize; z-index: 3; }
+.grid-rs:hover, .grid-rs:active { background: rgba(30, 79, 216, .35); }
+th[draggable="true"] { cursor: grab; }
+.grid-reset { position: absolute; top: 2px; right: 2px; z-index: 6; font-size: 11px; font-weight: 700; padding: 2px 8px;
+  border-radius: 8px; background: #EEF1F4; color: #5A6572; border: 1px solid #D5DBE3; }
+.grid-reset:hover { background: #E3E8EF; }

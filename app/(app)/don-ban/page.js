@@ -157,7 +157,7 @@ export default function DonBan() {
     return `${o.code} ${o.customer_name} ${o.customer_phone} ${o.frame_number} ${o.invoice_no || ""} ${v ? v.name : ""} ${o.seller_name}`.toLowerCase().includes(kw);
   });
   const sorted = sort.sortFn(filtered, {
-    code: (o) => o.code, date: (o) => o.sale_date, xe: (o) => vOf(o.vehicle_id)?.name || o.vehicle_id,
+    code: (o) => o.code, date: (o) => o.sale_date, xe: (o) => vOf(o.vehicle_id)?.name || o.vehicle_id, sk: (o) => o.frame_number || "", sdt: (o) => o.customer_phone || "",
     kho: (o) => locName(o.location_code), kh: (o) => o.customer_name, type: (o) => o.customer_type || "", tien: (o) => total(o),
     hd: (o) => o.invoice_status || "Chờ xuất HĐ", nv: (o) => o.seller_name,
   });
@@ -465,7 +465,7 @@ export default function DonBan() {
               }}>⬇ Xuất Excel</button>
             </SelectionBar>
             <div className="tbl-scroll"><table className="w-full border-collapse tbl-card table-fixed">
-              <thead><tr><ThCheck sel={sel} rows={pageSlice(sorted, page, pageSize)} idOf={(o) => o.id} /><Th label="Mã đơn" k="code" sort={sort} className="w-[9%]" /><Th label="Ngày" k="date" sort={sort} className="w-[6%]" /><Th label="Xe · Số khung · Kho" k="xe" sort={sort} className="w-[15%]" /><Th label="Điểm bán" k="kho" sort={sort} className="w-[8%]" /><Th label="Khách" k="kh" sort={sort} className="w-[14%]" /><Th label="Loại KH" k="type" sort={sort} className="w-[7%]" /><Th label="Tổng đơn" k="tien" sort={sort} className="w-[9%]" /><Th label="Hóa đơn" k="hd" sort={sort} className="w-[9%]" /><Th label="NV bán" k="nv" sort={sort} className="w-[7%]" /><th className="th w-[16%]"></th></tr></thead>
+              <thead><tr><ThCheck sel={sel} rows={pageSlice(sorted, page, pageSize)} idOf={(o) => o.id} /><Th label="Mã đơn" k="code" sort={sort} className="w-[8%]" /><Th label="Ngày" k="date" sort={sort} className="w-[6%]" /><Th label="Xe" k="xe" sort={sort} className="w-[10%]" /><Th label="Số khung" k="sk" sort={sort} className="w-[11%]" /><Th label="Điểm bán" k="kho" sort={sort} className="w-[8%]" /><Th label="Khách" k="kh" sort={sort} className="w-[10%]" /><Th label="SĐT" k="sdt" sort={sort} className="w-[7%]" /><Th label="Loại KH" k="type" sort={sort} className="w-[7%]" /><Th label="Tổng đơn" k="tien" sort={sort} className="w-[8%]" /><Th label="Hóa đơn" k="hd" sort={sort} className="w-[8%]" /><Th label="NV bán" k="nv" sort={sort} className="w-[6%]" /><th className="th w-[11%]"></th></tr></thead>
               <tbody>{pageSlice(sorted, page, pageSize).map((o, i) => {
                 const v = vOf(o.vehicle_id);
                 const st = o.invoice_status || "Chờ xuất HĐ";
@@ -478,16 +478,12 @@ export default function DonBan() {
                     <td data-label="Mã đơn" className="td font-bold"><Link href={`/don-ban/${o.id}`} className="text-brand hover:underline">{o.code}</Link>{nhanTra ? <Badge tone="red">Đã trả hàng</Badge> : huy && <Badge tone="red">Đã hủy</Badge>}</td>
                     <td data-label="Ngày" className="td text-xs">{fmtDate(o.sale_date)}</td>
                     <td data-label="Xe" className="td text-[13px]">
-                      <div className="truncate" title={`${v ? `${v.name} ${v.color}` : o.vehicle_id} · SK ${o.frame_number}`}>
-                        {v ? `${v.name} ${v.color}` : o.vehicle_id}<span className="font-mono text-[10.5px] text-[#8A93A0] ml-1.5">{o.frame_number}</span>
-                      </div>
+                      <div className="truncate" title={v ? `${v.brand} ${v.name} ${v.color}` : o.vehicle_id}>{v ? `${v.name} ${v.color}` : o.vehicle_id}</div>
                     </td>
+                    <td data-label="Số khung" className="td font-mono text-[11px]"><div className="truncate" title={o.frame_number}>{o.frame_number}</div></td>
                     <td data-label="Điểm bán" className="td text-xs"><div className="truncate" title={locName(o.location_code)}>{locName(o.location_code)}</div></td>
-                    <td data-label="Khách" className="td text-[13px]">
-                      <div className="truncate" title={`${o.customer_name} · ${o.customer_phone}`}>
-                        {o.customer_name}<span className="text-[10.5px] text-[#8A93A0] ml-1.5">{o.customer_phone}</span>
-                      </div>
-                    </td>
+                    <td data-label="Khách" className="td text-[13px]"><div className="truncate" title={o.customer_name}>{o.customer_name}</div></td>
+                    <td data-label="SĐT" className="td text-xs"><div className="truncate" title={o.customer_phone}>{o.customer_phone}</div></td>
                     <td data-label="Loại KH" className="td text-xs"><Badge tone={o.customer_type === "Khách buôn" ? "amber" : o.customer_type === "Khách lẻ của Đại lý" ? "blue" : o.customer_type === "Khách lẻ" || !o.customer_type ? "green" : "purple"}>{o.customer_type || "Khách lẻ"}</Badge></td>
                     <td data-label="Tổng đơn" className="td font-bold">{fmtVND(total(o))}</td>
                     <td data-label="Hóa đơn" className="td">
@@ -519,7 +515,7 @@ export default function DonBan() {
                     </div></td>
                   </tr>,
                   invId === o.id && (
-                    <tr key={o.id + "f"}><td colSpan={11} className="td bg-[#FFFDF5]">
+                    <tr key={o.id + "f"}><td colSpan={12} className="td bg-[#FFFDF5]">
                       <div className="flex flex-col gap-3">
                         <div className="flex gap-1.5 items-end flex-wrap">
                           <div><label className="lbl">Số hóa đơn (bắt buộc)</label><input className="inp !py-2 !w-48" autoFocus value={invF.no} onChange={(e) => setInvF((p) => ({ ...p, no: e.target.value }))} placeholder="VD: 00012345" /></div>
@@ -560,7 +556,7 @@ export default function DonBan() {
                   ),
                 ];
               })}
-              {sorted.length === 0 && <tr><td className="td" colSpan={11}>Không có đơn bán nào khớp bộ lọc.</td></tr>}
+              {sorted.length === 0 && <tr><td className="td" colSpan={12}>Không có đơn bán nào khớp bộ lọc.</td></tr>}
               </tbody>
             </table></div>
             <Pager total={sorted.length} page={page} setPage={setPage} pageSize={pageSize} setPageSize={setPageSize} />
