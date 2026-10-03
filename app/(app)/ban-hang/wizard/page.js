@@ -6,6 +6,7 @@ import { useCatalog, useToast } from "@/lib/useData";
 import { Field, Badge, Toast, LocSearch, CustomerSearch, MoneyInput, FrameSearch, VehicleSearch } from "@/components/ui";
 import { fmtVND, fmtDate, errMsg } from "@/lib/format";
 import { CUSTOMER_SOURCES } from "@/lib/const";
+import BankOptions from "@/components/BankOptions";
 
 const iso = (d) => d.toLocaleDateString("sv-SE");
 const STEPS = ["Đơn hàng & khách hàng", "Xe & ưu đãi", "Thanh toán & xuất HĐ", "Xác nhận"];
@@ -121,10 +122,12 @@ function TaoDonWizardInner() {
   const [bangGiaKey, setBangGiaKey] = useState(null); // khoa lua chon luc tinh Bang gia gan nhat
 
   const [bankAccounts, setBankAccounts] = useState([]);
+  const [companies, setCompanies] = useState([]);
   useEffect(() => {
     if (loading) return;
     supabase.from("promotions").select("*").eq("status", "Đang áp dụng").then(({ data }) => setPromos(data || []));
     supabase.from("cash_accounts").select("id, name, company_id, bank_info").eq("status", "Hoạt động").eq("type", "Ngân hàng").then(({ data }) => setBankAccounts(data || []));
+    supabase.from("companies").select("id,name").then(({ data }) => setCompanies(data || []));
   }, [loading]);
 
   const vehicleObj = vehicles.find((v) => v.id === picked?.vehicle_id);
@@ -254,7 +257,6 @@ function TaoDonWizardInner() {
   const PTTT = paymentMethods.length > 0 ? paymentMethods.map((m) => m.code) : ["Tiền mặt", "Chuyển khoản", "Trả góp"];
   const quyTypeOf = (method) => paymentMethods.find((m) => m.code === method)?.quy_type;
   const companyIdCuaDon = vehicleObj ? brands.find((b) => b.name === vehicleObj.brand)?.company_id || null : null;
-  const banksHopLe = companyIdCuaDon ? bankAccounts.filter((a) => a.company_id === companyIdCuaDon) : [];
 
   const phaiTra = bangGia?.gia_can_thanh_toan || 0;
   const tongCoc = Number(coc) || 0;
@@ -590,11 +592,11 @@ function TaoDonWizardInner() {
                     {quyTypeOf(cocRow.method) === "Ngân hàng" && (
                       <select className="inp !w-auto !py-1.5 !text-xs max-w-full" value={cocRow.account_id || ""} onChange={(e) => setCocRow((r) => ({ ...r, account_id: e.target.value }))}>
                         <option value="">— Tài khoản nhận tiền —</option>
-                        {banksHopLe.map((a) => <option key={a.id} value={a.id}>{a.name}{a.bank_info ? ` (${a.bank_info})` : ""}</option>)}
+                        <BankOptions accounts={bankAccounts} companies={companies} companyId={companyIdCuaDon} />
                       </select>
                     )}
                   </div>
-                  {quyTypeOf(cocRow.method) === "Ngân hàng" && banksHopLe.length === 0 && <div className="text-[10.5px] text-danger mt-1">Chưa có tài khoản Ngân hàng nào cho đúng pháp nhân của hãng xe này — vào Sổ quỹ tạo trước.</div>}
+                  {quyTypeOf(cocRow.method) === "Ngân hàng" && bankAccounts.length === 0 && <div className="text-[10.5px] text-danger mt-1">Chưa có tài khoản Ngân hàng nào — vào Cài đặt → Tài khoản nhận tiền để tạo.</div>}
                 </div>
               )}
               <div className="flex flex-col gap-2 mb-2">
@@ -624,9 +626,9 @@ function TaoDonWizardInner() {
                         <select className="inp !w-auto !py-1 !text-xs max-w-full" value={p.account_id || ""}
                           onChange={(e) => setPays((x) => x.map((y, j) => j === i ? { ...y, account_id: e.target.value } : y))}>
                           <option value="">— Chọn đúng tài khoản khách đã chuyển vào —</option>
-                          {banksHopLe.map((a) => <option key={a.id} value={a.id}>{a.name}{a.bank_info ? ` (${a.bank_info})` : ""}</option>)}
+                          <BankOptions accounts={bankAccounts} companies={companies} companyId={companyIdCuaDon} />
                         </select>
-                        {banksHopLe.length === 0 && <span className="text-[10.5px] text-danger">Chưa có tài khoản Ngân hàng nào cho đúng pháp nhân của hãng xe này — vào Sổ quỹ tạo trước.</span>}
+                        {bankAccounts.length === 0 && <span className="text-[10.5px] text-danger">Chưa có tài khoản Ngân hàng nào — vào Cài đặt → Tài khoản nhận tiền để tạo.</span>}
                       </div>
                     ) : null}
                   </div>

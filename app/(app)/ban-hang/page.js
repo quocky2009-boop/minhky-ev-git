@@ -8,6 +8,7 @@ import { uploadAnhDon } from "@/lib/img";
 import Link from "next/link";
 import { fmtVND, errMsg } from "@/lib/format";
 import { CUSTOMER_TYPES, CUSTOMER_SOURCES } from "@/lib/const";
+import BankOptions from "@/components/BankOptions";
 
 const iso = (d) => d.toLocaleDateString("sv-SE");
 const ITEM_TYPES = { PHU_KIEN: "Phụ kiện", DANG_KY: "Đăng ký xe", BAO_HIEM: "Bảo hiểm" };
@@ -80,6 +81,7 @@ function TaoDonInner() {
   const [promoChon, setPromoChon] = useState([]);   // mang id khuyen mai da tick
   const [promoQ, setPromoQ] = useState("");
   const [bankAccounts, setBankAccounts] = useState([]);
+  const [companies, setCompanies] = useState([]);
   const [che_do_tim, setCheDoTim] = useState("sk"); // "sk" | "model"
   const [modelChon, setModelChon] = useState("");
   const [xeTheoModel, setXeTheoModel] = useState([]);
@@ -111,13 +113,14 @@ function TaoDonInner() {
   const [extra, setExtra] = useState({});
 
   const loadCusts = async () => {
-    const [{ data: c }, { data: prods }, { data: kms }, { data: banks }] = await Promise.all([
+    const [{ data: c }, { data: prods }, { data: kms }, { data: banks }, { data: cps }] = await Promise.all([
       supabase.from("customers").select("id,code,name,phone,cccd,address,status,customer_type,source,email,gender,birthday").order("created_at", { ascending: false }).limit(2000),
       supabase.from("products").select("id,name,group_name,unit,sale_price,stock_qty").eq("status","Hoạt động").order("group_name").order("name"),
       supabase.from("promotions").select("*").eq("status","Đang áp dụng"),
       supabase.from("cash_accounts").select("id, name, company_id, bank_info").eq("status","Hoạt động").eq("type","Ngân hàng"),
+      supabase.from("companies").select("id,name"),
     ]);
-    setCusts(c || []); setProductList(prods || []); setPromos(kms || []); setBankAccounts(banks || []);
+    setCusts(c || []); setProductList(prods || []); setPromos(kms || []); setBankAccounts(banks || []); setCompanies(cps || []);
   };
   useEffect(() => {
     if (!loading) {
@@ -201,7 +204,6 @@ function TaoDonInner() {
     if (!v0) return null;
     return brands.find((b) => b.name === v0.brand)?.company_id || null;
   })();
-  const banksHopLe = companyIdCuaDon ? bankAccounts.filter((a) => a.company_id === companyIdCuaDon) : [];
 
   const vName = (id) => { const v = vehicles.find((x) => x.id === id); return v ? `${v.name} · ${v.color}` : id; };
 
@@ -880,9 +882,9 @@ function TaoDonInner() {
                 <select className="inp !w-auto !py-1 !text-xs" value={p.account_id || ""}
                   onChange={(e) => setPays((x) => x.map((y, j) => j === i ? { ...y, account_id: e.target.value } : y))}>
                   <option value="">— Chọn đúng tài khoản khách đã chuyển vào —</option>
-                  {banksHopLe.map((a) => <option key={a.id} value={a.id}>{a.name}{a.bank_info ? ` (${a.bank_info})` : ""}</option>)}
+                  <BankOptions accounts={bankAccounts} companies={companies} companyId={companyIdCuaDon} />
                 </select>
-                {banksHopLe.length === 0 && <span className="text-[10.5px] text-danger">Chưa có tài khoản Ngân hàng nào cho đúng pháp nhân của hãng xe này — vào Sổ quỹ tạo trước.</span>}
+                {bankAccounts.length === 0 && <span className="text-[10.5px] text-danger">Chưa có tài khoản Ngân hàng nào — vào Cài đặt → Tài khoản nhận tiền để tạo.</span>}
               </div>
             ) : null)}
           </div>
@@ -953,7 +955,7 @@ function TaoDonInner() {
                   ) : quyTypeOf(p.method) === "Ngân hàng" ? (
                     <select className="inp !flex-1" value={p.account_id || ""} onChange={(e) => setDaoNguoc((cur) => ({ ...cur, new_payments: cur.new_payments.map((x, j) => j === i ? { ...x, account_id: e.target.value } : x) }))}>
                       <option value="">— Chọn tài khoản —</option>
-                      {banksHopLe.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                      <BankOptions accounts={bankAccounts} companies={companies} companyId={companyIdCuaDon} withInfo={false} />
                     </select>
                   ) : <div className="flex-1" />}
                   <div className="!w-32"><MoneyInput value={p.amount} onChange={(v) => setDaoNguoc((cur) => ({ ...cur, new_payments: cur.new_payments.map((x, j) => j === i ? { ...x, amount: v } : x) }))} /></div>
