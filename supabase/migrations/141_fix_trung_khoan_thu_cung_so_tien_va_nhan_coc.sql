@@ -1,0 +1,12 @@
+-- =====================================================================
+-- 141_fix_trung_khoan_thu_cung_so_tien_va_nhan_coc.sql
+-- (1) LOI: 2 khoan thu cung phuong thuc + cung so tien trong 1 don (vd coc CK 2tr
+--     + them 1 dong CK 2tr) -> _auto_thu coi khoan 2 la "trung" (khoa chong trung
+--     ref_doc + so tien) nen KHONG tao phieu thu / khong gan tai khoan, du
+--     sale_payments van ghi "Da thu". fn_ban_hang_v2 nay them hau to -<id khoan thu>
+--     vao ref khi khoa da ton tai (khong doi hanh vi cac truong hop con lai).
+--     Don bi anh huong da biet: BH-2610-79125 (khoan CK 2tr thu 2 thieu phieu thu).
+-- (2) Tin Discord: dong thu la tien coc duoc danh dau "(cọc)" de khong nham la trung.
+-- Vá bằng pg_get_functiondef + replace: fn_ban_hang_v2, _don_discord_body,
+-- _don_discord_tao_embeds (DB that la nguon su that).
+-- =====================================================================
