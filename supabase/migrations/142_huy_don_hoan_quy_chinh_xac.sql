@@ -1,0 +1,30 @@
+-- =====================================================================
+-- 142_huy_don_hoan_quy_chinh_xac.sql
+-- Sua 2 loi hoan quy khi HUY / TRA HANG don ban (fn_xoa_don, fn_tra_hang_ban):
+--
+-- LOI 1 - hoan 2 lan: don da hoan MOT PHAN (fn_hoan_tien_don_v2) roi huy don,
+--   _hoan_quy_don van hoan lai TOAN BO phieu thu (khong tru phan da hoan);
+--   neu phieu thu chua chot con bi xoa du Chi hoan mot phan van con -> lech so quy.
+--   -> _hoan_quy_don: lay tong phieu Chi "Chi trả lại tiền cho khách hủy/trả đơn"
+--      da lap (ref_doc = ma don) theo tung quy, phan bo tru vao tung phieu thu cung quy,
+--      chi hoan PHAN CON LAI. Phieu thu da hoan 1 phan luon xu ly bang phieu Chi (khong xoa phieu thu goc).
+--
+-- LOI 2 - don ban buon (nhieu xe / 1 lo): tien ca lo nam o 1 don "giu tien".
+--   Huy don giu tien -> hoan ca lo trong khi cac don con lai van hieu luc;
+--   huy don khac -> khong hoan gi.
+--   -> _huy_don_tien: neu lo con don khac hieu luc: hoan PHAN VUOT
+--      (tong da thu cua lo - tong tien cac don con lai) qua _hoan_khoan_thu
+--      (phieu Chi dung quy/tai khoan da nhan, tang refunded_amount);
+--      neu don bi huy dang giu tien con lai thi chuyen khoan thu (va ref phieu thu/chi)
+--      sang don con hieu luc dau tien; don cuoi cung cua lo huy nhu don le.
+--   fn_xoa_don va fn_tra_hang_ban goi _huy_don_tien thay cho _hoan_quy_don.
+--
+-- Da kiem thu trong giao dich rollback: hoan mot phan 1tr/5tr roi huy -> chi hoan not 4tr;
+-- lo 3 don thu 20tr (don 1 giu tien): huy don 2 -> 0, huy don 1 -> hoan 10tr + chuyen 10tr sang don 3,
+-- huy don 3 -> hoan not 10tr; tong Chi = 20tr.
+-- (Ham duoc va qua pg_get_functiondef + replace; DB that la nguon su that.)
+-- Chua xu ly: 2 don thang 7 cu BH-2607-10142, BH-2607-22099 (don test).
+-- =====================================================================
+-- _hoan_khoan_thu(p_codes text[], p_amount bigint, p_ly_do text, p_ref text, p_cust text, p_uid uuid, p_uname text) returns bigint
+-- _huy_don_tien(p_code text, p_ly_do text, p_uid uuid, p_uname text) returns bigint
+-- (xem dinh nghia trong DB)
