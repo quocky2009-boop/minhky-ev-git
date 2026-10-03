@@ -117,7 +117,7 @@ function TaoDonInner() {
       supabase.from("customers").select("id,code,name,phone,cccd,address,status,customer_type,source,email,gender,birthday").order("created_at", { ascending: false }).limit(2000),
       supabase.from("products").select("id,name,group_name,unit,sale_price,stock_qty").eq("status","Hoạt động").order("group_name").order("name"),
       supabase.from("promotions").select("*").eq("status","Đang áp dụng"),
-      supabase.from("cash_accounts").select("id, name, company_id, bank_info").eq("status","Hoạt động").eq("type","Ngân hàng"),
+      supabase.rpc("fn_tai_khoan_chon").then((r) => ({ data: (r.data || []).filter((a) => a.status === "Hoạt động" && a.type === "Ngân hàng") })),
       supabase.from("companies").select("id,name"),
     ]);
     setCusts(c || []); setProductList(prods || []); setPromos(kms || []); setBankAccounts(banks || []); setCompanies(cps || []);

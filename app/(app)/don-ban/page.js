@@ -214,7 +214,7 @@ export default function DonBan() {
     setAllPromos(kms || []);
     if (accs.length === 0) {
       const [{ data: ac }, { data: cp }] = await Promise.all([
-        supabase.from("cash_accounts").select("id,name,type,bank_info,company_id,location_code"),
+        supabase.rpc("fn_tai_khoan_chon"),
         supabase.from("companies").select("id,name"),
       ]);
       setAccs(ac || []); setCos(cp || []);

@@ -42,7 +42,7 @@ export default function DonBanChiTiet() {
       supabase.from("sale_payments").select("*").eq("sale_code", code),
       supabase.from("sale_order_promotions").select("promotion_id, promotions(id, name)").eq("sale_code", code),
       supabase.from("promotions").select("*"),
-      supabase.from("cash_accounts").select("id,name,type,bank_info,company_id,location_code"),
+      supabase.rpc("fn_tai_khoan_chon"),
       supabase.from("companies").select("id,name"),
     ]);
     setAccs(ac || []); setCos(cp || []);

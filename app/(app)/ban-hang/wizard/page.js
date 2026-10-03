@@ -126,7 +126,8 @@ function TaoDonWizardInner() {
   useEffect(() => {
     if (loading) return;
     supabase.from("promotions").select("*").eq("status", "Đang áp dụng").then(({ data }) => setPromos(data || []));
-    supabase.from("cash_accounts").select("id, name, company_id, bank_info").eq("status", "Hoạt động").eq("type", "Ngân hàng").then(({ data }) => setBankAccounts(data || []));
+    // RPC (không đọc bảng trực tiếp): nhân viên kinh doanh không có quyền xem bảng cash_accounts
+    supabase.rpc("fn_tai_khoan_chon").then(({ data }) => setBankAccounts((data || []).filter((a) => a.status === "Hoạt động" && a.type === "Ngân hàng")));
     supabase.from("companies").select("id,name").then(({ data }) => setCompanies(data || []));
   }, [loading]);
 
