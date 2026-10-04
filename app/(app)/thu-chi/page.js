@@ -92,6 +92,15 @@ export default function SoQuy() {
     notify("Đã gửi báo cáo số dư quỹ về Discord.");
   };
 
+  // Báo cáo thu chi cả ngày (theo từng khu vực + tổng) — tự động gửi 17h hằng ngày, nút này gửi lại/gửi thử
+  const baoCaoThuChi = async () => {
+    const ngay = prompt("Gửi báo cáo thu chi cho ngày nào? (yyyy-mm-dd — để trống = hôm nay)", iso(new Date()));
+    if (ngay === null) return;
+    const { error } = await supabase.rpc("fn_bao_cao_thu_chi_now", { p_date: ngay.trim() || null });
+    if (error) return notify(errMsg(error), "err");
+    notify("Đã gửi báo cáo thu chi ngày về Discord.");
+  };
+
   const kw = q.trim().toLowerCase();
   const rows = txns.filter((t) => {
     if (fDir && t.direction !== fDir) return false;
@@ -121,6 +130,7 @@ export default function SoQuy() {
       <div className="flex items-center gap-2 flex-wrap">
         <div className="font-extrabold text-lg mr-auto">Sổ quỹ</div>
         <button className="btn-ghost !text-xs" onClick={baoCaoDiscord}>📤 Gửi số dư về Discord</button>
+        <button className="btn-ghost !text-xs" onClick={baoCaoThuChi}>📊 Gửi báo cáo thu chi ngày</button>
         <button className="btn-ghost !text-xs" onClick={exportCSV}>⬇ Xuất file</button>
       </div>
 

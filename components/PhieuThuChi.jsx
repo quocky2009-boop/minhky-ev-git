@@ -84,6 +84,7 @@ export default function PhieuThuChi({ dir }) {
   const ghi = async () => {
     if (!f.account_id) return notify("Chọn quỹ.", "err");
     if (!(Number(f.amount) > 0)) return notify("Nhập số tiền.", "err");
+    if (!isThu && !f.description.trim()) return notify("Nhập lý do chi (Diễn giải) — bắt buộc để báo cáo thu chi cuối ngày có nội dung.", "err");
     setBusy(true);
     const { data, error } = await supabase.rpc("fn_ghi_thu_chi", { p: { ...f, direction: dir, amount: Number(f.amount) } });
     setBusy(false);
@@ -236,8 +237,8 @@ export default function PhieuThuChi({ dir }) {
               <Field label="Giá trị" required><MoneyInput value={f.amount} onChange={(v) => setF((p) => ({ ...p, amount: v }))} /></Field>
               <Field label="Ngày ghi nhận"><input type="date" className="inp" value={f.txn_date} onChange={(e) => setF((p) => ({ ...p, txn_date: e.target.value }))} /></Field>
               <div className="md:col-span-2">
-                <Field label="Diễn giải / tham chiếu">
-                  <input className="inp" value={f.description} onChange={(e) => setF((p) => ({ ...p, description: e.target.value }))} placeholder="Nội dung phiếu" />
+                <Field label={isThu ? "Diễn giải / tham chiếu" : "Lý do chi"} required={!isThu}>
+                  <input className="inp" value={f.description} onChange={(e) => setF((p) => ({ ...p, description: e.target.value }))} placeholder={isThu ? "Nội dung phiếu" : "VD: cước lấy bảo vệ pin, mua dây thép, chi lương…"} />
                 </Field>
               </div>
             </div>

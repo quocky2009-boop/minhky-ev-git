@@ -1,0 +1,19 @@
+-- =====================================================================
+-- 144_bao_cao_thu_chi_ngay.sql
+-- Bao cao THU - CHI cuoi ngay gui Discord (kenh Tai chinh, webhook discord_webhook_thuchi),
+-- theo mau Excel cua CEO: doanh thu / tien mat / chuyen khoan / cong no / thu cong no /
+-- tong chi + ly do chi / tien mat thuc thu / ton quy chuyen sang - cuoi ngay.
+--  - Moi KHU VUC (Thanh pho, Ham Yen) 1 embed + 1 embed TONG toan cong ty
+--  - Doanh thu tach Ban xe / Dich vu / Tong
+--  - Tra gop cho giai ngan tinh vao CONG NO; coc nhan truoc tinh vao tien thu o ngay nhan
+--  - Tien mat theo quy tien mat cua diem; chuyen khoan gan diem qua ref_doc (don/coc/phieu DV)
+--  - Chi: bo phieu bi tu choi, danh dau "(cho duyet)"; ton quy gom opening + phieu den het ngay
+--  - Gui tu dong 17h00 (cron bao-cao-thu-chi-17h = 10:00 UTC); nut "Gui bao cao thu chi ngay" o So quy
+-- Ham: _btc_tinh, _btc_embed, _bao_cao_thu_chi_embeds, _bao_cao_thu_chi_gui, fn_bao_cao_thu_chi_now
+-- (xem dinh nghia trong DB — DB that la nguon su that).
+--
+-- Phieu chi tay BAT BUOC ly do (fn_ghi_thu_chi: THIEU_THONG_TIN neu diễn giải rong).
+-- LOI SUA KEM THEO: fn_ghi_thu_chi goi _quy_mac_dinh(uuid,text) khong ton tai (ham chi con
+--   (text,text)) nen MOI phieu thu/chi tay deu loi -> doi thanh _quy_mac_dinh(null::text,'Tiền mặt').
+-- Ghi chu: v_quy_so_du / fn_so_du hien van tinh ca phieu chi bi tu choi (bao cao thu chi thi bo).
+-- =====================================================================
