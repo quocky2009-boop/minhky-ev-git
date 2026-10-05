@@ -1,0 +1,27 @@
+-- =====================================================================
+-- 145_dv_ngoai_quy_cua_hang_truong.sql
+-- QUY DICH VU NGOAI: tien thu ho dang ky xe / ban phu kien-phu tung ngoai do CUA HANG TRUONG quan ly
+-- (khong vao tai khoan cong ty). Giai doan 1.
+--
+-- Du lieu
+--  - cash_accounts.nhom ('KINH_DOANH' | 'DV_NGOAI') + manager_id (cua hang truong); v_quy_so_du them nhom, manager_id
+--  - dv_ngoai_bang_gia: bang gia chuan (seed: Dang ky xe may Feliz 2025 thu 1.000.000/chi 800.000; Dan PPF thu 2.000.000/chi 1.500.000)
+--  - dv_ngoai: khoan dich vu gan don ban/so khung (hoac khach le): thu (khach tra), chi_phi (phai tra ngoai), lai = thu - chi_phi
+--      status DANG_XU_LY -> HOAN_TAT (can thu du) -> DA_NOP | HUY ; v_dv_ngoai (security_invoker) them da_thu, da_chi, lai
+--  - dv_ngoai_nop: de nghi nop ve cong ty cuoi thang (ke toan xac nhan)
+--  - RLS: CEO/ADMIN thay het; MANAGER chi thay khoan/de nghi cua minh
+--  - role_perms: dvn_ghi (ADMIN, MANAGER), dvn_xac_nhan_nop (ADMIN) — CEO luon co
+--
+-- Ham: _dvn_quy_ok, fn_dvn_tao/sua/thu/chi/hoan_tat/huy, fn_dvn_bang_gia_luu, fn_dvn_de_nghi_nop, fn_dvn_xac_nhan_nop
+--  - Thu: phieu thu category 'Thu dịch vụ ngoài' (ref_doc = ma khoan DVN-...), khong vuot so khach phai tra
+--  - Chi: phieu chi 'Chi dịch vụ ngoài', BAT BUOC ly do (khong bat buoc anh bien lai)
+--  - Nop: gom khoan HOAN_TAT chua nop; ke toan xac nhan -> phieu chi 'Nộp về công ty' (quy ngoai) + phieu thu 'Thu nộp từ dịch vụ ngoài' (quy cong ty)
+--
+-- Cach ly khoi quy kinh doanh (da va): _quy_mac_dinh, fn_tai_khoan_chon, fn_ds_quy chi tra quy KINH_DOANH;
+--   _auto_thu/_auto_chi tu choi quy ngoai; fn_doi_soat_tinh chi tinh quy kinh doanh; fn_them_quy nhan nhom/manager_id
+--   (quy ngoai khong bat buoc phap nhan).
+--
+-- Bao cao thu chi 17h (migration 144): _btc_tinh chi tinh quy kinh doanh (+ dong "nop tu quy dich vu ngoai");
+--   them _btc_ngoai, _btc_ngoai_text: moi khu vuc co khoi "Quy dich vu ngoai", embed tong them khoi "Tong ca hai loai"
+--   (loai cap phieu nop noi bo de khong tinh 2 lan).
+-- (Cac ham duoc vá bang pg_get_functiondef + replace; DB that la nguon su that.)

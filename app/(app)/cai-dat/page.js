@@ -156,30 +156,36 @@ function PhapNhan({ supabase, notify, brands, refresh, onChanged }) {
   );
 }
 
-const EMPTY_ACC = { id: null, name: "", type: "Ngân hàng", location_code: "", company_id: "", bank_info: "", opening_balance: 0, status: "Hoạt động" };
+const EMPTY_ACC = { id: null, name: "", type: "Ngân hàng", location_code: "", company_id: "", bank_info: "", opening_balance: 0, status: "Hoạt động", nhom: "KINH_DOANH", manager_id: "" };
 function QuyTaiKhoan({ supabase, notify, locations, tick }) {
   const [accs, setAccs] = useState([]);
   const [cos, setCos] = useState([]);
   const [f, setF] = useState(null);
+  const [mgrs, setMgrs] = useState([]);
   const load = async () => {
-    const [{ data: a }, { data: c }] = await Promise.all([
+    const [{ data: a }, { data: c }, { data: m }] = await Promise.all([
       supabase.from("cash_accounts").select("*").order("type").order("name"),
       supabase.from("companies").select("id,name").eq("status", "Hoạt động").order("name"),
+      supabase.from("profiles").select("id,name,role").in("role", ["MANAGER", "ADMIN", "CEO"]).order("name"),
     ]);
-    setAccs(a || []); setCos(c || []);
+    setAccs(a || []); setCos(c || []); setMgrs(m || []);
   };
   useEffect(() => { load(); }, [tick]);
   const luu = async (acc) => {
     const a = acc || f;
     if (!a.name.trim()) return notify("Nhập tên tài khoản/quỹ.", "err");
-    if (a.type === "Ngân hàng" && !a.company_id) return notify("Tài khoản ngân hàng bắt buộc chọn Pháp nhân sở hữu.", "err");
-    const { error } = await supabase.rpc("fn_them_quy", { p: { ...a, company_id: a.company_id || "", location_code: a.location_code || "", opening_balance: Number(a.opening_balance) || 0 } });
+    const ngoai = a.nhom === "DV_NGOAI";
+    if (a.type === "Ngân hàng" && !ngoai && !a.company_id) return notify("Tài khoản ngân hàng bắt buộc chọn Pháp nhân sở hữu.", "err");
+    if (ngoai && (!a.manager_id || !a.location_code)) return notify("Quỹ dịch vụ ngoài bắt buộc chọn Người quản lý (cửa hàng trưởng) và Điểm.", "err");
+    const { error } = await supabase.rpc("fn_them_quy", { p: { ...a, company_id: a.company_id || "", location_code: a.location_code || "", manager_id: a.manager_id || "", opening_balance: Number(a.opening_balance) || 0 } });
     if (error) return notify(errMsg(error), "err");
     notify(acc ? (acc.status === "Hoạt động" ? "Đã mở lại tài khoản." : "Đã khóa tài khoản — không còn hiện khi chọn nơi nhận tiền.") : "Đã lưu tài khoản.");
     setF(null); load();
   };
   const bank = accs.filter((a) => a.type === "Ngân hàng");
   const coName = (id) => cos.find((c) => c.id === id)?.name || "—";
+  const mgrName = (id) => mgrs.find((m) => m.id === id)?.name || "—";
+  const ngoai = f?.nhom === "DV_NGOAI";
   return (
     <div className="card">
       <div className="flex items-center mb-1">
@@ -191,12 +197,26 @@ function QuyTaiKhoan({ supabase, notify, locations, tick }) {
         <div className="bg-[#F8FAFC] rounded-xl p-3 mb-3">
           <div className="grid gap-x-3 md:grid-cols-3 sm:grid-cols-2">
             <Field label="Tên tài khoản / quỹ" required><input className="inp" value={f.name} onChange={(e) => setF((p) => ({ ...p, name: e.target.value }))} placeholder="VD: TK SHB Cty Ngân Thái Sơn" /></Field>
+            <Field label="Nhóm quỹ">
+              <select className="inp" disabled={!!f.id} value={f.nhom || "KINH_DOANH"} onChange={(e) => setF((p) => ({ ...p, nhom: e.target.value, company_id: "", location_code: "", manager_id: "" }))}>
+                <option value="KINH_DOANH">Quỹ kinh doanh của công ty</option>
+                <option value="DV_NGOAI">Quỹ dịch vụ ngoài (cửa hàng trưởng quản lý)</option>
+              </select>
+            </Field>
             <Field label="Loại">
               <select className="inp" disabled={!!f.id} value={f.type} onChange={(e) => setF((p) => ({ ...p, type: e.target.value, company_id: "", location_code: "" }))}>
                 <option>Ngân hàng</option><option>Tiền mặt</option>
               </select>
             </Field>
-            {f.type === "Ngân hàng" ? (
+            {ngoai && (
+              <Field label="Người quản lý (cửa hàng trưởng)" required>
+                <select className="inp" value={f.manager_id || ""} onChange={(e) => setF((p) => ({ ...p, manager_id: e.target.value }))}>
+                  <option value="">— Chọn người quản lý —</option>
+                  {mgrs.map((m) => <option key={m.id} value={m.id}>{m.name} ({m.role})</option>)}
+                </select>
+              </Field>
+            )}
+            {f.type === "Ngân hàng" && !ngoai ? (
               <Field label="Pháp nhân sở hữu" required>
                 <select className="inp" value={f.company_id || ""} onChange={(e) => setF((p) => ({ ...p, company_id: e.target.value }))}>
                   <option value="">— Chọn pháp nhân —</option>
@@ -204,7 +224,7 @@ function QuyTaiKhoan({ supabase, notify, locations, tick }) {
                 </select>
               </Field>
             ) : (
-              <Field label="Gắn với điểm">
+              <Field label="Gắn với điểm" required={ngoai}>
                 <select className="inp" value={f.location_code || ""} onChange={(e) => setF((p) => ({ ...p, location_code: e.target.value }))}>
                   <option value="">— Không gắn —</option>
                   {locations.map((l) => <option key={l.code} value={l.code}>{l.name}</option>)}
@@ -221,11 +241,14 @@ function QuyTaiKhoan({ supabase, notify, locations, tick }) {
         {[...bank, ...accs.filter((a) => a.type !== "Ngân hàng")].map((a) => (
           <div key={a.id} className={`flex items-center gap-2 p-2 rounded-lg border text-[13px] flex-wrap ${a.status === "Hoạt động" ? "border-[#E3E8EF]" : "border-[#EEE] bg-[#FAFAFA] opacity-70"}`}>
             <Badge tone={a.type === "Ngân hàng" ? "blue" : "amber"}>{a.type}</Badge>
+            {a.nhom === "DV_NGOAI" && <Badge tone="purple">Quỹ dịch vụ ngoài</Badge>}
             <b className="mr-auto">{a.name}</b>
-            <span className="text-xs text-[#5A6572]">{a.type === "Ngân hàng" ? `${coName(a.company_id)}${a.bank_info ? " · " + a.bank_info : ""}` : (locations.find((l) => l.code === a.location_code)?.name || "")}</span>
+            <span className="text-xs text-[#5A6572]">{a.nhom === "DV_NGOAI"
+              ? `${locations.find((l) => l.code === a.location_code)?.name || ""} · QL: ${mgrName(a.manager_id)}${a.bank_info ? " · " + a.bank_info : ""}`
+              : a.type === "Ngân hàng" ? `${coName(a.company_id)}${a.bank_info ? " · " + a.bank_info : ""}` : (locations.find((l) => l.code === a.location_code)?.name || "")}</span>
             {a.status !== "Hoạt động" && <Badge tone="dark">Đã khóa</Badge>}
-            <button className="btn-ghost !px-2 !py-1 !text-xs" onClick={() => setF({ ...a, company_id: a.company_id || "", location_code: a.location_code || "" })}>✎ Sửa</button>
-            <button className="btn-ghost !px-2 !py-1 !text-xs" onClick={() => luu({ ...a, company_id: a.company_id || "", status: a.status === "Hoạt động" ? "Đã khóa" : "Hoạt động" })}>{a.status === "Hoạt động" ? "Khóa" : "Mở lại"}</button>
+            <button className="btn-ghost !px-2 !py-1 !text-xs" onClick={() => setF({ ...a, company_id: a.company_id || "", location_code: a.location_code || "", manager_id: a.manager_id || "" })}>✎ Sửa</button>
+            <button className="btn-ghost !px-2 !py-1 !text-xs" onClick={() => luu({ ...a, company_id: a.company_id || "", manager_id: a.manager_id || "", status: a.status === "Hoạt động" ? "Đã khóa" : "Hoạt động" })}>{a.status === "Hoạt động" ? "Khóa" : "Mở lại"}</button>
           </div>
         ))}
         {accs.length === 0 && <div className="text-sm text-[#8A93A0]">Chưa có tài khoản nào.</div>}

@@ -216,7 +216,7 @@ export default function PhieuThuChi({ dir }) {
               <Field label="Quỹ nhận/chi tiền" required>
                 <select className="inp" value={f.account_id} onChange={(e) => setF((p) => ({ ...p, account_id: e.target.value }))}>
                   <option value="">— Chọn quỹ —</option>
-                  {accs.filter((a) => a.status === "Hoạt động").map((a) => <option key={a.id} value={a.id}>{a.name} ({fmtVND(a.so_du)})</option>)}
+                  {accs.filter((a) => a.status === "Hoạt động" && a.nhom !== "DV_NGOAI").map((a) => <option key={a.id} value={a.id}>{a.name} ({fmtVND(a.so_du)})</option>)}
                 </select>
               </Field>
               <Field label={`Loại ${tenPhieu.toLowerCase()}`}>

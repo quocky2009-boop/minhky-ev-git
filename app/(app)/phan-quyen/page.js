@@ -29,6 +29,8 @@ const PERM_GROUPS = [
   ]},
   { group: "Sổ quỹ", icon: "💰", items: [
     { key: "thu_chi_chot", label: "Xem/tạo phiếu thu chi & duyệt", desc: "Truy cập Sổ quỹ, duyệt phiếu chi" },
+    { key: "dvn_ghi", label: "Dịch vụ đăng ký & phụ kiện ngoài", desc: "Cửa hàng trưởng ghi khoản, thu/chi trên quỹ dịch vụ ngoài của mình" },
+    { key: "dvn_xac_nhan_nop", label: "Xác nhận nộp dịch vụ ngoài về công ty", desc: "Kế toán xác nhận khoản nộp cuối tháng" },
   ]},
   { group: "Dữ liệu", icon: "📋", items: [
     { key: "sua_danh_muc", label: "Thêm/sửa danh mục xe, kho, NCC", desc: "Quản lý danh mục hệ thống" },
