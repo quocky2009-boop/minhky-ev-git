@@ -1,0 +1,15 @@
+-- =====================================================================
+-- 146_kiem_soat_ton_kho.sql
+-- KIEM SOAT TON KHO XE THEO NGAY
+--  - ton_kho_snapshot_ngay: luu so ton MOI NGAY (xe x diem x trang thai, nhom tuoi <=30 / 31-60 / 61-90 / >90, tong tuoi)
+--    chup tu dong 17h30 (cron bao-cao-ton-kho-17h30 = 10:30 UTC); ngay truoc khi bat chuc nang khong co so lieu
+--  - _ton_live(ngay): ton hien tai tinh truc tiep tu vehicle_units (tuoi = ngay - ngay nhap, gio VN)
+--  - fn_ton_tong_hop(ngay): hom nay = live, ngay cu = snapshot | fn_ton_ngay_da_luu() | _ton_chup()
+--  - fn_ban_theo_model(ngay, so_ngay) (theo xe) va fn_ban_theo_diem(ngay, so_ngay) (theo xe x diem):
+--    ban le (khach khong phai 'Khach buon') va ban buon ('Khach buon') TACH RIENG, loai don huy/tra
+--  - Quyen: chi CEO / ADMIN / MANAGER (kem cua hang truong) — _ton_quyen()
+--  - Discord kenh Ton kho (discord_webhook) 17h30: _ton_bao_cao_embeds / _ton_bao_cao_gui / fn_ton_bao_cao_now
+--    (tong quan + theo diem theo khu vuc + theo model: ton, >30 ngay, ban le/buon 30 ngay, so ngay du hang;
+--     canh bao do: du hang < 10 ngay; cam: >=50% xe tren 30 ngay hoac du hang > 90 ngay)
+-- Man hinh: /kiem-soat-ton (loc ngay, so sanh ngay, khu vuc, diem, hang, model, mau, trang thai; xuat Excel)
+-- (Dinh nghia day du trong DB — DB that la nguon su that.)

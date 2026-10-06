@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Field, Badge, Toast, LocSearch, VehicleSearch, Pager, pageSlice, useSortable, Th } from "@/components/ui";
 import { fmtDate, fmtTime, errMsg } from "@/lib/format";
+import ImportDatHang from "@/components/ImportDatHang";
 
 const iso = (d) => d.toLocaleDateString("sv-SE");
 const emptyLine = { vehicle_id: "", qty: 1, note: "" };
@@ -23,6 +24,7 @@ export default function DatHangNhap() {
   const sort = useSortable();
 
   const [showForm, setShowForm] = useState(false);
+  const [showImp, setShowImp] = useState(false);
   const [meta, setMeta] = useState({ location_code: "", supplier: "", ngay_du_kien: "", note: "" });
   const [lines, setLines] = useState([{ ...emptyLine }]);
 
@@ -168,8 +170,10 @@ export default function DatHangNhap() {
       <Toast toast={toast} />
       <div className="flex items-center gap-2 flex-wrap">
         <div className="font-extrabold text-lg mr-auto">Danh sách đơn đặt hàng nhập</div>
+        <button className="btn-ghost !text-xs" onClick={() => setShowImp((x) => !x)}>⬆ Import Excel</button>
         <button className="btn-primary !text-xs" onClick={moForm}>+ Tạo đơn đặt hàng</button>
       </div>
+      {showImp && <ImportDatHang supabase={supabase} vehicles={vehicles} locations={locations} notify={notify} onClose={() => setShowImp(false)} onDone={() => { load(); refresh(); }} />}
 
       <div className="card">
         <div className="flex gap-1 border-b border-[#E3E8EF] mb-3 flex-wrap">
