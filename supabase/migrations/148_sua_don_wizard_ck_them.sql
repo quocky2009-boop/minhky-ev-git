@@ -1,0 +1,9 @@
+-- =====================================================================
+-- 148_sua_don_wizard_ck_them.sql
+-- (1) fn_dao_nguoc_khoan_thu: khoan thu moi qua NGAN HANG nay truyen dung account_id (truoc day thieu -> loi THIEU_TAI_KHOAN)
+-- (2) CHIET KHAU THEM CUA BGD (Wizard buoc 2): luu trong price_snapshot.ck_them {so_tien, ly_do, nguoi_duyet_id,
+--     nguoi_duyet_name, tru_hoa_don}; client cong vao tong_uu_dai, tru vao gia_can_thanh_toan va (neu chon) tong_xuat_hd.
+--     Tin Discord don ban (_don_discord_body) them dong "CK them (BGD: ten)" + ly do + co/khong tru hoa don.
+-- Giao dien: Wizard (CK them; sua don hien cac khoan da thu, Admin/BGD sua bang dao nguoc-ghi lai; KM da het hieu luc co the bo),
+--   BangGiaDon, loai khach hang khi tao khach/ don.
+-- (Dinh nghia day du trong DB — DB that la nguon su that.)

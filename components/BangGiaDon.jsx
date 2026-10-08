@@ -28,6 +28,12 @@ export default function BangGiaDon({ o }) {
               </div>
             ))}
             {(s.khuyen_mai || []).length === 0 && <div className="px-3 py-1.5 border-b border-dashed border-[#F0F2F5] text-[12px] text-[#8A93A0]">Không áp dụng khuyến mại.</div>}
+            {s.ck_them && (
+              <div className="px-3 py-1.5 border-b border-dashed border-[#F0F2F5] text-[12px]">
+                <div className="flex justify-between gap-2"><span className="text-[#5A6572]">💸 Chiết khấu thêm (BGĐ){s.ck_them.nguoi_duyet_name ? ` · ${s.ck_them.nguoi_duyet_name}` : ""}</span><span className="text-danger font-semibold whitespace-nowrap">-{fmtVND(s.ck_them.so_tien)}</span></div>
+                <div className="text-[10.5px] text-[#8A93A0]">{s.ck_them.ly_do} · {s.ck_them.tru_hoa_don ? "đã trừ vào hóa đơn xuất" : "không trừ vào hóa đơn xuất"}</div>
+              </div>
+            )}
             <div className="flex justify-between px-3 py-2 border-b border-dashed border-[#E3E8EF]"><span className="text-[#5A6572]">Tổng ưu đãi</span><b className="text-danger">-{fmtVND(s.tong_uu_dai)}</b></div>
             <div className="flex justify-between px-3 py-2 border-b border-dashed border-[#E3E8EF] bg-[#EAF2FF]"><span className="font-bold">Giá cần thanh toán</span><b className="text-brand">{fmtVND(s.gia_can_thanh_toan)}</b></div>
             <div className="flex justify-between px-3 py-2"><span className="text-[#5A6572]">Tổng tiền xuất hóa đơn</span><b>{fmtVND(o.invoice_total ?? s.tong_xuat_hd)}</b></div>
