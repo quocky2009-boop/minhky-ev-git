@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Badge, Toast, Field, LocSearch, Pager, pageSlice, pageClamp, useSortable, Th, useSelection, ThCheck, TdCheck, SelectionBar } from "@/components/ui";
+import { QuickDates, AmountFilter, SavedFilters, RefLink, TongLoc, trongKhoang } from "@/components/FinFilters";
+import { Badge, Toast, Field, LocSearch, MultiCheck, Pager, pageSlice, pageClamp, useSortable, Th, useSelection, ThCheck, TdCheck, SelectionBar } from "@/components/ui";
 import { fmtVND, fmtTime, fmtDate, errMsg, downloadCSV } from "@/lib/format";
 
 const iso = (d) => d.toLocaleDateString("sv-SE");
@@ -18,8 +19,14 @@ export default function SoQuy() {
   const [duKy, setDuKy] = useState(0);
   const [from, setFrom] = useState(firstOfMonth());
   const [to, setTo] = useState(iso(new Date()));
-  const [fAcc, setFAcc] = useState("");
+  const [fAcc, setFAcc] = useState([]);
   const [fDir, setFDir] = useState("");
+  const [fCat, setFCat] = useState([]);
+  const [fWho, setFWho] = useState([]);
+  const [fAuto, setFAuto] = useState("");
+  const [aMin, setAMin] = useState("");
+  const [aMax, setAMax] = useState("");
+  const [duKyMap, setDuKyMap] = useState({});
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
@@ -39,7 +46,7 @@ export default function SoQuy() {
     setBusy(true);
     let qy = supabase.from("cash_txns").select("*").gte("txn_date", from).lte("txn_date", to)
       .order("txn_date", { ascending: false }).order("id", { ascending: false }).limit(3000);
-    if (fAcc) qy = qy.eq("account_id", fAcc);
+    if (fAcc.length) qy = qy.in("account_id", fAcc.map(Number));
     const [{ data: a }, { data: t }, { data: c }, { data: pm }, { data: cos }] = await Promise.all([
       supabase.from("v_quy_so_du").select("*").order("type").order("name"),
       qy,
@@ -51,16 +58,16 @@ export default function SoQuy() {
     const m = {}; (pm || []).forEach((x) => { m[x.perm] = x.allowed; }); setPerms(m);
 
     // So du dau ky = tong so du moi quy den het ngay truoc 'from'
-    const relevant = (a || []).filter((x) => !fAcc || x.id === Number(fAcc));
-    let dk = 0;
+    const relevant = (a || []).filter((x) => !fAcc.length || fAcc.includes(String(x.id)));
+    let dk = 0; const mp = {};
     for (const acc of relevant) {
       const { data: sd } = await supabase.rpc("fn_so_du", { p_account: acc.id, p_to: dayBefore(from) });
-      dk += Number(sd) || 0;
+      mp[acc.id] = Number(sd) || 0; dk += Number(sd) || 0;
     }
-    setDuKy(dk);
+    setDuKy(dk); setDuKyMap(mp);
     setBusy(false);
   };
-  useEffect(() => { if (!loading) load(); }, [loading, profile, from, to, fAcc]);
+  useEffect(() => { if (!loading) load(); }, [loading, profile, from, to, fAcc.join(",")]);
 
   if (loading || !profile) return <div className="card">Đang tải dữ liệu…</div>;
   if (!can("thu_chi_xem")) return <div className="card">Bạn không có quyền xem sổ quỹ.</div>;
@@ -104,8 +111,13 @@ export default function SoQuy() {
   const kw = q.trim().toLowerCase();
   const rows = txns.filter((t) => {
     if (fDir && t.direction !== fDir) return false;
+    if (fCat.length && !fCat.includes(t.category)) return false;
+    if (fWho.length && !fWho.includes(t.created_by_name)) return false;
+    if (fAuto === "auto" && !t.ref_doc) return false;
+    if (fAuto === "tay" && t.ref_doc) return false;
+    if (!trongKhoang(t.amount, aMin, aMax)) return false;
     if (!kw) return true;
-    return `${t.code} ${t.category} ${t.counterparty} ${t.description} ${t.ref_doc}`.toLowerCase().includes(kw);
+    return `${t.code} ${t.category} ${t.counterparty} ${t.description} ${t.ref_doc} ${t.amount}`.toLowerCase().includes(kw);
   });
   const sorted = sort.sortFn(rows, {
     code: (t) => t.code, date: (t) => t.txn_date, acc: (t) => accName(t.account_id),
@@ -114,7 +126,15 @@ export default function SoQuy() {
   });
   const tongThu = rows.filter((t) => t.direction === "Thu").reduce((a, b) => a + b.amount, 0);
   const tongChi = rows.filter((t) => t.direction === "Chi").reduce((a, b) => a + b.amount, 0);
-  const cuoiKy = duKy + tongThu - tongChi;
+  // KPI dau ky/cuoi ky chi phu thuoc Quy + khoang ngay (khong bi bo loc danh muc/so tien... lam lech)
+  const kpiThu = txns.filter((t) => t.direction === "Thu").reduce((a, b) => a + b.amount, 0);
+  const kpiChi = txns.filter((t) => t.direction === "Chi").reduce((a, b) => a + b.amount, 0);
+  const cuoiKy = duKy + kpiThu - kpiChi;
+  const tabQuy = accs.filter((x) => (!fAcc.length || fAcc.includes(String(x.id))) && (x.id in duKyMap)).map((x) => ({
+    id: x.id, name: x.name, dk: duKyMap[x.id] || 0,
+    thu: rows.filter((t) => t.account_id === x.id && t.direction === "Thu").reduce((a, b) => a + b.amount, 0),
+    chi: rows.filter((t) => t.account_id === x.id && t.direction === "Chi").reduce((a, b) => a + b.amount, 0),
+  })).filter((r) => r.dk || r.thu || r.chi);
   const tongQuy = accs.filter((a) => a.status === "Hoạt động").reduce((a, b) => a + Number(b.so_du), 0);
 
   const exportCSV = () => {
@@ -144,12 +164,12 @@ export default function SoQuy() {
           <div className="text-2xl text-[#C8D0DA] font-bold">+</div>
           <div>
             <div className="text-[11.5px] text-[#8A93A0] font-semibold uppercase">Tổng thu</div>
-            <div className="text-lg font-extrabold text-[#0E7A4A]">{fmtVND(tongThu)}</div>
+            <div className="text-lg font-extrabold text-[#0E7A4A]">{fmtVND(kpiThu)}</div>
           </div>
           <div className="text-2xl text-[#C8D0DA] font-bold">−</div>
           <div>
             <div className="text-[11.5px] text-[#8A93A0] font-semibold uppercase">Tổng chi</div>
-            <div className="text-lg font-extrabold text-danger">{fmtVND(tongChi)}</div>
+            <div className="text-lg font-extrabold text-danger">{fmtVND(kpiChi)}</div>
           </div>
           <div className="text-2xl text-[#C8D0DA] font-bold">=</div>
           <div>
@@ -169,17 +189,44 @@ export default function SoQuy() {
         <div className="card">
           <div className="flex gap-2 items-center mb-3 flex-wrap">
             <div className="font-extrabold mr-auto">Tất cả phiếu ({sorted.length})</div>
+          </div>
+          <div className="flex gap-2 items-center mb-2 flex-wrap">
+            <QuickDates from={from} to={to} setFrom={setFrom} setTo={setTo} onChange={() => setPage(1)} />
             <input type="date" className="inp !w-auto" value={from} onChange={(e) => setFrom(e.target.value)} />
             <input type="date" className="inp !w-auto" value={to} onChange={(e) => setTo(e.target.value)} />
-            <select className="inp !w-auto" value={fAcc} onChange={(e) => setFAcc(e.target.value)}>
-              <option value="">Quỹ: tất cả</option>
-              {accs.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-            </select>
+          </div>
+          <div className="flex gap-2 items-center mb-3 flex-wrap">
+            <MultiCheck label="Quỹ: tất cả" value={fAcc} onChange={(v) => { setFAcc(v); setPage(1); }}
+              options={accs.map((a) => ({ key: a.id, label: a.name, group: a.type }))} />
             <select className="inp !w-auto" value={fDir} onChange={(e) => { setFDir(e.target.value); setPage(1); }}>
               <option value="">Thu + Chi</option><option>Thu</option><option>Chi</option>
             </select>
-            <input className="inp !w-52" placeholder="Tìm mã phiếu, chứng từ gốc…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
+            <MultiCheck label="Danh mục: tất cả" value={fCat} onChange={(v) => { setFCat(v); setPage(1); }}
+              options={[...new Set(txns.map((t) => t.category))].filter(Boolean).sort().map((c) => ({ key: c, label: c }))} />
+            <MultiCheck label="Người tạo: tất cả" value={fWho} onChange={(v) => { setFWho(v); setPage(1); }}
+              options={[...new Set(txns.map((t) => t.created_by_name))].filter(Boolean).sort().map((c) => ({ key: c, label: c }))} />
+            <select className="inp !w-auto" value={fAuto} onChange={(e) => { setFAuto(e.target.value); setPage(1); }}>
+              <option value="">Tự động + thủ công</option><option value="auto">Chỉ tự động</option><option value="tay">Chỉ thủ công</option>
+            </select>
+            <AmountFilter min={aMin} max={aMax} setMin={setAMin} setMax={setAMax} onChange={() => setPage(1)} />
+            <input className="inp !w-56" placeholder="Tìm mã phiếu, chứng từ gốc, số tiền…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
+            <SavedFilters k="so-quy" state={{ fAcc, fDir, fCat, fWho, fAuto, aMin, aMax, q }}
+              apply={(o) => { setFAcc(o.fAcc || []); setFDir(o.fDir || ""); setFCat(o.fCat || []); setFWho(o.fWho || []); setFAuto(o.fAuto || ""); setAMin(o.aMin || ""); setAMax(o.aMax || ""); setQ(o.q || ""); }} />
           </div>
+
+          <TongLoc>
+            <span>Theo bộ lọc: <b>{sorted.length}</b> phiếu</span>
+            <span>Thu: <b className="text-[#0E7A4A]">{fmtVND(tongThu)}</b></span>
+            <span>Chi: <b className="text-danger">{fmtVND(tongChi)}</b></span>
+            <span>Chênh lệch: <b>{fmtVND(tongThu - tongChi)}</b></span>
+          </TongLoc>
+
+          {tabQuy.length > 0 && (
+            <div className="tbl-scroll mb-3"><table className="w-full border-collapse text-[12.5px]">
+              <thead><tr><th className="th">Quỹ</th><th className="th text-right">Đầu kỳ</th><th className="th text-right">Thu</th><th className="th text-right">Chi</th><th className="th text-right">Cuối kỳ</th></tr></thead>
+              <tbody>{tabQuy.map((r) => (<tr key={r.id}><td className="td">{r.name}</td><td className="td text-right">{fmtVND(r.dk)}</td><td className="td text-right text-[#0E7A4A]">{fmtVND(r.thu)}</td><td className="td text-right text-danger">{fmtVND(r.chi)}</td><td className="td text-right font-bold">{fmtVND(r.dk + r.thu - r.chi)}</td></tr>))}</tbody>
+            </table></div>
+          )}
 
           {busy && txns.length === 0 ? <div className="text-sm text-[#8A93A0] py-4">Đang tải…</div> : (
             <>
@@ -198,6 +245,7 @@ export default function SoQuy() {
                   <ThCheck sel={sel} rows={pageSlice(sorted, page, pageSize)} idOf={(t) => t.id} />
                   <Th label="Mã phiếu" k="code" sort={sort} />
                   <Th label="Loại phiếu" k="cat" sort={sort} />
+                  <Th label="Quỹ" k="acc" sort={sort} />
                   <Th label="Tiền thu" k="thu" sort={sort} className="text-right" />
                   <Th label="Tiền chi" k="chi" sort={sort} className="text-right" />
                   <Th label="Ngày tạo" k="date" sort={sort} />
@@ -208,13 +256,14 @@ export default function SoQuy() {
                     <TdCheck sel={sel} id={t.id} />
                     <td data-label="Mã phiếu" className="td"><button className="font-bold text-brand hover:underline" onClick={() => setDetail(t)}>{t.code}</button></td>
                     <td data-label="Loại phiếu" className="td text-[13px]">{t.ref_doc ? <Badge tone="blue">Tự động</Badge> : <Badge tone="gray">Thủ công</Badge>} {t.category}</td>
+                    <td data-label="Quỹ" className="td text-xs">{accName(t.account_id)}</td>
                     <td data-label="Tiền thu" className="td rt font-bold text-[#0E7A4A]">{t.direction === "Thu" ? fmtVND(t.amount) : "—"}</td>
                     <td data-label="Tiền chi" className="td rt font-bold text-danger">{t.direction === "Chi" ? fmtVND(t.amount) : "—"}</td>
                     <td data-label="Ngày tạo" className="td text-xs whitespace-nowrap">{fmtTime(t.created_at)}</td>
-                    <td data-label="Chứng từ gốc" className="td text-xs text-brand">{t.ref_doc || "—"}</td>
+                    <td data-label="Chứng từ gốc" className="td text-xs"><RefLink code={t.ref_doc} /></td>
                   </tr>
                 ))}
-                {sorted.length === 0 && <tr><td className="td" colSpan={7}>Không có phiếu nào trong khoảng ngày này.</td></tr>}
+                {sorted.length === 0 && <tr><td className="td" colSpan={8}>Không có phiếu nào trong khoảng ngày này.</td></tr>}
                 </tbody>
               </table></div>
               <Pager total={sorted.length} page={page} setPage={setPage} pageSize={pageSize} setPageSize={setPageSize} />

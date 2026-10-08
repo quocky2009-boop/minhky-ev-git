@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
+import { QuickDates, AmountFilter, SavedFilters, RefLink, TongLoc, trongKhoang } from "@/components/FinFilters";
 import { Badge, Toast, KPI, Field, LocSearch, MultiCheck, MoneyInput, Pager, pageSlice, pageClamp, useSortable, Th, useSelection, ThCheck, TdCheck, SelectionBar } from "@/components/ui";
 import { fmtVND, fmtTime, fmtDate, errMsg, downloadCSV } from "@/lib/format";
 
@@ -18,7 +19,12 @@ export default function PhieuThuChi({ dir }) {
   const [from, setFrom] = useState(firstOfMonth());
   const [to, setTo] = useState(iso(new Date()));
   const [fAcc, setFAcc] = useState([]);
-  const [fCat, setFCat] = useState("");
+  const [fCat, setFCat] = useState([]);
+  const [fWho, setFWho] = useState([]);
+  const [fAuto, setFAuto] = useState("");
+  const [fAppr, setFAppr] = useState("");
+  const [aMin, setAMin] = useState("");
+  const [aMax, setAMax] = useState("");
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
@@ -61,9 +67,14 @@ export default function PhieuThuChi({ dir }) {
 
   const kw = q.trim().toLowerCase();
   const rows = txns.filter((t) => {
-    if (fCat && t.category !== fCat) return false;
+    if (fCat.length && !fCat.includes(t.category)) return false;
+    if (fWho.length && !fWho.includes(t.created_by_name)) return false;
+    if (fAuto === "auto" && !t.ref_doc) return false;
+    if (fAuto === "tay" && t.ref_doc) return false;
+    if (fAppr) { const st = t.approval_status === "pending" ? "pending" : t.approval_status === "rejected" ? "rejected" : "ok"; if (st !== fAppr) return false; }
+    if (!trongKhoang(t.amount, aMin, aMax)) return false;
     if (!kw) return true;
-    return `${t.code} ${t.category} ${t.counterparty} ${t.description} ${t.ref_doc}`.toLowerCase().includes(kw);
+    return `${t.code} ${t.category} ${t.counterparty} ${t.description} ${t.ref_doc} ${t.amount}`.toLowerCase().includes(kw);
   });
   const sorted = sort.sortFn(rows, {
     code: (t) => t.code, date: (t) => t.txn_date, acc: (t) => accName(t.account_id),
@@ -281,17 +292,37 @@ export default function PhieuThuChi({ dir }) {
       <div className="card">
         <div className="flex gap-2 items-center mb-3 flex-wrap">
           <div className="font-extrabold mr-auto">Danh sách {tenPhieu.toLowerCase()} ({sorted.length})</div>
+        </div>
+        <div className="flex gap-2 items-center mb-2 flex-wrap">
+          <QuickDates from={from} to={to} setFrom={setFrom} setTo={setTo} onChange={() => setPage(1)} />
           <input type="date" className="inp !w-auto" value={from} onChange={(e) => setFrom(e.target.value)} />
           <input type="date" className="inp !w-auto" value={to} onChange={(e) => setTo(e.target.value)} />
+        </div>
+        <div className="flex gap-2 items-center mb-3 flex-wrap">
           <MultiCheck label="Quỹ: tất cả" value={fAcc} onChange={(v) => { setFAcc(v); setPage(1); }}
             options={accs.map((a) => ({ key: a.id, label: a.name, group: a.type }))} />
-          <select className="inp !w-auto" value={fCat} onChange={(e) => { setFCat(e.target.value); setPage(1); }}>
-            <option value="">Danh mục: tất cả</option>
-            {[...new Set(txns.map((t) => t.category))].filter(Boolean).map((c) => <option key={c}>{c}</option>)}
+          <MultiCheck label="Danh mục: tất cả" value={fCat} onChange={(v) => { setFCat(v); setPage(1); }}
+            options={[...new Set([...allCats, ...txns.map((t) => t.category)])].filter(Boolean).map((c) => ({ key: c, label: c }))} />
+          <MultiCheck label="Người tạo: tất cả" value={fWho} onChange={(v) => { setFWho(v); setPage(1); }}
+            options={[...new Set(txns.map((t) => t.created_by_name))].filter(Boolean).sort().map((c) => ({ key: c, label: c }))} />
+          <select className="inp !w-auto" value={fAuto} onChange={(e) => { setFAuto(e.target.value); setPage(1); }}>
+            <option value="">Tự động + thủ công</option><option value="auto">Chỉ tự động (từ đơn/DV)</option><option value="tay">Chỉ thủ công</option>
           </select>
-          <input className="inp !w-56" placeholder="Tìm mã phiếu, chứng từ gốc, đối tượng…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
+          {!isThu && (
+            <select className="inp !w-auto" value={fAppr} onChange={(e) => { setFAppr(e.target.value); setPage(1); }}>
+              <option value="">Mọi trạng thái duyệt</option><option value="pending">⏳ Chờ duyệt</option><option value="ok">Đã duyệt</option><option value="rejected">✗ Từ chối</option>
+            </select>
+          )}
+          <AmountFilter min={aMin} max={aMax} setMin={setAMin} setMax={setAMax} onChange={() => setPage(1)} />
+          <input className="inp !w-56" placeholder="Tìm mã phiếu, chứng từ gốc, đối tượng, số tiền…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
+          <SavedFilters k={isThu ? "phieu-thu" : "phieu-chi"} state={{ fAcc, fCat, fWho, fAuto, fAppr, aMin, aMax, q }}
+            apply={(o) => { setFAcc(o.fAcc || []); setFCat(o.fCat || []); setFWho(o.fWho || []); setFAuto(o.fAuto || ""); setFAppr(o.fAppr || ""); setAMin(o.aMin || ""); setAMax(o.aMax || ""); setQ(o.q || ""); }} />
         </div>
 
+        <TongLoc>
+          <span>Theo bộ lọc: <b>{sorted.length}</b> phiếu</span>
+          <span>Tổng {isThu ? "thu" : "chi"}: <b className={isThu ? "text-[#0E7A4A]" : "text-danger"}>{fmtVND(tong)}</b></span>
+        </TongLoc>
         {busy && txns.length === 0 ? <div className="text-sm text-[#8A93A0] py-4">Đang tải…</div> : (
           <>
             <SelectionBar sel={sel}>
@@ -322,7 +353,7 @@ export default function PhieuThuChi({ dir }) {
                   <td data-label={`Tên ${nhomNhan}`} className="td text-[13px]">{t.counterparty || <span className="text-[#8A93A0]">—</span>}</td>
                   <td data-label="Số tiền" className="td rt font-bold"><span className={isThu ? "text-[#0E7A4A]" : "text-danger"}>{fmtVND(t.amount)}</span></td>
                   <td data-label="Quỹ" className="td text-xs">{accName(t.account_id)}</td>
-                  <td data-label="Chứng từ gốc" className="td text-xs text-brand">{t.ref_doc || "—"}</td>
+                  <td data-label="Chứng từ gốc" className="td text-xs"><RefLink code={t.ref_doc} /></td>
                   {!isThu && (
                     <td className="td">
                       {t.approval_status === "pending" && can("thu_chi_chot") && (

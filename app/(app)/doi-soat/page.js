@@ -2,9 +2,57 @@
 import { useEffect, useState } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Badge, Toast, KPI, MoneyInput } from "@/components/ui";
+import Link from "next/link";
+import { QuickDates } from "@/components/FinFilters";
 import { fmtVND, fmtDate, fmtTime, errMsg } from "@/lib/format";
 
 const iso = (d) => d.toLocaleDateString("sv-SE");
+
+// Doi chieu don ban <-> so quy: don co thu (payments) ma quy khong co phieu, hoac nguoc lai
+function LechDonQuy({ supabase, locations, notify }) {
+  const t0 = iso(new Date());
+  const [from, setFrom] = useState(iso(new Date(new Date().getFullYear(), new Date().getMonth(), 1)));
+  const [to, setTo] = useState(t0);
+  const [rows, setRows] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const run = async () => {
+    setBusy(true);
+    const { data, error } = await supabase.rpc("fn_doi_soat_lech", { p_from: from, p_to: to });
+    setBusy(false);
+    if (error) return notify(errMsg(error), "err");
+    setRows(data || []);
+  };
+  const locName = (c) => locations.find((l) => l.code === c)?.name || c || "—";
+  return (
+    <div className="card">
+      <div className="font-extrabold mb-1">🔎 Đối chiếu Đơn bán ↔ Sổ quỹ</div>
+      <p className="text-[11.5px] text-[#8A93A0] mb-2">Liệt kê đơn có tiền thu ghi trên đơn nhưng số tiền trong sổ quỹ (thu − hoàn) không khớp: <b>thiếu phiếu thu</b> (đơn có thu, quỹ chưa có) hoặc <b>phiếu thừa</b> (quỹ có, đơn không ghi).</p>
+      <div className="flex gap-2 flex-wrap items-center mb-2">
+        <QuickDates from={from} to={to} setFrom={setFrom} setTo={setTo} />
+        <input type="date" className="inp !w-auto" value={from} onChange={(e) => setFrom(e.target.value)} />
+        <input type="date" className="inp !w-auto" value={to} onChange={(e) => setTo(e.target.value)} />
+        <button className="btn-primary !text-xs" disabled={busy} onClick={run}>{busy ? "Đang quét…" : "Quét chênh lệch"}</button>
+      </div>
+      {rows && (rows.length === 0 ? <div className="text-sm text-[#0E7A4A] font-semibold">✓ Không có đơn nào lệch trong kỳ.</div> : (
+        <div className="tbl-scroll"><table className="w-full border-collapse tbl-card">
+          <thead><tr><th className="th">Mã đơn</th><th className="th">Ngày</th><th className="th">Khách</th><th className="th">Điểm bán</th><th className="th text-right">Thu trên đơn</th><th className="th text-right">Sổ quỹ (thu−hoàn)</th><th className="th text-right">Chênh</th><th className="th">Kết luận</th></tr></thead>
+          <tbody>{rows.map((r) => (
+            <tr key={r.sale_code} className="hover:bg-[#F8FAFC]">
+              <td data-label="Mã đơn" className="td font-bold"><Link href={`/don-ban?q=${r.sale_code}`} className="text-brand hover:underline">{r.sale_code}</Link>{r.order_status && r.order_status !== "Hoàn thành" && <span className="ml-1 text-[10.5px] text-[#8A93A0]">({r.order_status})</span>}</td>
+              <td data-label="Ngày" className="td text-xs">{r.sale_date ? fmtDate(r.sale_date) : "—"}</td>
+              <td data-label="Khách" className="td text-[13px]">{r.customer_name || "—"}</td>
+              <td data-label="Điểm bán" className="td text-xs">{locName(r.location_code)}</td>
+              <td data-label="Thu trên đơn" className="td text-right">{fmtVND(r.tong_payments)}</td>
+              <td data-label="Sổ quỹ" className="td text-right">{fmtVND(r.tong_quy)}</td>
+              <td data-label="Chênh" className="td text-right font-bold text-danger">{fmtVND(r.chenh)}</td>
+              <td data-label="Kết luận" className="td"><Badge tone={r.chenh > 0 ? "red" : "amber"}>{r.chenh > 0 ? "Thiếu phiếu thu" : "Phiếu thừa"}</Badge></td>
+            </tr>
+          ))}</tbody>
+        </table></div>
+      ))}
+    </div>
+  );
+}
 
 export default function DoiSoat() {
   const { supabase, locations, profile, loading, regions } = useCatalog();
@@ -151,6 +199,8 @@ export default function DoiSoat() {
           </div>
         </>
       )}
+
+      <LechDonQuy supabase={supabase} locations={locations} notify={notify} />
 
       <div className="card">
         <div className="font-extrabold mb-2">Lịch sử đối soát ({lichSu.length})</div>
