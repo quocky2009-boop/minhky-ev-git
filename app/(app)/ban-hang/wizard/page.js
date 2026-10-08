@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Field, Badge, Toast, LocSearch, CustomerSearch, MoneyInput, FrameSearch, VehicleSearch } from "@/components/ui";
 import { fmtVND, fmtDate, errMsg } from "@/lib/format";
-import { CUSTOMER_SOURCES } from "@/lib/const";
+import { CUSTOMER_SOURCES, CUSTOMER_TYPES } from "@/lib/const";
 import BankOptions from "@/components/BankOptions";
 
 const iso = (d) => d.toLocaleDateString("sv-SE");
@@ -77,7 +77,7 @@ function TaoDonWizardInner() {
   const [staff, setStaff] = useState([]);
   const [custs, setCusts] = useState([]);
   const [custId, setCustId] = useState("");
-  const [kh, setKh] = useState({ customer_name: "", customer_phone: "", customer_cccd: "", customer_address: "" });
+  const [kh, setKh] = useState({ customer_name: "", customer_phone: "", customer_cccd: "", customer_address: "", customer_type: "Khách lẻ" });
   const [newC, setNewC] = useState(null);
 
   useEffect(() => {
@@ -90,19 +90,19 @@ function TaoDonWizardInner() {
   const pickCust = (c) => {
     if (!c) { setCustId(""); return; }
     setCustId(c.id);
-    setKh({ customer_name: c.name || "", customer_phone: c.phone || "", customer_cccd: c.cccd || "", customer_address: c.address || "" });
+    setKh({ customer_name: c.name || "", customer_phone: c.phone || "", customer_cccd: c.cccd || "", customer_address: c.address || "", customer_type: c.customer_type || "Khách lẻ" });
   };
   const luuCustMoi = async () => {
     if (!newC.name.trim() || !newC.phone.trim()) return notify("Nhập tên và SĐT.", "err");
     if (!newC.email?.trim()) return notify("Bắt buộc nhập Email.", "err");
     if (!newC.gender) return notify("Bắt buộc chọn Giới tính.", "err");
     if (!newC.birthday) return notify("Bắt buộc nhập Ngày sinh.", "err");
-    const { data, error } = await supabase.rpc("fn_luu_khach_hang_v2", { p: { name: newC.name, phone: newC.phone, address: newC.address || "", email: newC.email, gender: newC.gender, birthday: newC.birthday, source: "Bán hàng" } });
+    const { data, error } = await supabase.rpc("fn_luu_khach_hang_v2", { p: { name: newC.name, phone: newC.phone, address: newC.address || "", email: newC.email, gender: newC.gender, birthday: newC.birthday, source: "Bán hàng", customer_type: newC.customer_type || "Khách lẻ" } });
     if (error) return notify(errMsg(error), "err");
     const { data: c2 } = await supabase.from("customers").select("id,code,name,phone,cccd,address,status,customer_type").order("created_at", { ascending: false }).limit(2000);
     setCusts(c2 || []);
     setCustId(data);
-    setKh({ customer_name: newC.name, customer_phone: newC.phone, customer_cccd: "", customer_address: newC.address || "" });
+    setKh({ customer_name: newC.name, customer_phone: newC.phone, customer_cccd: "", customer_address: newC.address || "", customer_type: newC.customer_type || "Khách lẻ" });
     setNewC(null); notify("Đã tạo khách mới.");
   };
 
@@ -184,7 +184,7 @@ function TaoDonWizardInner() {
       const ids = (sop || []).map((x) => x.promotion_id);
       const gia = Number(o.price_snapshot.gia_xe) || 0;
       setSuaId(o.id); setSuaCode(o.code);
-      setKh({ customer_name: o.customer_name || "", customer_phone: o.customer_phone || "", customer_cccd: o.customer_cccd || "", customer_address: o.customer_address || "" });
+      setKh({ customer_name: o.customer_name || "", customer_phone: o.customer_phone || "", customer_cccd: o.customer_cccd || "", customer_address: o.customer_address || "", customer_type: o.customer_type || "Khách lẻ" });
       const c = custs.find((x) => (x.phone || "").replace(/\D/g, "") === (o.customer_phone || "").replace(/\D/g, ""));
       if (c) setCustId(c.id);
       setNgayLayGia(o.sale_date); setTuVanId(o.seller_id || ""); setTuVanName(o.seller_name || "");
@@ -309,7 +309,7 @@ function TaoDonWizardInner() {
     };
     const khOut = {
       customer_name: kh.customer_name, customer_phone: kh.customer_phone,
-      customer_cccd: kh.customer_cccd, customer_address: kh.customer_address,
+      customer_cccd: kh.customer_cccd, customer_address: kh.customer_address, customer_type: kh.customer_type || "Khách lẻ",
       customer_source: nguonDon, sale_date: ngayLayGia, location_code: diemBan,
       seller_id: tuVanId, seller_name: tuVanName, battery_option: batteryOption || null,
     };
@@ -363,7 +363,7 @@ function TaoDonWizardInner() {
   const lamMoi = () => {
     setKetQua(null); setStep(1);
     setCocDatTruoc(false); setBanCheo(false); setGhiChu1("");
-    setCustId(""); setNewC(null); setKh({ customer_name: "", customer_phone: "", customer_cccd: "", customer_address: "" });
+    setCustId(""); setNewC(null); setKh({ customer_name: "", customer_phone: "", customer_cccd: "", customer_address: "", customer_type: "Khách lẻ" });
     setPicked(null); setBatteryOption(""); setCoc(0); setPromoChon([]); setBangGia(null); setBangGiaLoi(""); setBangGiaKey(null); setGiaGoc(null);
     setSuaId(null); setSuaCode(""); setLyDo(""); setItemsGoc([]); setDTongGoc({ type: "amount", value: 0 });
     setPays([]); setCocRow({ method: "Tiền mặt", amount: "", account_id: "" }); setExtra({}); setHd({ tinh_tp: "", phuong_xa: "", dia_chi: "" });
@@ -456,6 +456,11 @@ function TaoDonWizardInner() {
                 </Field>
                 <Field label="Ngày sinh *"><input type="date" className="inp" value={newC.birthday} onChange={(e) => setNewC((p) => ({ ...p, birthday: e.target.value }))} /></Field>
                 <Field label="Địa chỉ"><input className="inp" value={newC.address} onChange={(e) => setNewC((p) => ({ ...p, address: e.target.value }))} /></Field>
+                <Field label="Loại khách hàng *">
+                  <select className="inp" value={newC.customer_type} onChange={(e) => setNewC((p) => ({ ...p, customer_type: e.target.value }))}>
+                    {CUSTOMER_TYPES.map((x) => <option key={x}>{x}</option>)}
+                  </select>
+                </Field>
                 <div className="flex gap-2">
                   <button className="btn-ghost !text-xs" onClick={() => setNewC(null)}>Hủy</button>
                   <button className="btn-ok !text-xs" onClick={luuCustMoi}>Lưu khách mới</button>
@@ -464,12 +469,16 @@ function TaoDonWizardInner() {
             ) : (
               <div className="flex flex-col gap-2">
                 <CustomerSearch customers={custs} value={custId} onPick={pickCust} onCreate={() => {}} />
-                <button className="btn-ghost !text-xs self-start" onClick={() => setNewC({ name: "", phone: "", address: "", email: "", gender: "", birthday: "" })}>+ Tạo khách mới</button>
+                <button className="btn-ghost !text-xs self-start" onClick={() => setNewC({ name: "", phone: "", address: "", email: "", gender: "", birthday: "", customer_type: "Khách lẻ" })}>+ Tạo khách mới</button>
               </div>
             )}
             {kh.customer_name && (
               <div className="mt-3 text-[13px] bg-[#F8FAFC] rounded-lg p-2.5">
                 <b>{kh.customer_name}</b> · {kh.customer_phone}{kh.customer_address && <div className="text-[#5A6572]">{kh.customer_address}</div>}
+                <div className="mt-2"><label className="lbl">Loại khách hàng của đơn</label>
+                  <select className="inp" value={kh.customer_type || "Khách lẻ"} onChange={(e) => setKh((p) => ({ ...p, customer_type: e.target.value }))}>
+                    {CUSTOMER_TYPES.map((x) => <option key={x}>{x}</option>)}
+                  </select></div>
               </div>
             )}
           </div>
