@@ -1,0 +1,2 @@
+-- 149: Giai ngan tra gop khong con tinh/cho xac nhan cac khoan is_reversed (don huy/tra hang/sua).
+-- fn_xac_nhan_giai_ngan: tu choi khoan da dao nguoc. (Ghi chu: da ap dung qua MCP)

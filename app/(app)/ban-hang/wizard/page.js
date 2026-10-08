@@ -19,7 +19,7 @@ const KIND_LABELS = { GIAM_GIA: "Giảm giá", QUY_DOI_TIEN_MAT: "Quy đổi ti�
 // snapshot trong bangGia) de "Con lai phai thu" nhay theo ngay khi go,
 // khong can bam Lam moi (coc khong lam doi KM nao ap dung/so tien).
 const BangGiaPanel = ({ picked, bangGiaCu, bangGiaLoi, busy, tinhBangGia, bangGia, coc, cocLabel = "Đã đặt cọc" }) => (
-  <div className="card self-start">
+  <div className="card self-start lg:sticky lg:top-4 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto">
     <div className="font-extrabold mb-2.5">💰 Bảng giá</div>
     {!picked ? (
       <div className="text-xs text-[#8A93A0]">Chọn xe để xem bảng giá.</div>

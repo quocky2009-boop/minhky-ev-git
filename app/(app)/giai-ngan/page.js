@@ -21,7 +21,7 @@ export default function GiaiNgan() {
   const [pageSize, setPageSize] = useState(20);
 
   const load = async () => {
-    const { data } = await supabase.from("sale_payments").select("*").eq("method", "Trả góp").order("created_at", { ascending: false }).limit(1000);
+    const { data } = await supabase.from("sale_payments").select("*").eq("method", "Trả góp").eq("is_reversed", false).order("created_at", { ascending: false }).limit(1000);
     setList(data || []);
     const codes = [...new Set((data || []).map((x) => x.sale_code))];
     if (codes.length) {
