@@ -443,3 +443,48 @@ export function FrameSearch({ supabase, value, onPick, onlyStatus = null, placeh
     </div>
   );
 }
+
+
+// ===== Loc nhieu lua chon bang checkbox (dropdown) =====
+// options: [{ key, label, group? }]; value: mang key da chon ([] = tat ca)
+export function MultiCheck({ options, value, onChange, label = "Tất cả", width = "w-64" }) {
+  const [open, setOpen] = useSt(false);
+  const [q, setQ] = useSt("");
+  const sel = new Set(value.map(String));
+  const kw = q.trim().toLowerCase();
+  const shown = options.filter((o) => !kw || o.label.toLowerCase().includes(kw));
+  const toggle = (k) => { const n = new Set(sel); n.has(String(k)) ? n.delete(String(k)) : n.add(String(k)); onChange([...n]); };
+  const text = value.length === 0 ? label : value.length === 1 ? (options.find((o) => String(o.key) === String(value[0]))?.label || label) : `${label.split(":")[0]}: ${value.length} đã chọn`;
+  const groups = [...new Set(shown.map((o) => o.group || ""))];
+  return (
+    <div className="relative">
+      <button type="button" className={`inp !w-auto text-left flex items-center gap-2 ${value.length ? "!border-brand !text-brand font-semibold" : ""}`} onClick={() => setOpen(!open)}>
+        <span className="truncate max-w-[220px]">{text}</span><span className="text-[10px]">▾</span>
+      </button>
+      {open && (<>
+        <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
+        <div className={`absolute z-40 mt-1 ${width} max-w-[90vw] bg-white border border-[#E3E8EF] rounded-xl shadow-lg p-2`}>
+          {options.length > 8 && <input className="inp !py-1.5 !text-xs mb-1.5" placeholder="Tìm…" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />}
+          <div className="flex gap-2 mb-1 text-[11px]">
+            <button type="button" className="text-brand font-semibold" onClick={() => onChange(options.map((o) => String(o.key)))}>Chọn hết</button>
+            <button type="button" className="text-[#5A6572] font-semibold" onClick={() => onChange([])}>Bỏ chọn (tất cả)</button>
+          </div>
+          <div className="max-h-72 overflow-y-auto">
+            {groups.map((g) => (
+              <div key={g}>
+                {g && <div className="text-[10.5px] font-bold uppercase text-[#8A93A0] px-1 pt-1.5">{g}</div>}
+                {shown.filter((o) => (o.group || "") === g).map((o) => (
+                  <label key={o.key} className="flex items-center gap-2 px-1.5 py-1 rounded hover:bg-[#F3F6FB] cursor-pointer text-[13px]">
+                    <input type="checkbox" className="w-4 h-4" checked={sel.has(String(o.key))} onChange={() => toggle(o.key)} />
+                    <span>{o.label}</span>
+                  </label>
+                ))}
+              </div>
+            ))}
+            {shown.length === 0 && <div className="text-xs text-[#8A93A0] p-2">Không có lựa chọn.</div>}
+          </div>
+        </div>
+      </>)}
+    </div>
+  );
+}

@@ -2,7 +2,7 @@
 import { useEffect, useState, useRef, Fragment } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Badge, Toast, KPI, Pager, pageSlice, pageClamp, useSortable, Th, LocSearch, MoneyInput, useSelection, ThCheck, TdCheck, SelectionBar } from "@/components/ui";
+import { Badge, Toast, KPI, Pager, pageSlice, pageClamp, useSortable, Th, LocSearch, MultiCheck, MoneyInput, useSelection, ThCheck, TdCheck, SelectionBar } from "@/components/ui";
 import { fmtVND, fmtDate, fmtTime, errMsg, downloadCSV, downloadXLSX } from "@/lib/format";
 import { printOrder, printOrderBill } from "@/lib/print";
 import BangGiaDon from "@/components/BangGiaDon";
@@ -36,7 +36,7 @@ export default function DonBan() {
   // khoi phuc va man hinh danh sach hien dung lai dung trang thai dang loc/tim.
   const [from, setFrom] = useState(() => _params.get("from") || (_params.get("q") ? "2000-01-01" : firstOfMonth()));
   const [to, setTo] = useState(() => _params.get("to") || iso(new Date()));
-  const [fLoc, setFLoc] = useState(() => _params.get("kho") || "");
+  const [fLoc, setFLoc] = useState(() => (_params.get("kho") || "").split(",").filter(Boolean));
   const [fInv, setFInv] = useState(() => _params.get("hd") || "");
   const [fType, setFType] = useState(() => _params.get("loai") || "");
   const [showHuy, setShowHuy] = useState(() => _params.get("huy") === "1");
@@ -60,14 +60,14 @@ export default function DonBan() {
     if (q) sp.set("q", q);
     if (from) sp.set("from", from);
     if (to) sp.set("to", to);
-    if (fLoc) sp.set("kho", fLoc);
+    if (fLoc.length) sp.set("kho", fLoc.join(","));
     if (fInv) sp.set("hd", fInv);
     if (fType) sp.set("loai", fType);
     if (showHuy) sp.set("huy", "1");
     if (page > 1) sp.set("trang", String(page));
     const qs = sp.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-  }, [q, from, to, fLoc, fInv, fType, showHuy, page]);
+  }, [q, from, to, fLoc.join(","), fInv, fType, showHuy, page]);
   // Tu mo chi tiet khi den tu o tim kiem toan cuc (khop dung 1 don)
   const [_autoOpened, _setAutoOpened] = useState(false);
   useEffect(() => {
@@ -96,7 +96,7 @@ export default function DonBan() {
     setBusy(true);
     let qy = supabase.from("sales_orders").select("*").gte("sale_date", from).lte("sale_date", to)
       .order("created_at", { ascending: false }).limit(3000);
-    if (fLoc) qy = qy.eq("location_code", fLoc);
+    if (fLoc.length) qy = qy.in("location_code", fLoc);
     const [{ data }, { data: si }, { data: sop }, { data: promoList }, { data: kmAudit }, { data: sp }] = await Promise.all([
       qy, supabase.from("sale_items").select("sale_code, amount, item_type").limit(10000),
       supabase.from("sale_order_promotions").select("sale_code, promotion_id").limit(10000),
@@ -127,7 +127,7 @@ export default function DonBan() {
     setKmAuditMap(km);
     setBusy(false);
   };
-  useEffect(() => { if (!loading) load(); }, [loading, from, to, fLoc]);
+  useEffect(() => { if (!loading) load(); }, [loading, from, to, fLoc.join(",")]);
   useEffect(() => {
     if (!profile) return;
     if (profile.role === "CEO") { setCanSuaKM(true); return; }
@@ -435,7 +435,8 @@ export default function DonBan() {
           <Link href="/ban-hang?new=1" className="btn-ghost !text-xs" title="Chọn nhiều xe trong 1 đơn, tự tách thành từng đơn theo từng xe">+ Tạo đơn bán buôn</Link>
           <input type="date" className="inp !w-auto" value={from} onChange={(e) => setFrom(e.target.value)} />
           <input type="date" className="inp !w-auto" value={to} onChange={(e) => setTo(e.target.value)} />
-          <div className="!w-52"><LocSearch locations={locations} value={fLoc} onChange={setFLoc} placeholder="Lọc kho…" /></div>
+          <MultiCheck label="Cửa hàng: tất cả" value={fLoc} onChange={(v) => { setFLoc(v); setPage(1); }}
+            options={[...locations].filter((l) => l.status === "Hoạt động").sort((a, b) => (a.type === "Cửa hàng" ? 0 : 1) - (b.type === "Cửa hàng" ? 0 : 1)).map((l) => ({ key: l.code, label: `[${l.region}] ${l.name}`, group: l.type === "Cửa hàng" ? "Cửa hàng" : "Kho" }))} />
           <select className="inp !w-auto" value={fInv} onChange={(e) => { setFInv(e.target.value); setPage(1); }}>
             <option value="">Hóa đơn: tất cả</option><option>Chờ xuất HĐ</option><option>Đã xuất HĐ</option>
           </select>
@@ -475,7 +476,7 @@ export default function DonBan() {
               }}>⬇ Xuất Excel</button>
             </SelectionBar>
             <div className="tbl-scroll"><table className="w-full border-collapse tbl-card table-fixed">
-              <thead><tr><ThCheck sel={sel} rows={pageSlice(sorted, page, pageSize)} idOf={(o) => o.id} /><Th label="Mã đơn" k="code" sort={sort} className="w-[8%]" /><Th label="Ngày" k="date" sort={sort} className="w-[6%]" /><Th label="Xe" k="xe" sort={sort} className="w-[10%]" /><Th label="Số khung" k="sk" sort={sort} className="w-[11%]" /><Th label="Điểm bán" k="kho" sort={sort} className="w-[8%]" /><Th label="Khách" k="kh" sort={sort} className="w-[10%]" /><Th label="SĐT" k="sdt" sort={sort} className="w-[7%]" /><Th label="Loại KH" k="type" sort={sort} className="w-[7%]" /><Th label="Tổng đơn" k="tien" sort={sort} className="w-[8%]" /><Th label="Hóa đơn" k="hd" sort={sort} className="w-[8%]" /><Th label="NV bán" k="nv" sort={sort} className="w-[6%]" /><th className="th w-[11%]"></th></tr></thead>
+              <thead><tr><ThCheck sel={sel} rows={pageSlice(sorted, page, pageSize)} idOf={(o) => o.id} /><Th label="Mã đơn / Ngày" k="date" sort={sort} className="w-[12%]" /><Th label="Xe / Số khung" k="xe" sort={sort} className="w-[19%]" /><Th label="Điểm bán" k="kho" sort={sort} className="w-[12%]" /><Th label="Khách / SĐT" k="kh" sort={sort} className="w-[19%]" /><Th label="Tổng đơn" k="tien" sort={sort} className="w-[10%]" /><Th label="Hóa đơn" k="hd" sort={sort} className="w-[10%]" /><Th label="NV bán" k="nv" sort={sort} className="w-[8%]" /><th className="th w-[10%]"></th></tr></thead>
               <tbody>{pageSlice(sorted, page, pageSize).map((o, i) => {
                 const v = vOf(o.vehicle_id);
                 const st = o.invoice_status || "Chờ xuất HĐ";
@@ -485,16 +486,17 @@ export default function DonBan() {
                 return [
                   <tr key={o.id} className={huy ? "bg-[#F3F4F6] text-[#8A93A0]" : sel.has(o.id) ? "bg-[#EAF2FF]" : invId === o.id ? "bg-[#FDF6E3]" : done ? "hover:bg-[#F8FAFC]" : "bg-[#FFFCF5] hover:bg-[#FDF6E3]"}>
                     <TdCheck sel={sel} id={o.id} />
-                    <td data-label="Mã đơn" className="td font-bold"><Link href={`/don-ban/${o.id}`} className="text-brand hover:underline">{o.code}</Link>{nhanTra ? <Badge tone="red">Đã trả hàng</Badge> : huy && <Badge tone="red">Đã hủy</Badge>}</td>
-                    <td data-label="Ngày" className="td text-xs">{fmtDate(o.sale_date)}</td>
-                    <td data-label="Xe" className="td text-[13px]">
-                      <div className="truncate" title={v ? `${v.brand} ${v.name} ${v.color}` : o.vehicle_id}>{v ? `${v.name} ${v.color}` : o.vehicle_id}</div>
+                    <td data-label="Mã đơn" className="td"><div className="font-bold"><Link href={`/don-ban/${o.id}`} className="text-brand hover:underline">{o.code}</Link></div><div className="text-[11px] text-[#5A6572]">{fmtDate(o.sale_date)}</div>{nhanTra ? <Badge tone="red">Đã trả hàng</Badge> : huy && <Badge tone="red">Đã hủy</Badge>}</td>
+                    <td data-label="Xe" className="td">
+                      <div className="text-[13px] truncate" title={v ? `${v.brand} ${v.name} ${v.color}` : o.vehicle_id}>{v ? `${v.name} ${v.color}` : o.vehicle_id}</div>
+                      <div className="font-mono text-[10.5px] text-[#5A6572] truncate" title={o.frame_number}>{o.frame_number}</div>
                     </td>
-                    <td data-label="Số khung" className="td font-mono text-[11px]"><div className="truncate" title={o.frame_number}>{o.frame_number}</div></td>
-                    <td data-label="Điểm bán" className="td text-xs"><div className="truncate" title={locName(o.location_code)}>{locName(o.location_code)}</div></td>
-                    <td data-label="Khách" className="td text-[13px]"><div className="truncate" title={o.customer_name}>{o.customer_name}</div></td>
-                    <td data-label="SĐT" className="td text-xs"><div className="truncate" title={o.customer_phone}>{o.customer_phone}</div></td>
-                    <td data-label="Loại KH" className="td text-xs"><Badge tone={o.customer_type === "Khách buôn" ? "amber" : o.customer_type === "Khách lẻ của Đại lý" ? "blue" : o.customer_type === "Khách lẻ" || !o.customer_type ? "green" : "purple"}>{o.customer_type || "Khách lẻ"}</Badge></td>
+                    <td data-label="Điểm bán" className="td text-xs"><div className="break-words" title={locName(o.location_code)}>{locName(o.location_code)}</div></td>
+                    <td data-label="Khách" className="td">
+                      <div className="text-[13px] truncate" title={o.customer_name}>{o.customer_name}</div>
+                      <div className="text-[11px] text-[#5A6572]">{o.customer_phone}</div>
+                      <Badge tone={o.customer_type === "Khách buôn" ? "amber" : o.customer_type === "Khách lẻ của Đại lý" ? "blue" : o.customer_type === "Khách lẻ" || !o.customer_type ? "green" : "purple"}>{o.customer_type || "Khách lẻ"}</Badge>
+                    </td>
                     <td data-label="Tổng đơn" className="td font-bold">{fmtVND(total(o))}</td>
                     <td data-label="Hóa đơn" className="td">
                       <div className="flex items-center gap-1 flex-wrap">
@@ -525,7 +527,7 @@ export default function DonBan() {
                     </div></td>
                   </tr>,
                   invId === o.id && (
-                    <tr key={o.id + "f"}><td colSpan={12} className="td bg-[#FFFDF5]">
+                    <tr key={o.id + "f"}><td colSpan={9} className="td bg-[#FFFDF5]">
                       <div className="flex flex-col gap-3">
                         <div className="flex gap-1.5 items-end flex-wrap">
                           <div><label className="lbl">Số hóa đơn (bắt buộc)</label><input className="inp !py-2 !w-48" autoFocus value={invF.no} onChange={(e) => setInvF((p) => ({ ...p, no: e.target.value }))} placeholder="VD: 00012345" /></div>
@@ -566,7 +568,7 @@ export default function DonBan() {
                   ),
                 ];
               })}
-              {sorted.length === 0 && <tr><td className="td" colSpan={12}>Không có đơn bán nào khớp bộ lọc.</td></tr>}
+              {sorted.length === 0 && <tr><td className="td" colSpan={9}>Không có đơn bán nào khớp bộ lọc.</td></tr>}
               </tbody>
             </table></div>
             <Pager total={sorted.length} page={page} setPage={setPage} pageSize={pageSize} setPageSize={setPageSize} />

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Badge, Toast, KPI, Field, LocSearch, MoneyInput, Pager, pageSlice, pageClamp, useSortable, Th, useSelection, ThCheck, TdCheck, SelectionBar } from "@/components/ui";
+import { Badge, Toast, KPI, Field, LocSearch, MultiCheck, MoneyInput, Pager, pageSlice, pageClamp, useSortable, Th, useSelection, ThCheck, TdCheck, SelectionBar } from "@/components/ui";
 import { fmtVND, fmtTime, fmtDate, errMsg, downloadCSV } from "@/lib/format";
 
 const iso = (d) => d.toLocaleDateString("sv-SE");
@@ -17,7 +17,7 @@ export default function PhieuThuChi({ dir }) {
   const [txns, setTxns] = useState([]);
   const [from, setFrom] = useState(firstOfMonth());
   const [to, setTo] = useState(iso(new Date()));
-  const [fAcc, setFAcc] = useState("");
+  const [fAcc, setFAcc] = useState([]);
   const [fCat, setFCat] = useState("");
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
@@ -41,7 +41,7 @@ export default function PhieuThuChi({ dir }) {
     let qy = supabase.from("cash_txns").select("*").eq("direction", dir)
       .gte("txn_date", from).lte("txn_date", to)
       .order("txn_date", { ascending: false }).order("id", { ascending: false }).limit(3000);
-    if (fAcc) qy = qy.eq("account_id", fAcc);
+    if (fAcc.length) qy = qy.in("account_id", fAcc.map(Number));
     const [{ data: a }, { data: t }, { data: pm }] = await Promise.all([
       supabase.from("v_quy_so_du").select("*").order("type").order("name"),
       qy,
@@ -51,7 +51,7 @@ export default function PhieuThuChi({ dir }) {
     const m = {}; (pm || []).forEach((x) => { m[x.perm] = x.allowed; }); setPerms(m);
     setBusy(false);
   };
-  useEffect(() => { if (!loading) load(); }, [loading, profile, from, to, fAcc]);
+  useEffect(() => { if (!loading) load(); }, [loading, profile, from, to, fAcc.join(",")]);
 
   if (loading || !profile) return <div className="card">Đang tải dữ liệu…</div>;
   if (!can("thu_chi_xem")) return <div className="card">Bạn không có quyền xem sổ quỹ.</div>;
@@ -283,10 +283,8 @@ export default function PhieuThuChi({ dir }) {
           <div className="font-extrabold mr-auto">Danh sách {tenPhieu.toLowerCase()} ({sorted.length})</div>
           <input type="date" className="inp !w-auto" value={from} onChange={(e) => setFrom(e.target.value)} />
           <input type="date" className="inp !w-auto" value={to} onChange={(e) => setTo(e.target.value)} />
-          <select className="inp !w-auto" value={fAcc} onChange={(e) => setFAcc(e.target.value)}>
-            <option value="">Quỹ: tất cả</option>
-            {accs.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-          </select>
+          <MultiCheck label="Quỹ: tất cả" value={fAcc} onChange={(v) => { setFAcc(v); setPage(1); }}
+            options={accs.map((a) => ({ key: a.id, label: a.name, group: a.type }))} />
           <select className="inp !w-auto" value={fCat} onChange={(e) => { setFCat(e.target.value); setPage(1); }}>
             <option value="">Danh mục: tất cả</option>
             {[...new Set(txns.map((t) => t.category))].filter(Boolean).map((c) => <option key={c}>{c}</option>)}
