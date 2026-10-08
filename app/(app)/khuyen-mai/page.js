@@ -30,6 +30,9 @@ export default function KhuyenMai() {
   const [editId, setEditId] = useState(null);
   const [f, setF] = useState(empty);
   const [q, setQ] = useState("");
+  const [fModel, setFModel] = useState("");
+  const [fPin, setFPin] = useState("");
+  const [fTT, setFTT] = useState("");
   const [page, setPage] = useState(1);
   const sort = useSortable();
 
@@ -77,10 +80,15 @@ export default function KhuyenMai() {
   const modelsOfBrand = [...new Set(vehicles.filter((v) => v.brand === f.brand).map((v) => v.name))].sort();
 
   const filtered = rows.filter((r) => {
+    // Model/Pin: CT bo trong = ap dung moi model/hinh thuc -> van khop khi loc
+    if (fModel && (r.vehicle_names || []).length > 0 && !r.vehicle_names.includes(fModel)) return false;
+    if (fPin && (r.battery_options || []).length > 0 && !r.battery_options.includes(fPin)) return false;
+    if (fTT && trangThaiThuc(r) !== fTT) return false;
     if (!q) return true;
     const kw = q.toLowerCase();
     return `${r.code} ${r.name} ${r.brand}`.toLowerCase().includes(kw);
   });
+  const allModels = [...new Set(rows.flatMap((r) => r.vehicle_names || []))].sort();
   const sorted = sort.sortFn(filtered, { code: (r) => r.code, name: (r) => r.name, brand: (r) => r.brand,
     tu: (r) => r.start_date, den: (r) => r.end_date, tt: trangThaiThuc });
 
@@ -185,7 +193,22 @@ export default function KhuyenMai() {
       )}
 
       <div className="card">
-        <input className="inp !w-64 mb-3" placeholder="Tìm mã, tên, hãng…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
+        <div className="flex gap-2 flex-wrap items-center mb-3">
+          <input className="inp !w-64" placeholder="Tìm mã, tên, hãng…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
+          <select className="inp !w-auto" value={fModel} onChange={(e) => { setFModel(e.target.value); setPage(1); }}>
+            <option value="">Model áp dụng: tất cả</option>
+            {allModels.map((m) => <option key={m} value={m}>{m}</option>)}
+          </select>
+          <select className="inp !w-auto" value={fPin} onChange={(e) => { setFPin(e.target.value); setPage(1); }}>
+            <option value="">Pin áp dụng: tất cả</option>
+            {BATTERY_OPTIONS.map((b) => <option key={b} value={b}>{b}</option>)}
+          </select>
+          <select className="inp !w-auto" value={fTT} onChange={(e) => { setFTT(e.target.value); setPage(1); }}>
+            <option value="">Trạng thái: tất cả</option>
+            <option>Đang áp dụng</option><option>Tạm dừng</option><option>Hết hạn</option>
+          </select>
+          {(fModel || fPin || fTT) && <button className="btn-ghost !text-xs" onClick={() => { setFModel(""); setFPin(""); setFTT(""); setPage(1); }}>✕ Bỏ lọc</button>}
+        </div>
         <div className="tbl-scroll"><table className="w-full border-collapse tbl-card">
           <thead><tr>
             <Th label="Mã CT" k="code" sort={sort} />
