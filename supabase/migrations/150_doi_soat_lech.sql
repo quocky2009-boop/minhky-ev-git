@@ -1,3 +1,6 @@
 -- 150: fn_doi_soat_lech(p_from,p_to) - doi chieu don ban <-> so quy (so da thu thuc te tren don = paid_amount - coc_applied - tra gop cho giai ngan).
 -- Ra soat 08/10/2026: bo sung sale_payments cho BH-2607-39651/19695/19838 (gan phieu PT-2608-43313/67061/10899, TK id 3);
 -- dao nguoc 2 khoan thu cua don huy BH-2607-22099 (khong co phieu quy). Da ap dung qua MCP.
+-- 151 (ra soat 4 don lech con lai, 08/10/2026): bang doi_soat_bo_qua (don da ra soat, khong can xu ly; fn_doi_soat_lech bo qua).
+-- BH-2608-61304 / BH-2607-12366 / BH-2607-41009: phat sinh quy truoc ngay chot so du 05/10/2026 -> da hap thu vao so du dau ky.
+-- BH-2607-67333: dao nguoc khoan thu #40 (da hoan "chua thu tien cua khach"), don con cong no 15.840.000.
