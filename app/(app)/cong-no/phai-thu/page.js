@@ -2,7 +2,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Badge, Toast, KPI, Field, Pager, pageSlice, useSortable, Th, useSelection, ThCheck, TdCheck, SelectionBar } from "@/components/ui";
+import { SavedFilters, AmountFilter, trongKhoang } from "@/components/FinFilters";
+import { Badge, Toast, KPI, Field, MultiCheck, Pager, pageSlice, useSortable, Th, useSelection, ThCheck, TdCheck, SelectionBar } from "@/components/ui";
 import { fmtVND, fmtDate, fmtTime, errMsg, downloadCSV } from "@/lib/format";
 
 const iso = (d) => d.toLocaleDateString("sv-SE");
@@ -17,7 +18,11 @@ export default function CongNoPhai() {
   const [reminders, setReminders] = useState({}); // { order_id: [reminder...] }
   const [busy, setBusy] = useState(true);
   const [fNhom, setFNhom] = useState("");
-  const [fLoc, setFLoc] = useState("");
+  const [fLoc, setFLoc] = useState([]);
+  const [fSeller, setFSeller] = useState([]);
+  const [fAge, setFAge] = useState("");
+  const [aMin, setAMin] = useState("");
+  const [aMax, setAMax] = useState("");
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
@@ -51,12 +56,18 @@ export default function CongNoPhai() {
   const locName = (c) => locations.find((l) => l.code === c)?.name || c || "—";
   const vName = (id) => { const v = vehicles.find((x) => x.id === id); return v ? `${v.name} ${v.color}` : id; };
 
+  // Tuoi no = so ngay ke tu ngay ban
+  const tuoiNo = (r) => Math.max(0, Math.floor((new Date(iso(new Date())) - new Date(r.sale_date)) / 86400000));
+  const AGES = [["0-30", "≤ 30 ngày"], ["31-60", "31–60 ngày"], ["61-90", "61–90 ngày"], ["91-99999", "> 90 ngày"]];
   const kw = q.trim().toLowerCase();
   const filtered = rows.filter((r) => {
     if (fNhom && r.nhom_qua_han !== fNhom) return false;
-    if (fLoc && r.location_code !== fLoc) return false;
+    if (fLoc.length && !fLoc.includes(r.location_code)) return false;
+    if (fSeller.length && !fSeller.includes(r.seller_name)) return false;
+    if (fAge) { const d = tuoiNo(r); const [lo, hi] = fAge.split("-").map(Number); if (d < lo || d > hi) return false; }
+    if (!trongKhoang(r.con_no, aMin, aMax)) return false;
     if (!kw) return true;
-    return `${r.code} ${r.customer_name} ${r.customer_phone} ${r.frame_number}`.toLowerCase().includes(kw);
+    return `${r.code} ${r.customer_name} ${r.customer_phone} ${r.frame_number} ${r.con_no}`.toLowerCase().includes(kw);
   });
   const sorted = sort.sortFn(filtered, {
     code: (r) => r.code, kh: (r) => r.customer_name, don: (r) => r.tong_don,
@@ -130,10 +141,17 @@ export default function CongNoPhai() {
       <div className="card">
         <div className="flex gap-2 flex-wrap items-center mb-3">
           <input className="inp !w-52" placeholder="Tìm mã đơn, khách, SĐT, số khung…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
-          <select className="inp !w-auto" value={fLoc} onChange={(e) => { setFLoc(e.target.value); setPage(1); }}>
-            <option value="">Tất cả điểm bán</option>
-            {locations.filter((l) => l.type === "Cửa hàng" || l.type === "Showroom").map((l) => <option key={l.code} value={l.code}>{l.name}</option>)}
+          <MultiCheck label="Điểm bán: tất cả" value={fLoc} onChange={(v) => { setFLoc(v); setPage(1); }}
+            options={locations.filter((l) => l.type === "Cửa hàng" || l.type === "Showroom").map((l) => ({ key: l.code, label: l.name }))} />
+          <MultiCheck label="NV bán: tất cả" value={fSeller} onChange={(v) => { setFSeller(v); setPage(1); }}
+            options={[...new Set(rows.map((r) => r.seller_name))].filter(Boolean).sort().map((n) => ({ key: n, label: n }))} />
+          <select className="inp !w-auto" value={fAge} onChange={(e) => { setFAge(e.target.value); setPage(1); }}>
+            <option value="">Tuổi nợ: tất cả</option>
+            {AGES.map(([k, l]) => <option key={k} value={k}>{l} ({rows.filter((r) => { const d = tuoiNo(r); const [lo, hi] = k.split("-").map(Number); return d >= lo && d <= hi; }).length} đơn)</option>)}
           </select>
+          <AmountFilter min={aMin} max={aMax} setMin={setAMin} setMax={setAMax} onChange={() => setPage(1)} />
+          <SavedFilters k="cong-no-phai-thu" state={{ fLoc, fSeller, fAge, aMin, aMax, fNhom, q }}
+            apply={(o) => { setFLoc(o.fLoc || []); setFSeller(o.fSeller || []); setFAge(o.fAge || ""); setAMin(o.aMin || ""); setAMax(o.aMax || ""); setFNhom(o.fNhom || ""); setQ(o.q || ""); }} />
           <div className="ml-auto text-[13px] font-bold text-danger">Tổng lọc: {fmtVND(filtered.reduce((s, r) => s + r.con_no, 0))}</div>
         </div>
 

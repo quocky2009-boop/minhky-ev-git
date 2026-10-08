@@ -1,19 +1,27 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Badge, Toast, KPI, Pager, pageSlice } from "@/components/ui";
+import { QuickDates, AmountFilter, SavedFilters, trongKhoang } from "@/components/FinFilters";
+import { Badge, Toast, KPI, Pager, pageSlice, MultiCheck } from "@/components/ui";
 import { fmtVND, fmtDate, fmtTime, errMsg, downloadCSV } from "@/lib/format";
 
 const todayISO = () => new Date().toLocaleDateString("sv-SE");
 
 export default function GiaiNgan() {
-  const { supabase, profile, loading } = useCatalog();
+  const { supabase, locations, profile, loading } = useCatalog();
   const { toast, notify } = useToast();
   const [list, setList] = useState([]);
   const [orders, setOrders] = useState({});
   const [funds, setFunds] = useState([]);
   const [fStatus, setFStatus] = useState("Chờ giải ngân");
   const [q, setQ] = useState("");
+  const [fCo, setFCo] = useState([]);
+  const [fLoc, setFLoc] = useState([]);
+  const [fLate, setFLate] = useState(false);
+  const [dFrom, setDFrom] = useState("");
+  const [dTo, setDTo] = useState("");
+  const [aMin, setAMin] = useState("");
+  const [aMax, setAMax] = useState("");
   const [confirmRow, setConfirmRow] = useState(null);
   const [accSel, setAccSel] = useState("");
   const [noteSel, setNoteSel] = useState("");
@@ -25,7 +33,7 @@ export default function GiaiNgan() {
     setList(data || []);
     const codes = [...new Set((data || []).map((x) => x.sale_code))];
     if (codes.length) {
-      const { data: os } = await supabase.from("sales_orders").select("code, customer_name, customer_phone, seller_name, sale_date").in("code", codes);
+      const { data: os } = await supabase.from("sales_orders").select("code, customer_name, customer_phone, seller_name, sale_date, location_code").in("code", codes);
       const m = {}; (os || []).forEach((o) => (m[o.code] = o)); setOrders(m);
     }
     const { data: fs } = await supabase.rpc("fn_ds_quy");
@@ -44,7 +52,13 @@ export default function GiaiNgan() {
   const filtered = list.filter((x) => {
     if (fStatus && x.status !== fStatus) return false;
     const o = orders[x.sale_code];
-    const t = (x.sale_code + x.finance_company + (o?.customer_name || "") + (o?.customer_phone || "")).toLowerCase();
+    if (fCo.length && !fCo.includes(x.finance_company)) return false;
+    if (fLoc.length && !fLoc.includes(o?.location_code)) return false;
+    if (fLate && !(x.status === "Chờ giải ngân" && x.expected_date && x.expected_date < today)) return false;
+    if (dFrom && (!o?.sale_date || o.sale_date < dFrom)) return false;
+    if (dTo && (!o?.sale_date || o.sale_date > dTo)) return false;
+    if (!trongKhoang(x.amount, aMin, aMax)) return false;
+    const t = (x.sale_code + x.finance_company + (o?.customer_name || "") + (o?.customer_phone || "") + x.amount).toLowerCase();
     return !q || t.includes(q.toLowerCase());
   });
 
@@ -80,6 +94,23 @@ export default function GiaiNgan() {
             <option value="">Tất cả trạng thái</option><option>Chờ giải ngân</option><option>Đã giải ngân</option>
           </select>
           <button className="btn-ghost !text-xs" onClick={exportCSV}>⬇ Xuất CSV</button>
+        </div>
+        <div className="flex gap-2 flex-wrap items-center mb-2">
+          <span className="text-[11.5px] text-[#8A93A0] font-semibold">Ngày bán:</span>
+          <QuickDates from={dFrom} to={dTo} setFrom={setDFrom} setTo={setDTo} onChange={() => setPage(1)} />
+          <input type="date" className="inp !w-auto" value={dFrom} onChange={(e) => { setDFrom(e.target.value); setPage(1); }} />
+          <input type="date" className="inp !w-auto" value={dTo} onChange={(e) => { setDTo(e.target.value); setPage(1); }} />
+          {(dFrom || dTo) && <button className="btn-ghost !text-xs" onClick={() => { setDFrom(""); setDTo(""); }}>✕</button>}
+        </div>
+        <div className="flex gap-2 flex-wrap items-center mb-3">
+          <MultiCheck label="Công ty TC: tất cả" value={fCo} onChange={(v) => { setFCo(v); setPage(1); }}
+            options={[...new Set(list.map((x) => x.finance_company))].filter(Boolean).sort().map((n) => ({ key: n, label: n }))} />
+          <MultiCheck label="Cửa hàng: tất cả" value={fLoc} onChange={(v) => { setFLoc(v); setPage(1); }}
+            options={locations.filter((l) => l.type === "Cửa hàng").map((l) => ({ key: l.code, label: l.name }))} />
+          <label className="flex items-center gap-1.5 text-xs font-semibold cursor-pointer"><input type="checkbox" className="w-4 h-4" checked={fLate} onChange={(e) => { setFLate(e.target.checked); setPage(1); }} />⚠ Chỉ khoản quá hạn</label>
+          <AmountFilter min={aMin} max={aMax} setMin={setAMin} setMax={setAMax} onChange={() => setPage(1)} />
+          <SavedFilters k="giai-ngan" state={{ fStatus, fCo, fLoc, fLate, aMin, aMax, q }}
+            apply={(o) => { setFStatus(o.fStatus || "Chờ giải ngân"); setFCo(o.fCo || []); setFLoc(o.fLoc || []); setFLate(!!o.fLate); setAMin(o.aMin || ""); setAMax(o.aMax || ""); setQ(o.q || ""); }} />
         </div>
         <div className="overflow-x-auto"><table className="w-full border-collapse">
           <thead><tr><th className="th">Đơn bán</th><th className="th">Khách</th><th className="th">Công ty TC</th><th className="th">Số tiền</th><th className="th">Dự kiến</th><th className="th">Trạng thái</th><th className="th"></th></tr></thead>

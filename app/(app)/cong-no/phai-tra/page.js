@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Badge, Toast, KPI, Field, Pager, pageSlice, useSortable, Th, useSelection, ThCheck, TdCheck, SelectionBar } from "@/components/ui";
+import { SavedFilters, AmountFilter, trongKhoang } from "@/components/FinFilters";
+import { Badge, Toast, KPI, Field, MultiCheck, Pager, pageSlice, useSortable, Th, useSelection, ThCheck, TdCheck, SelectionBar } from "@/components/ui";
 import { fmtVND, fmtDate, fmtTime, errMsg, downloadCSV } from "@/lib/format";
 
 const iso = (d) => d.toLocaleDateString("sv-SE");
@@ -13,7 +14,11 @@ export default function CongNoPhaiTra() {
   const [payments, setPayments] = useState({}); // { debt_id: [...] }
   const [busy, setBusy] = useState(true);
   const [q, setQ] = useState("");
-  const [fLoc, setFLoc] = useState("");
+  const [fLoc, setFLoc] = useState([]);
+  const [fNcc, setFNcc] = useState([]);
+  const [fHan, setFHan] = useState("");
+  const [aMin, setAMin] = useState("");
+  const [aMax, setAMax] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [showNew, setShowNew] = useState(false);
@@ -42,9 +47,18 @@ export default function CongNoPhaiTra() {
 
   const kw = q.trim().toLowerCase();
   const filtered = rows.filter((r) => {
-    if (fLoc && r.location_code !== fLoc) return false;
+    if (fLoc.length && !fLoc.includes(r.location_code)) return false;
+    if (fNcc.length && !fNcc.includes(r.supplier)) return false;
+    if (fHan) {
+      const t = iso(new Date()), t7 = iso(new Date(Date.now() + 7 * 86400000));
+      if (fHan === "qua" && !r.qua_han) return false;
+      if (fHan === "7" && !(r.due_date && r.due_date >= t && r.due_date <= t7)) return false;
+      if (fHan === "trong" && !(r.due_date && !r.qua_han)) return false;
+      if (fHan === "chua" && r.due_date) return false;
+    }
+    if (!trongKhoang(r.con_no, aMin, aMax)) return false;
     if (!kw) return true;
-    return `${r.code} ${r.import_doc} ${r.supplier}`.toLowerCase().includes(kw);
+    return `${r.code} ${r.import_doc} ${r.supplier} ${r.con_no}`.toLowerCase().includes(kw);
   });
   const sorted = sort.sortFn(filtered, {
     code: (r) => r.code, ncc: (r) => r.supplier, no: (r) => r.con_no,
@@ -138,10 +152,16 @@ export default function CongNoPhaiTra() {
       <div className="card">
         <div className="flex gap-2 flex-wrap items-center mb-3">
           <input className="inp !w-52" placeholder="Tìm mã nợ, NCC, phiếu nhập…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
-          <select className="inp !w-auto" value={fLoc} onChange={(e) => { setFLoc(e.target.value); setPage(1); }}>
-            <option value="">Tất cả kho</option>
-            {locations.map((l) => <option key={l.code} value={l.code}>{l.name}</option>)}
+          <MultiCheck label="Nhà cung cấp: tất cả" value={fNcc} onChange={(v) => { setFNcc(v); setPage(1); }}
+            options={[...new Set(rows.map((r) => r.supplier))].filter(Boolean).sort().map((n) => ({ key: n, label: n }))} />
+          <MultiCheck label="Kho: tất cả" value={fLoc} onChange={(v) => { setFLoc(v); setPage(1); }}
+            options={locations.map((l) => ({ key: l.code, label: l.name }))} />
+          <select className="inp !w-auto" value={fHan} onChange={(e) => { setFHan(e.target.value); setPage(1); }}>
+            <option value="">Hạn thanh toán: tất cả</option><option value="qua">Quá hạn</option><option value="7">Đến hạn trong 7 ngày</option><option value="trong">Còn trong hạn</option><option value="chua">Chưa đặt hạn</option>
           </select>
+          <AmountFilter min={aMin} max={aMax} setMin={setAMin} setMax={setAMax} onChange={() => setPage(1)} />
+          <SavedFilters k="cong-no-phai-tra" state={{ fLoc, fNcc, fHan, aMin, aMax, q }}
+            apply={(o) => { setFLoc(o.fLoc || []); setFNcc(o.fNcc || []); setFHan(o.fHan || ""); setAMin(o.aMin || ""); setAMax(o.aMax || ""); setQ(o.q || ""); }} />
         </div>
 
         <div className="tbl-scroll"><table className="w-full border-collapse tbl-card">
