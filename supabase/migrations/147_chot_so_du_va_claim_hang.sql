@@ -1,0 +1,16 @@
+-- =====================================================================
+-- 147_chot_so_du_va_claim_hang.sql
+-- (A) CHOT SO DU DAU KY: so_du_dau_ky_log + fn_chot_so_du_dau_ky(account, so_thuc_te, ngay, ly_do) (CEO/ADMIN):
+--     dat opening_balance = so_thuc_te - tong phat sinh den het ngay (giu nguyen moi phieu, co nhat ky).
+--     Da ap dung 08/10/2026 theo CEO: quy tien mat Thanh pho dau ky 1.000.000 -> -3.099.984.394;
+--     Ham Yen 2.000.000 -> -1.455.826.600 (so du den het 05/10/2026 = 0). Man hinh: Cai dat -> nut "Chot so du".
+-- (B) CLAIM HANG (tien khach tra thang cho VinFast, hang doi tru vao tien nhap lo sau)
+--     cash_accounts.thu_ho_hang (da bat cho "Cty VinFast Viet Nam"): van la thanh toan cua don, nhung
+--     KHONG tinh vao tien/ton quy cong ty o bao cao 17h & doi soat -> dong rieng "Khach tra thang cho hang".
+--     Bang: hang_claim (ho so, NHAP -> DA_NOP -> HANG_DUYET -> DA_DOI_TRU | HUY), hang_claim_dong (moi khoan:
+--       CHO | DUYET | TU_CHOI_BO_SUNG (tra ve cho nop lai) | TU_CHOI_MAT (ghi giam so du tien hang giu ho)),
+--       hang_cong_no (hang con no dai ly = tien duoc duyet), hang_doi_tru (doi tru vao NHAP_XE | NHAP_PHU_TUNG | KHAC,
+--       tuy chon gan supplier_debts). Moi lan doi tru lap phieu chi 'Đối trừ claim hãng' tren tai khoan hang giu ho.
+--     Ham: fn_claim_cho/lap/nop/huy/duyet/doi_tru, _claim_nhac (cron 8h VN, ngay chot app_settings.claim_ngay_chot).
+--     Quyen: perm claim_hang (ADMIN + CEO). Man hinh: /claim-hang.
+-- (Dinh nghia day du trong DB — DB that la nguon su that.)

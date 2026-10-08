@@ -30,6 +30,7 @@ const PERM_GROUPS = [
   { group: "Sổ quỹ", icon: "💰", items: [
     { key: "thu_chi_chot", label: "Xem/tạo phiếu thu chi & duyệt", desc: "Truy cập Sổ quỹ, duyệt phiếu chi" },
     { key: "dvn_ghi", label: "Dịch vụ đăng ký & phụ kiện ngoài", desc: "Cửa hàng trưởng ghi khoản, thu/chi trên quỹ dịch vụ ngoài của mình" },
+    { key: "claim_hang", label: "Claim hãng (tiền khách trả thẳng cho hãng)", desc: "Lập hồ sơ claim, ghi kết quả hãng duyệt, đối trừ công nợ hãng" },
     { key: "dvn_xac_nhan_nop", label: "Xác nhận nộp dịch vụ ngoài về công ty", desc: "Kế toán xác nhận khoản nộp cuối tháng" },
   ]},
   { group: "Dữ liệu", icon: "📋", items: [

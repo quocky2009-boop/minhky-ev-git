@@ -182,6 +182,18 @@ function QuyTaiKhoan({ supabase, notify, locations, tick }) {
     notify(acc ? (acc.status === "Hoạt động" ? "Đã mở lại tài khoản." : "Đã khóa tài khoản — không còn hiện khi chọn nơi nhận tiền.") : "Đã lưu tài khoản.");
     setF(null); load();
   };
+  const chotDauKy = async (a) => {
+    const so = prompt(`CHỐT SỐ DƯ ĐẦU KỲ — ${a.name}\n\nNhập SỐ DƯ THỰC TẾ (đ) vào cuối ngày chốt (không có số lẻ, có thể là 0):`);
+    if (so === null) return;
+    const n = Number(String(so).replace(/[^\d-]/g, ""));
+    if (!Number.isFinite(n) || String(so).trim() === "") return notify("Số dư thực tế không hợp lệ.", "err");
+    const ngay = prompt("Ngày chốt (yyyy-mm-dd) — số dư đến hết ngày này sẽ đúng bằng số vừa nhập:", new Date().toLocaleDateString("sv-SE"));
+    if (!ngay) return;
+    if (!confirm(`Đặt số dư ${a.name} đến hết ${ngay} = ${n.toLocaleString("vi-VN")}đ?\nHệ thống chỉ điều chỉnh SỐ DƯ ĐẦU KỲ (giữ nguyên mọi phiếu), có ghi nhật ký.`)) return;
+    const { error } = await supabase.rpc("fn_chot_so_du_dau_ky", { p_account_id: a.id, p_so_thuc_te: n, p_ngay: ngay, p_ly_do: "Chốt số dư thực tế từ màn Cài đặt" });
+    if (error) return notify(errMsg(error), "err");
+    notify("Đã chốt số dư đầu kỳ."); load();
+  };
   const bank = accs.filter((a) => a.type === "Ngân hàng");
   const coName = (id) => cos.find((c) => c.id === id)?.name || "—";
   const mgrName = (id) => mgrs.find((m) => m.id === id)?.name || "—";
@@ -248,6 +260,7 @@ function QuyTaiKhoan({ supabase, notify, locations, tick }) {
               : a.type === "Ngân hàng" ? `${coName(a.company_id)}${a.bank_info ? " · " + a.bank_info : ""}` : (locations.find((l) => l.code === a.location_code)?.name || "")}</span>
             {a.status !== "Hoạt động" && <Badge tone="dark">Đã khóa</Badge>}
             <button className="btn-ghost !px-2 !py-1 !text-xs" onClick={() => setF({ ...a, company_id: a.company_id || "", location_code: a.location_code || "", manager_id: a.manager_id || "" })}>✎ Sửa</button>
+            <button className="btn-ghost !px-2 !py-1 !text-xs" title="Đặt số dư đầu kỳ để số dư tới một ngày bằng số thực tế" onClick={() => chotDauKy(a)}>Chốt số dư</button>
             <button className="btn-ghost !px-2 !py-1 !text-xs" onClick={() => luu({ ...a, company_id: a.company_id || "", manager_id: a.manager_id || "", status: a.status === "Hoạt động" ? "Đã khóa" : "Hoạt động" })}>{a.status === "Hoạt động" ? "Khóa" : "Mở lại"}</button>
           </div>
         ))}
