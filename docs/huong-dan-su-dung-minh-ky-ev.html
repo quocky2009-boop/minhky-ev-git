@@ -1,0 +1,315 @@
+<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hướng dẫn sử dụng Minh Kỳ EV</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--brand:#1D4FB8;--brand-d:#173F94;--bg:#F3F5F8;--card:#fff;--ink:#1B2733;--mut:#5A6572;--line:#E3E8EF;
+--ok:#129D61;--okbg:#E5F6EE;--warn:#D97E00;--warnbg:#FDF1DF;--danger:#DC2F3E;--dbg:#FDE8EA;--blue-bg:#E7EFFD;
+--sales:#2563EB;--cht:#D97E00;--kt:#0E9F6E;--nav:#0F1D33}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;font-family:'Be Vietnam Pro',system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink);line-height:1.55;font-size:15px}
+a{color:var(--brand)}
+.wrap{max-width:1080px;margin:0 auto;padding:0 18px}
+/* top nav */
+.top{position:sticky;top:0;z-index:50;background:var(--nav);color:#fff}
+.top .wrap{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:9px 18px}
+.top b{font-weight:800;margin-right:auto;font-size:14px;letter-spacing:.2px}
+.top a{color:#CFE0FF;text-decoration:none;font-size:13px;font-weight:600;padding:6px 11px;border-radius:999px}
+.top a:hover{background:rgba(255,255,255,.12);color:#fff}
+/* hero */
+.hero{background:linear-gradient(135deg,#173F94 0%,#1D4FB8 55%,#2A6AE0 100%);color:#fff;padding:46px 0 70px}
+.hero h1{margin:0 0 8px;font-size:34px;font-weight:800;line-height:1.2}
+.hero p{margin:0;opacity:.9;max-width:640px;font-size:16px}
+.hero .ver{display:inline-block;margin-top:14px;font-size:12px;background:rgba(255,255,255,.16);padding:4px 11px;border-radius:999px}
+.roles{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:-44px}
+.role{background:#fff;border-radius:18px;padding:18px;box-shadow:0 6px 22px rgba(20,40,90,.12);text-decoration:none;color:var(--ink);border-top:5px solid var(--c);transition:.15s}
+.role:hover{transform:translateY(-3px);box-shadow:0 10px 28px rgba(20,40,90,.18)}
+.role .ic{font-size:30px}.role h3{margin:6px 0 4px;font-size:18px}.role p{margin:0;font-size:13px;color:var(--mut)}
+.role .go{display:inline-block;margin-top:10px;font-size:13px;font-weight:700;color:var(--c)}
+/* section */
+section{padding-top:38px}
+h2.sec{font-size:26px;font-weight:800;margin:0 0 4px;display:flex;align-items:center;gap:10px}
+.sub{color:var(--mut);margin:0 0 18px}
+.pill{display:inline-block;font-size:11px;font-weight:800;padding:3px 10px;border-radius:999px;color:#fff;background:var(--c,var(--brand));letter-spacing:.3px}
+.card{background:var(--card);border-radius:16px;box-shadow:0 2px 10px rgba(20,40,90,.07);padding:20px;margin-bottom:16px}
+/* big flow */
+.flow{display:grid;grid-template-columns:repeat(4,1fr);gap:16px 20px}
+.guide,section{scroll-margin-top:62px}
+.fstep{background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:12px 10px;text-align:center;position:relative}
+.fstep:not(:nth-child(4n)):not(:last-child)::after{content:"➜";position:absolute;right:-18px;top:50%;transform:translateY(-50%);color:#9AA7BA;font-size:15px}
+.fstep .n{display:inline-flex;width:22px;height:22px;border-radius:50%;background:var(--brand);color:#fff;font-size:12px;font-weight:800;align-items:center;justify-content:center}
+.fstep .t{font-weight:800;font-size:13.5px;margin:5px 0 2px}.fstep .d{font-size:11.5px;color:var(--mut)}
+.who{display:flex;gap:4px;justify-content:center;margin-top:7px;flex-wrap:wrap}
+.who i{font-style:normal;font-size:10.5px;font-weight:800;color:#fff;border-radius:999px;padding:1px 8px}
+.w-s{background:var(--sales)}.w-c{background:var(--cht)}.w-k{background:var(--kt)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--mut);margin-top:10px;align-items:center}
+.minflow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
+.minflow span{background:#fff;border:1.5px solid var(--c);color:var(--c);font-weight:700;font-size:13px;border-radius:999px;padding:5px 13px}
+.minflow em{color:#9AA7BA;font-style:normal}
+/* guide */
+.guide{background:#fff;border-radius:18px;box-shadow:0 2px 12px rgba(20,40,90,.08);margin-bottom:20px;overflow:hidden;border-left:6px solid var(--c)}
+.ghead{padding:16px 22px 10px;display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap}
+.ghead .gi{font-size:28px;line-height:1}.ghead h3{margin:0;font-size:19px;font-weight:800}
+.where{display:inline-flex;gap:6px;align-items:center;margin-top:4px;font-size:12.5px;color:var(--mut);background:#F0F3F8;border-radius:8px;padding:3px 10px}
+.where b{color:var(--ink)}
+.gbody{display:grid;grid-template-columns:1fr 1.05fr;gap:22px;padding:6px 22px 20px}
+.gbody.one{grid-template-columns:1fr}
+@media(max-width:860px){.flow{grid-template-columns:repeat(2,1fr)}.fstep:nth-child(2n)::after{display:none}.gbody{grid-template-columns:1fr}.roles{grid-template-columns:1fr}.hero h1{font-size:26px}}
+ol.steps{list-style:none;margin:0;padding:0;counter-reset:s}
+ol.steps li{counter-increment:s;position:relative;padding:0 0 11px 36px;font-size:14.5px}
+ol.steps li::before{content:counter(s);position:absolute;left:0;top:0;width:25px;height:25px;border-radius:50%;background:var(--c);color:#fff;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center}
+ol.steps li b{color:var(--ink)}
+.kbd{display:inline-block;background:#EEF2F8;border:1px solid #D6DEEA;border-bottom-width:2px;border-radius:7px;padding:0 7px;font-size:12.5px;font-weight:700;color:#23324A;white-space:nowrap}
+.ex{background:var(--blue-bg);border:1px dashed #9DB8EE;border-radius:12px;padding:10px 13px;font-size:13.5px;margin-top:6px}
+.ex strong:first-child{color:var(--brand)}
+.tip{background:var(--warnbg);border-radius:12px;padding:9px 13px;font-size:13.5px;margin-top:8px}
+.warn{background:var(--dbg);border-radius:12px;padding:9px 13px;font-size:13.5px;margin-top:8px}
+/* mock screens */
+.mock{border:1px solid #D3DBE8;border-radius:12px;overflow:hidden;background:#fff;box-shadow:0 4px 14px rgba(20,40,90,.10);font-size:12.5px}
+.mbar{background:#EEF2F8;border-bottom:1px solid #D3DBE8;padding:6px 10px;display:flex;align-items:center;gap:6px;font-weight:700;color:#3C4A60;font-size:12px}
+.mbar .dots{display:flex;gap:4px}.mbar .dots i{width:9px;height:9px;border-radius:50%;background:#C9D2E0;display:block}
+.mbar .ttl{margin-left:6px}
+.mbody{padding:11px}
+.mrow{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+.mbtn{display:inline-block;border-radius:8px;padding:4px 11px;font-weight:700;font-size:12px;background:#EEF1F4;color:#3C4A60;border:1px solid #DDE3EC}
+.mbtn.p{background:var(--brand);color:#fff;border-color:var(--brand)}.mbtn.ok{background:var(--ok);color:#fff;border-color:var(--ok)}.mbtn.d{background:var(--danger);color:#fff;border-color:var(--danger)}
+.minp{border:1px solid #D3DBE8;border-radius:8px;padding:4px 9px;background:#fff;color:#7C8797;min-width:90px;display:inline-block}
+.minp.on{color:var(--brand);border-color:var(--brand);font-weight:700;background:#F2F7FF}
+.mchip{display:inline-block;border-radius:999px;padding:1px 9px;font-weight:700;font-size:11px}
+.c-g{background:var(--okbg);color:#0E7A4A}.c-a{background:var(--warnbg);color:#A25F00}.c-r{background:var(--dbg);color:#B01E2C}.c-b{background:var(--blue-bg);color:#1D4FB8}.c-x{background:#EEF1F4;color:#5A6572}.c-p{background:#F1EAFB;color:#6B39B8}
+table.mt{width:100%;border-collapse:collapse;font-size:12px}
+table.mt th{text-align:left;font-size:10.5px;text-transform:uppercase;color:#5A6572;border-bottom:2px solid #E6EAEF;padding:5px 6px;white-space:nowrap}
+table.mt td{border-bottom:1px solid #EEF1F4;padding:6px;vertical-align:top}
+table.mt td.r,table.mt th.r{text-align:right}
+.hl{outline:2.5px solid #FF9F1A;outline-offset:1px;border-radius:8px;position:relative}
+.callout{position:absolute;right:-6px;top:-11px;background:#FF9F1A;color:#fff;font-weight:800;font-size:10.5px;border-radius:999px;padding:0 7px;line-height:17px}
+.stepbar{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:9px}
+.stepbar span{font-size:11px;font-weight:700;border-radius:999px;padding:2px 10px;background:#EEF1F4;color:#5A6572}
+.stepbar span.on{background:var(--brand);color:#fff}.stepbar span.dn{background:var(--okbg);color:#0E7A4A}
+.two{display:grid;grid-template-columns:1.4fr 1fr;gap:10px}
+.box{border:1px solid #E3E8EF;border-radius:10px;padding:8px 10px;background:#FAFBFD}
+.box h5{margin:0 0 5px;font-size:12px}
+.kv{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px dashed #E3E8EF;font-size:12px}
+.kv b.neg{color:var(--danger)}.kv b.pos{color:#0E7A4A}
+.cap{font-size:11.5px;color:var(--mut);text-align:center;margin-top:6px}
+.pipe{display:flex;gap:3px;flex-wrap:wrap}
+.pipe span{font-size:10.5px;font-weight:700;border-radius:6px;padding:3px 7px;background:#EEF1F4;color:#5A6572}
+.pipe span.on{background:var(--brand);color:#fff}
+/* tables */
+table.ref{width:100%;border-collapse:collapse;font-size:13.5px;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 2px 10px rgba(20,40,90,.07)}
+table.ref th{background:var(--nav);color:#fff;text-align:left;padding:9px 12px;font-size:12.5px}
+table.ref td{padding:9px 12px;border-bottom:1px solid #EEF1F4;vertical-align:top}
+table.ref tr:last-child td{border-bottom:0}
+.tag{display:inline-block;font-size:11px;font-weight:800;border-radius:999px;padding:1px 9px;color:#fff}
+.faq details{background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(20,40,90,.06);padding:11px 16px;margin-bottom:9px}
+.faq summary{cursor:pointer;font-weight:700}.faq p{margin:8px 0 2px;color:var(--mut);font-size:14px}
+footer{padding:30px 0 50px;color:var(--mut);font-size:12.5px;text-align:center}
+@media print{.top{display:none}body{background:#fff}.guide,.card{box-shadow:none;border:1px solid #ddd;break-inside:avoid}.hero{background:#173F94!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style></head><body>
+<div class="top"><div class="wrap"><b>⚡ Minh Kỳ EV · Hướng dẫn sử dụng</b><a href="#luong">Luồng thao tác</a><a href="#sales">Sales</a><a href="#cht">Cửa hàng trưởng</a><a href="#ketoan">Kế toán</a><a href="#faq">Hỏi đáp</a></div></div>
+<header class="hero"><div class="wrap"><h1>Hướng dẫn sử dụng ứng dụng<br>Minh Kỳ EV</h1><p>Tài liệu ngắn gọn cho <b>Nhân viên Sales</b>, <b>Cửa hàng trưởng</b> và <b>Kế toán</b>: từ tiếp khách, tạo đơn bán đến kiểm tra số liệu cuối ngày.</p><span class="ver">Phiên bản 10/2026</span></div></header>
+<main class="wrap">
+<div class="roles">
+<a class="role" href="#sales" style="--c:var(--sales)"><div class="ic">🧑‍💼</div><h3>Nhân viên Sales</h3><p>Khách hàng, cơ hội, lái thử, đặt cọc, tạo đơn bán, thu tiền.</p><span class="go">Xem hướng dẫn ›</span></a>
+<a class="role" href="#cht" style="--c:var(--cht)"><div class="ic">🏪</div><h3>Cửa hàng trưởng</h3><p>Duyệt lái thử, quản lý đơn, đối soát, công nợ, tồn kho.</p><span class="go">Xem hướng dẫn ›</span></a>
+<a class="role" href="#ketoan" style="--c:var(--kt)"><div class="ic">📒</div><h3>Kế toán</h3><p>Phiếu thu chi, sổ quỹ, đối chiếu, công nợ, giải ngân.</p><span class="go">Xem hướng dẫn ›</span></a>
+</div>
+
+<section id="luong"><h2 class="sec">🔄 Luồng thao tác trên app</h2><p class="sub">Một chiếc xe đi từ khách quan tâm đến khi thu đủ tiền. Nhãn màu cho biết ai chịu trách nhiệm ở từng bước.</p>
+<div class="card"><div class="flow"><div class="fstep"><span class="n">1</span><div class="t">Khách &amp; Cơ hội</div><div class="d">Ghi nhận, chăm sóc</div><div class="who"><i class="w-s">Sales</i></div></div><div class="fstep"><span class="n">2</span><div class="t">Lái thử</div><div class="d">Gửi duyệt</div><div class="who"><i class="w-s">Sales</i><i class="w-c">CH trưởng</i></div></div><div class="fstep"><span class="n">3</span><div class="t">Đặt cọc</div><div class="d">Giữ xe, thu cọc</div><div class="who"><i class="w-s">Sales</i></div></div><div class="fstep"><span class="n">4</span><div class="t">Tạo đơn bán</div><div class="d">Wizard 4 bước</div><div class="who"><i class="w-s">Sales</i></div></div><div class="fstep"><span class="n">5</span><div class="t">Thu tiền</div><div class="d">Tiền mặt, CK, trả góp</div><div class="who"><i class="w-s">Sales</i><i class="w-k">Kế toán</i></div></div><div class="fstep"><span class="n">6</span><div class="t">Xuất HĐ &amp; giao xe</div><div class="d">Checklist bàn giao</div><div class="who"><i class="w-s">Sales</i><i class="w-c">CH trưởng</i></div></div><div class="fstep"><span class="n">7</span><div class="t">Sổ quỹ &amp; đối soát</div><div class="d">Kiểm tra cuối ngày</div><div class="who"><i class="w-c">CH trưởng</i><i class="w-k">Kế toán</i></div></div><div class="fstep"><span class="n">8</span><div class="t">Công nợ &amp; giải ngân</div><div class="d">Theo dõi, thu hồi</div><div class="who"><i class="w-c">CH trưởng</i><i class="w-k">Kế toán</i></div></div></div>
+<div class="legend"><span><i class="tag w-s">Sales</i> bán hàng</span><span><i class="tag w-c">CH trưởng</i> quản lý cửa hàng</span><span><i class="tag w-k">Kế toán</i> tài chính</span></div></div>
+<div class="card"><b>Luồng riêng của từng vai trò</b>
+<div style="margin-top:8px"><span class="pill" style="--c:var(--sales)">SALES</span><div class="minflow" style="--c:var(--sales)"><span>Cơ hội</span><em>➜</em><span>Lái thử</span><em>➜</em><span>Đặt cọc</span><em>➜</em><span>Tạo đơn (Wizard)</span><em>➜</em><span>Thu tiền</span><em>➜</em><span>✓ HĐ &amp; bàn giao</span></div></div>
+<div style="margin-top:10px"><span class="pill" style="--c:var(--cht)">CỬA HÀNG TRƯỞNG</span><div class="minflow" style="--c:var(--cht)"><span>Duyệt lái thử</span><em>➜</em><span>Rà đơn trong ngày</span><em>➜</em><span>Đối soát cuối ngày</span><em>➜</em><span>Công nợ &amp; giải ngân (tuần)</span><em>➜</em><span>Tồn kho</span></div></div>
+<div style="margin-top:10px"><span class="pill" style="--c:var(--kt)">KẾ TOÁN</span><div class="minflow" style="--c:var(--kt)"><span>Duyệt phiếu chi</span><em>➜</em><span>Sổ quỹ vs sao kê</span><em>➜</em><span>Quét đối chiếu</span><em>➜</em><span>Giải ngân &amp; công nợ</span><em>➜</em><span>Chốt quỹ (tháng)</span></div></div></div>
+<div class="card"><b>3 quy tắc vàng</b><ol style="margin:8px 0 0;padding-left:20px"><li><b>Không sửa tay số tiền đã ghi</b> — muốn đổi, đảo ngược và ghi lại kèm lý do.</li><li><b>Phiếu chi luôn có lý do chi.</b></li><li><b>Lệch số thì báo Kế toán</b>, không tạo phiếu thu/chi để “cân”.</li></ol></div>
+</section>
+
+<section id="sales" style="--c:var(--sales)"><h2 class="sec"><span class="pill" style="--c:var(--sales)">SALES</span> Dành cho Nhân viên Sales</h2><p class="sub">6 việc bạn làm hằng ngày, theo đúng thứ tự bán hàng.</p>
+<div class="guide" id="s1" style="--c:var(--sales)">
+<div class="ghead"><div class="gi">🎯</div><div><h3>Ghi nhận khách &amp; Cơ hội bán hàng</h3><div class="where">📍 <b>BÁN HÀNG › Cơ hội bán hàng</b></div></div></div>
+<div class="gbody"><div><ol class="steps"><li>Bấm <span class="kbd">+ Cơ hội mới</span>, nhập <b>họ tên, SĐT</b>, nguồn khách, mức độ nóng, dự kiến mua, ghi chú.</li><li>Mỗi lần tư vấn xong, mở dòng khách và <b>chuyển giai đoạn</b> (Mới tiếp nhận → Đã liên hệ → Có nhu cầu → Hẹn tới cửa hàng → Đã lái thử → Đang báo giá → Đã cọc → Đã bán).</li><li>Khách không mua: chọn <b>Mất khách</b> và <b>bắt buộc chọn lý do</b> (giá cao, chưa đủ tiền, chọn thương hiệu khác…).</li></ol><div class="ex"><strong>Ví dụ:</strong> Khách Hường hẹn xem xe thứ Bảy → đặt giai đoạn <b>Hẹn tới cửa hàng</b>, ghi chú “thích màu hồng, hỏi trả góp”.</div><div class="tip">💡 Cập nhật giai đoạn ngay sau mỗi cuộc gọi — Cửa hàng trưởng theo dõi cơ hội của cả đội trên cùng màn hình này.</div></div><div><div class="mock"><div class="mbar"><span class="dots"><i></i><i></i><i></i></span><span class="ttl">BÁN HÀNG › Cơ hội bán hàng</span></div><div class="mbody">
+<div class="mrow"><span class="mbtn p">+ Cơ hội mới</span><span class="minp">Tìm tên, SĐT…</span><span class="minp">Giai đoạn: tất cả</span></div>
+<table class="mt"><tr><th>Khách</th><th>SĐT</th><th>Mức độ</th><th>Giai đoạn</th></tr>
+<tr><td><b>Lê Kiều Diệu Hường</b></td><td>0912 639 507</td><td><span class="mchip c-r">Nóng</span></td><td><span class="mchip c-b">Đang báo giá</span></td></tr>
+<tr><td><b>Phạm Lan Thương</b></td><td>0862 165 139</td><td><span class="mchip c-a">Ấm</span></td><td><span class="mchip c-b">Hẹn tới cửa hàng</span></td></tr>
+<tr><td><b>Nguyễn Văn A</b></td><td>0935 555 555</td><td><span class="mchip c-x">Lạnh</span></td><td><span class="mchip c-r">Mất khách</span></td></tr></table>
+<div style="margin-top:9px" class="pipe"><span>Mới tiếp nhận</span><span>Đã liên hệ</span><span>Có nhu cầu</span><span>Hẹn tới CH</span><span>Đã lái thử</span><span class="on">Đang báo giá</span><span>Đã cọc</span><span>Đã bán</span></div>
+</div></div><div class="cap">Mỗi khách là một dòng; kéo qua từng giai đoạn bán hàng</div></div></div></div><div class="guide" id="s2" style="--c:var(--sales)">
+<div class="ghead"><div class="gi">🛵</div><div><h3>Lái thử</h3><div class="where">📍 <b>BÁN HÀNG › Lái thử</b></div></div></div>
+<div class="gbody"><div><ol class="steps"><li>Bấm tạo lượt mới, chọn hoặc tạo khách (nhập <b>tên + SĐT</b>).</li><li>Chọn <b>dòng xe đã lái thử</b>, ngày giờ, ghi <b>phản hồi của khách</b>, mức độ nhu cầu, kết quả sau lái thử.</li><li>Tải ảnh lái thử rồi bấm <span class="kbd">Gửi duyệt</span>. Cửa hàng trưởng sẽ xác nhận, từ chối hoặc yêu cầu bổ sung — bạn sửa lại và gửi lại nếu cần.</li></ol><div class="tip">💡 Chưa gửi duyệt thì lượt lái thử chưa được tính vào báo cáo.</div></div><div><div class="mock"><div class="mbar"><span class="dots"><i></i><i></i><i></i></span><span class="ttl">BÁN HÀNG › Lái thử</span></div><div class="mbody">
+<div class="mrow"><span class="mbtn p">Lượt của tôi</span><span class="mbtn ">Chờ duyệt (2)</span></div>
+<div class="two"><div class="box"><h5>Khách lái thử mới</h5>
+<div class="kv"><span>Khách</span><b>Đinh Quốc Tuấn · 0399 063 026</b></div>
+<div class="kv"><span>Dòng xe đã lái thử</span><b>Evo Grand Lite</b></div>
+<div class="kv"><span>Ngày giờ</span><b>10/10/2026 09:30</b></div>
+<div class="kv"><span>Mức độ nhu cầu</span><b>Cao</b></div>
+<div class="kv"><span>Phản hồi của khách</span><b>Thích, hỏi trả góp</b></div></div>
+<div class="box"><h5>Ảnh &amp; gửi duyệt</h5><div style="height:54px;border:2px dashed #C9D2E0;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#8A93A0">📷 Tải ảnh</div><div style="margin-top:8px"><span class="mbtn ok">Gửi duyệt</span></div></div></div>
+</div></div><div class="cap">Nhân viên gửi duyệt → Cửa hàng trưởng xác nhận / từ chối / yêu cầu bổ sung</div></div></div></div><div class="guide" id="s3" style="--c:var(--sales)">
+<div class="ghead"><div class="gi">🔒</div><div><h3>Đặt cọc / Giữ xe</h3><div class="where">📍 <b>BÁN HÀNG › Đặt cọc / Giữ xe</b></div></div></div>
+<div class="gbody"><div><ol class="steps"><li>Bấm <span class="kbd">+ Đặt cọc</span>. Nhập <b>số khung xe cần giữ</b> và chọn khách đặt cọc.</li><li>Nhập <b>số tiền cọc</b>, <b>giữ xe đến ngày</b>, người nhận cọc.</li><li>Bấm <span class="kbd">In biên nhận cọc</span> đưa khách. Khi khách mua, bấm <b>Chuyển thành đơn bán</b> — tiền cọc <b>tự trừ vào tiền xe</b>.</li><li>Phiếu <b>quá hạn giữ</b> hiện màu đỏ: liên hệ khách hoặc hủy giữ để trả xe về tồn.</li></ol><div class="ex"><strong>Ví dụ:</strong> Cọc 2.000.000, giữ đến 17/10. Khi lên đơn xe 23.900.000 → khách chỉ còn phải trả 21.900.000.</div></div><div><div class="mock"><div class="mbar"><span class="dots"><i></i><i></i><i></i></span><span class="ttl">BÁN HÀNG › Đặt cọc / Giữ xe</span></div><div class="mbody">
+<div class="mrow"><span class="mbtn p">+ Đặt cọc</span><span class="minp">Tìm số khung, khách…</span></div>
+<div class="box"><div class="kv"><span>Số khung xe cần giữ</span><b>RPXT7LHHVTE633317</b></div>
+<div class="kv"><span>Khách đặt cọc</span><b>Trương Thị Hồng Thiên</b></div>
+<div class="kv"><span>Số tiền cọc</span><b class="pos">2.000.000 đ</b></div>
+<div class="kv"><span>Giữ xe đến ngày</span><b>17/10/2026</b></div></div>
+<div class="mrow" style="margin-top:8px"><span class="mbtn ">In biên nhận cọc</span><span class="mbtn ok">Chuyển thành đơn bán</span><span class="mchip c-g">Đang giữ</span><span class="mchip c-r">Quá hạn giữ</span></div>
+</div></div><div class="cap">Tiền cọc sẽ tự trừ vào tiền xe khi tạo đơn bán</div></div></div></div><div class="guide" id="s4" style="--c:var(--sales)">
+<div class="ghead"><div class="gi">🧾</div><div><h3>Tạo đơn bán — Wizard 4 bước</h3><div class="where">📍 <b>BÁN HÀNG › Đơn bán › + Tạo đơn bán mới</b></div></div></div>
+<div class="gbody"><div><ol class="steps"><li><b>Bước 1 · Đơn hàng &amp; khách:</b> gõ SĐT để tìm khách cũ, hoặc nhập khách mới (họ tên, SĐT, email, giới tính, ngày sinh, <b>loại khách hàng</b> — các ô có dấu * là bắt buộc).</li><li><b>Bước 2 · Xe &amp; ưu đãi:</b> chọn xe (theo số khung), điểm bán, hình thức pin, tick các <b>khuyến mại</b> còn hạn rồi bấm <span class="kbd">Làm mới Bảng giá</span>.</li><li><b>Bước 3 · Thanh toán &amp; HĐ:</b> thêm từng dòng thanh toán (Tiền mặt / Chuyển khoản + chọn tài khoản nhận / Trả góp + đơn vị tài chính). Mục <b>Còn phải trả</b> về 0 là đủ. Điền thông tin xuất hóa đơn (tỉnh, phường, địa chỉ).</li><li><b>Bước 4 · Xác nhận:</b> kiểm tra lại rồi bấm <span class="kbd">💾 Lưu đơn</span>.</li></ol><div class="ex"><strong>Ví dụ:</strong> Xe 26.900.000, khuyến mại CBNV −3.000.000, cọc 2.000.000 → còn 21.900.000: trả 5 triệu tiền mặt + 5 triệu chuyển khoản + 11,9 triệu trả góp Shinhan.</div><div class="tip">💡 Chiết khấu thêm ngoài khuyến mại: nhập số tiền, lý do và <b>người duyệt là Ban giám đốc</b>. Khuyến mại hiện chip đỏ = đã hết hạn — gỡ ra hoặc chọn ngày lấy giá khác.</div><div class="warn">⚠️ Ở Bước 2 phải bấm <b>Làm mới Bảng giá</b> thì mới sang được Bước 3.</div></div><div><div class="mock"><div class="mbar"><span class="dots"><i></i><i></i><i></i></span><span class="ttl">Tạo đơn bán — Wizard 4 bước</span></div><div class="mbody">
+<div class="stepbar"><span class="on">1 Đơn hàng &amp; khách</span><span>2 Xe &amp; ưu đãi</span><span>3 Thanh toán &amp; HĐ</span><span>4 Xác nhận</span></div>
+<div class="two"><div class="box"><h5>Khách hàng</h5>
+<div class="kv"><span>Họ tên *</span><b>Lã Thị Xuân</b></div><div class="kv"><span>SĐT *</span><b>0943 704 850</b></div>
+<div class="kv"><span>Email *</span><b>xuan@gmail.com</b></div><div class="kv"><span>Giới tính / Ngày sinh *</span><b>Nữ · 12/05/1998</b></div>
+<div class="kv"><span>Loại khách hàng *</span><b><span class="mchip c-g">Khách lẻ</span></b></div></div>
+<div class="box"><h5>Đơn hàng</h5><div class="kv"><span>Ngày lấy giá</span><b>10/10/2026</b></div>
+<div class="kv"><span>Tư vấn bán hàng</span><b>Bạn</b></div><div class="kv"><span>Nguồn đơn</span><b>Zalo</b></div></div></div>
+</div></div><div class="cap">Bước 1 — nhập khách (gõ SĐT để tìm khách cũ)</div></div><div style="height:12px"></div><div><div class="mock"><div class="mbar"><span class="dots"><i></i><i></i><i></i></span><span class="ttl">Tạo đơn bán — Bước 2: Xe &amp; ưu đãi</span></div><div class="mbody">
+<div class="stepbar"><span class="dn">1 ✓</span><span class="on">2 Xe &amp; ưu đãi</span><span>3</span><span>4</span></div>
+<div class="two"><div>
+<div class="box"><h5>Chọn xe</h5><div class="kv"><span>Xe</span><b>Feliz 2025 Xanh Oliu</b></div><div class="kv"><span>Điểm bán</span><b>TP-CH TAILG 322 QT</b></div></div>
+<div class="box" style="margin-top:7px"><h5>🏷 Khuyến mại áp dụng</h5><span class="mchip c-g">CBNV VG cấp T5-T8 giảm 10%</span> <span class="mchip c-r">Voucher hết hạn</span><div style="margin-top:7px"><span class="mbtn p">Làm mới Bảng giá</span></div></div></div>
+<div class="box hl" style="background:#fff"><span class="callout">cố định</span><h5>💰 Bảng giá</h5>
+<div class="kv"><span>Giá niêm yết</span><b>26.900.000</b></div><div class="kv"><span>Tổng ưu đãi</span><b class="neg">− 3.000.000</b></div>
+<div class="kv"><span>Giá cần thanh toán</span><b>23.900.000</b></div><div class="kv"><span>Đã đặt cọc</span><b class="neg">− 2.000.000</b></div><div class="kv"><span>Còn phải trả</span><b class="pos">21.900.000</b></div></div></div>
+</div></div><div class="cap">Bảng giá bên phải luôn hiện khi cuộn trang</div></div><div style="height:12px"></div><div><div class="mock"><div class="mbar"><span class="dots"><i></i><i></i><i></i></span><span class="ttl">Tạo đơn bán — Bước 3: Thanh toán &amp; xuất HĐ</span></div><div class="mbody">
+<div class="stepbar"><span class="dn">1 ✓</span><span class="dn">2 ✓</span><span class="on">3 Thanh toán</span><span>4</span></div>
+<table class="mt"><tr><th>Phương thức</th><th>Tài khoản / Đơn vị</th><th class="r">Số tiền</th></tr>
+<tr><td><span class="mchip c-g">Tiền mặt</span></td><td>Quỹ tiền mặt cửa hàng</td><td class="r"><b>5.000.000</b></td></tr>
+<tr><td><span class="mchip c-b">Chuyển khoản</span></td><td>SHB Cty Ngân Thái Sơn</td><td class="r"><b>5.000.000</b></td></tr>
+<tr><td><span class="mchip c-p">Trả góp</span></td><td>Shinhan Finance</td><td class="r"><b>11.900.000</b></td></tr></table>
+<div class="kv" style="margin-top:6px"><span>Còn phải trả</span><b class="pos">0 đ</b></div>
+<div class="box" style="margin-top:7px"><h5>Thông tin xuất hóa đơn</h5><div class="kv"><span>Tỉnh / Phường</span><b>Tuyên Quang · P. Minh Xuân</b></div><div class="kv"><span>Địa chỉ chi tiết</span><b>Số 12, tổ 4</b></div></div>
+</div></div><div class="cap">Có thể tách nhiều phương thức; Chuyển khoản phải chọn tài khoản nhận</div></div></div></div><div class="guide" id="s5" style="--c:var(--sales)">
+<div class="ghead"><div class="gi">✅</div><div><h3>Thu thêm tiền &amp; xuất hóa đơn, bàn giao</h3><div class="where">📍 <b>BÁN HÀNG › Đơn bán</b></div></div></div>
+<div class="gbody"><div><ol class="steps"><li>Tìm đơn bằng ô tìm kiếm (mã đơn, tên khách, SĐT, số khung).</li><li>Đơn còn thiếu tiền có nút <span class="kbd">💵</span> — bấm để <b>thu thêm</b> (chọn phương thức, tài khoản).</li><li>Khi giao xe: bấm <span class="kbd">✓ HĐ</span>, nhập số hóa đơn, tick checklist <b>bảo hành, app VF eScooter (xe VinFast), giấy COC</b> rồi xác nhận.</li><li>Đơn bán buôn hiện <b>⚠ Thiếu KL</b>: mở đơn (👤) nhập thông tin khách lẻ mua sau cùng.</li></ol><div class="tip">💡 Muốn xem phiếu in/biên nhận: bấm 🖨 trên dòng đơn.</div><div class="warn">⚠️ Không tự sửa số tiền đã thu. Thu nhầm phương thức/tài khoản → nhờ Admin / Ban giám đốc sửa (mục ✎ Sửa).</div></div><div><div class="mock"><div class="mbar"><span class="dots"><i></i><i></i><i></i></span><span class="ttl">BÁN HÀNG › Đơn bán</span></div><div class="mbody">
+<div class="mrow"><span class="mbtn p">+ Tạo đơn bán mới</span><span class="minp">Cửa hàng: tất cả</span><span class="minp">Hóa đơn: tất cả</span></div>
+<table class="mt"><tr><th>Mã đơn / Ngày</th><th>Xe / Số khung</th><th>Khách / SĐT</th><th class="r">Tổng đơn</th><th>Hóa đơn</th><th></th></tr>
+<tr><td><b style="color:#1D4FB8">BH-2610-22252</b><br>08/10</td><td>Evo Grand Xanh Oliu<br><small>RPXT7LHH…317</small></td><td>Trương Thị Hồng Thiên<br><small>0398 604 124</small></td><td class="r"><b>23.900.000</b></td><td><span class="mchip c-a">Chờ xuất HĐ</span></td><td><span class="mbtn ok">✓ HĐ</span> <span class="mbtn ">💵</span> <span class="mbtn ">👁</span> <span class="mbtn ">🖨</span></td></tr>
+<tr><td><b style="color:#1D4FB8">BH-2610-06566</b><br>08/10</td><td>GR54 Angel Hồng<br><small>RL9YYEKU…086</small></td><td>Lê Kiều Diệu Hường<br><small>0912 639 507</small></td><td class="r"><b>18.500.000</b></td><td><span class="mchip c-g">✓ HĐ0123</span></td><td><span class="mbtn ">👁</span> <span class="mbtn ">🖨</span></td></tr></table>
+<div class="cap" style="text-align:left">💵 thu thêm · 👁 xem nhanh · 🖨 in phiếu xuất · ✓ HĐ xác nhận xuất hóa đơn</div>
+</div></div></div><div style="height:12px"></div><div><div class="mock"><div class="mbar"><span class="dots"><i></i><i></i><i></i></span><span class="ttl">Đơn bán › ✓ HĐ — Xác nhận xuất hóa đơn &amp; bàn giao</span></div><div class="mbody">
+<div class="two"><div class="box"><h5>Hóa đơn</h5><div class="kv"><span>Số hóa đơn</span><b>HĐ0123</b></div><div class="kv"><span>Ngày xuất</span><b>10/10/2026</b></div></div>
+<div class="box"><h5>Checklist bàn giao</h5>
+<div class="kv"><span>☑ Đã kích hoạt bảo hành</span><span class="mchip c-r">bắt buộc</span></div>
+<div class="kv"><span>☑ Kích hoạt app VF eScooter</span><span class="mchip c-r">xe VinFast</span></div>
+<div class="kv"><span>☑ Bàn giao giấy COC</span><span class="mchip c-r">bắt buộc</span></div>
+<div class="kv"><span>☐ Chụp ảnh khách nhận xe</span><span class="mchip c-x">khuyến khích</span></div></div></div>
+<div class="mrow" style="margin-top:8px"><span class="mbtn ok">Xác nhận</span></div></div></div><div class="cap">Không tick đủ mục bắt buộc thì hệ thống không cho xác nhận</div></div></div></div><div class="guide" id="s6" style="--c:var(--sales)">
+<div class="ghead"><div class="gi">📦</div><div><h3>Tra cứu tồn &amp; Điều chuyển xe</h3><div class="where">📍 <b>KHO › Tra cứu tồn / Điều chuyển</b></div></div></div>
+<div class="gbody"><div><ol class="steps"><li><b>Tra cứu tồn:</b> gõ tên xe, mã hoặc màu vào ô “Tìm nhanh”. Bấm vào dòng xe để xem tồn từng kho.</li><li>Cần xe ở kho khác: vào <b>Điều chuyển</b> › <span class="kbd">+ Phiếu điều chuyển</span> → chọn <b>kho xuất</b>, <b>kho nhận</b>, chọn xe/số khung.</li><li>Phiếu sẽ ở trạng thái <b>Đang chuyển</b>; kho nhận bấm xác nhận <b>Đã nhận</b> khi xe về.</li></ol></div><div><div class="mock"><div class="mbar"><span class="dots"><i></i><i></i><i></i></span><span class="ttl">KHO › Tra cứu tồn</span></div><div class="mbody">
+<div class="mrow"><span class="minp">Tìm nhanh: tên xe, mã xe, màu…</span></div>
+<table class="mt"><tr><th>Xe</th><th class="r">Thành phố</th><th class="r">Hàm Yên</th><th class="r">Tổng</th></tr>
+<tr><td><b>Feliz 2025 Đen</b></td><td class="r">12</td><td class="r">4</td><td class="r"><b>16</b></td></tr>
+<tr><td><b>Evo Grand Lite Đen</b></td><td class="r">7</td><td class="r">0</td><td class="r"><b>7</b></td></tr>
+<tr><td><b>GR54 Angel Hồng</b></td><td class="r">0</td><td class="r">3</td><td class="r"><b>3</b></td></tr></table>
+<div class="cap">Bấm vào một dòng để xem “Tồn từng kho”</div></div></div></div><div style="height:12px"></div><div><div class="mock"><div class="mbar"><span class="dots"><i></i><i></i><i></i></span><span class="ttl">KHO › Điều chuyển</span></div><div class="mbody">
+<div class="mrow"><span class="mbtn p">+ Phiếu điều chuyển</span></div>
+<div class="box"><div class="kv"><span>Kho xuất → Kho nhận</span><b>TP-KHO 36 Song Hào → HY-CH VINFAST Km40</b></div><div class="kv"><span>Xe · SL</span><b>Feliz 2025 Đen · 2</b></div>
+<div class="kv"><span>Trạng thái</span><b><span class="mchip c-a">Đang chuyển</span> → <span class="mchip c-g">Đã nhận</span></b></div></div>
+<div class="cap">Kho nhận bấm “Đã nhận” khi xe về tới nơi</div></div></div></div></div></div></section>
+
+<section id="cht"><h2 class="sec"><span class="pill" style="--c:var(--cht)">CH TRƯỞNG</span> Dành cho Cửa hàng trưởng</h2><p class="sub">Duyệt, kiểm soát và đối soát số liệu của cửa hàng. Chu kỳ gợi ý: đối soát <b>hằng ngày</b>, công nợ &amp; giải ngân <b>hằng tuần</b>, nộp dịch vụ ngoài <b>hằng tháng</b>.</p>
+<div class="guide" id="c1" style="--c:var(--cht)">
+<div class="ghead"><div class="gi">👀</div><div><h3>Duyệt lái thử &amp; theo dõi đội nhóm</h3><div class="where">📍 <b>BÁN HÀNG › Lái thử › tab Chờ duyệt  |  CÔNG VIỆC › Việc đội nhóm</b></div></div></div>
+<div class="gbody"><div><ol class="steps"><li>Mở <b>Chờ duyệt</b> (có số đỏ = số lượt đang chờ).</li><li>Xem ảnh và phản hồi, bấm <span class="kbd">✓ Xác nhận</span>, hoặc <b>Từ chối</b> / <b>Yêu cầu bổ sung</b> (bắt buộc ghi lý do).</li><li>Vào <b>Cơ hội bán hàng</b> lọc theo nhân viên để biết ai đang có khách nóng, ai để cơ hội “nguội”.</li></ol></div><div><div class="mock"><div class="mbar"><span class="dots"><i></i><i></i><i></i></span><span class="ttl">Lái thử › Chờ duyệt</span></div><div class="mbody">
+<table class="mt"><tr><th>Khách</th><th>Nhân viên</th><th>Kết quả</th><th>Thao tác</th></tr>
+<tr><td><b>Đinh Quốc Tuấn</b></td><td>thanhloan6594</td><td>Cao – hỏi trả góp</td><td><span class="mbtn ok">✓ Xác nhận</span> <span class="mbtn ">Bổ sung</span> <span class="mbtn d">Từ chối</span></td></tr>
+<tr><td><b>Nông Đức Tùng</b></td><td>hathehoang</td><td>Trung bình</td><td><span class="mbtn ok">✓ Xác nhận</span> <span class="mbtn ">Bổ sung</span> <span class="mbtn d">Từ chối</span></td></tr></table></div></div></div></div></div><div class="guide" id="c2" style="--c:var(--cht)">
+<div class="ghead"><div class="gi">🏪</div><div><h3>Quản lý đơn bán của cửa hàng</h3><div class="where">📍 <b>BÁN HÀNG › Đơn bán</b></div></div></div>
+<div class="gbody"><div><ol class="steps"><li>Dùng bộ lọc <b>Cửa hàng</b> (tick được nhiều điểm), ngày, trạng thái hóa đơn, loại khách; bấm <b>Đơn hủy/trả</b> để xem đơn đã hủy.</li><li>Kiểm tra đơn <b>Chờ xuất HĐ</b> lâu ngày; nhắc nhân viên hoàn tất checklist bàn giao.</li><li>Đơn <b>⚠ Thiếu KL</b> (bán buôn): nhắc nhân viên nhập khách lẻ cuối.</li><li>Dùng <span class="kbd">⬇ Excel</span> để xuất đúng danh sách đang lọc.</li></ol><div class="tip">💡 Bảng chỉ có 8 cột nên xem trọn trên màn hình, không phải kéo ngang.</div></div><div><div class="mock"><div class="mbar"><span class="dots"><i></i><i></i><i></i></span><span class="ttl">BÁN HÀNG › Đơn bán</span></div><div class="mbody">
+<div class="mrow"><span class="mbtn p">+ Tạo đơn bán mới</span><span class="minp">Cửa hàng: tất cả</span><span class="minp">Hóa đơn: tất cả</span></div>
+<table class="mt"><tr><th>Mã đơn / Ngày</th><th>Xe / Số khung</th><th>Khách / SĐT</th><th class="r">Tổng đơn</th><th>Hóa đơn</th><th></th></tr>
+<tr><td><b style="color:#1D4FB8">BH-2610-22252</b><br>08/10</td><td>Evo Grand Xanh Oliu<br><small>RPXT7LHH…317</small></td><td>Trương Thị Hồng Thiên<br><small>0398 604 124</small></td><td class="r"><b>23.900.000</b></td><td><span class="mchip c-a">Chờ xuất HĐ</span></td><td><span class="mbtn ok">✓ HĐ</span> <span class="mbtn ">💵</span> <span class="mbtn ">👁</span> <span class="mbtn ">🖨</span></td></tr>
+<tr><td><b style="color:#1D4FB8">BH-2610-06566</b><br>08/10</td><td>GR54 Angel Hồng<br><small>RL9YYEKU…086</small></td><td>Lê Kiều Diệu Hường<br><small>0912 639 507</small></td><td class="r"><b>18.500.000</b></td><td><span class="mchip c-g">✓ HĐ0123</span></td><td><span class="mbtn ">👁</span> <span class="mbtn ">🖨</span></td></tr></table>
+<div class="cap" style="text-align:left">💵 thu thêm · 👁 xem nhanh · 🖨 in phiếu xuất · ✓ HĐ xác nhận xuất hóa đơn</div>
+</div></div></div></div></div><div class="guide" id="c3" style="--c:var(--cht)">
+<div class="ghead"><div class="gi">🧮</div><div><h3>Đối soát cuối ngày (trước 17h)</h3><div class="where">📍 <b>TÀI CHÍNH › Đối soát cuối ngày</b></div></div></div>
+<div class="gbody"><div><ol class="steps"><li>Chọn <b>khu vực</b> và <b>ngày</b>, bấm <span class="kbd">🔄 Tính số liệu ngày</span> — số liệu tự tổng hợp từ đơn, phiếu dịch vụ, cọc và sổ quỹ.</li><li>Đếm <b>tiền mặt thực tế</b> trong két, nhập vào ô tiền mặt thực tế và ghi biên bản (nếu lệch ghi nguyên nhân).</li><li>Bấm xác nhận phần <b>cửa hàng trưởng</b>. Cần cả <b>người thu</b> xác nhận mới chốt được ngày.</li></ol><div class="tip">💡 Lệch ≠ 0 thì dòng chuyển đỏ — tìm nguyên nhân trước khi chốt, không tạo phiếu thu/chi để cân số.</div></div><div><div class="mock"><div class="mbar"><span class="dots"><i></i><i></i><i></i></span><span class="ttl">TÀI CHÍNH › Đối soát cuối ngày</span></div><div class="mbody">
+<div class="mrow"><span class="minp on">Khu vực: Thành phố</span><span class="minp on">Ngày: 10/10/2026</span><span class="mbtn p">🔄 Tính số liệu ngày</span></div>
+<div class="two"><div class="box"><h5>🛵 Bán xe</h5><div class="kv"><span>Số đơn</span><b>8</b></div><div class="kv"><span>Doanh thu</span><b>187.400.000</b></div><div class="kv"><span>Thu tiền mặt</span><b>42.000.000</b></div><div class="kv"><span>Thu chuyển khoản</span><b>63.500.000</b></div></div>
+<div class="box"><h5>Đối soát tiền mặt</h5><div class="kv"><span>Hệ thống</span><b>42.000.000</b></div><div class="kv"><span>Thực đếm</span><b>42.000.000</b></div><div class="kv"><span>Lệch</span><b class="pos">0 đ</b></div><div class="mrow" style="margin-top:6px"><span class="mchip c-g">Người thu ✓</span><span class="mchip c-a">CH trưởng ⏳</span></div></div></div>
+</div></div><div class="cap">Cần đủ 2 người xác nhận mới chốt ngày</div></div></div></div><div class="guide" id="c4" style="--c:var(--cht)">
+<div class="ghead"><div class="gi">💳</div><div><h3>Công nợ phải thu &amp; Giải ngân trả góp</h3><div class="where">📍 <b>TÀI CHÍNH › Công nợ phải thu  |  Giải ngân trả góp</b></div></div></div>
+<div class="gbody"><div><ol class="steps"><li><b>Mỗi thứ Hai:</b> Công nợ phải thu → lọc <b>Điểm bán</b> của mình, <b>Tuổi nợ &gt; 30 ngày</b> → bấm Nhắc nợ từng đơn (ghi kênh liên hệ + kết quả).</li><li>Giải ngân trả góp → tick <b>Chỉ khoản quá hạn</b>. Đã nhận tiền: bấm <span class="kbd">✓ Đã nhận tiền</span> rồi chọn tài khoản ngân hàng; chưa nhận: liên hệ công ty tài chính.</li><li>Khoản thuộc đơn <b>đã hủy</b> sẽ không còn hiện trong danh sách giải ngân.</li></ol></div><div><div class="mock"><div class="mbar"><span class="dots"><i></i><i></i><i></i></span><span class="ttl">TÀI CHÍNH › Công nợ phải thu</span></div><div class="mbody">
+<div class="mrow"><span class="minp">Điểm bán: tất cả</span><span class="minp">NV bán: tất cả</span><span class="minp on">Tuổi nợ: > 30 ngày</span><span class="minp">Số tiền từ – đến</span></div>
+<table class="mt"><tr><th>Mã đơn</th><th>Khách</th><th class="r">Còn nợ</th><th>Hạn TT</th><th>Nhóm</th></tr>
+<tr><td><b style="color:#1D4FB8">BH-2609-59798</b></td><td>BB Anh Thảo Hà</td><td class="r"><b>10.322.000</b></td><td>25/10</td><td><span class="mchip c-g">Chưa đến hạn</span></td></tr>
+<tr style="background:#FFF6F6"><td><b style="color:#1D4FB8">BH-2608-33011</b></td><td>ĐL Dũng Duyên</td><td class="r"><b>18.900.000</b></td><td>20/09</td><td><span class="mchip c-r">Quá hạn >30 ngày</span></td></tr></table>
+<div class="mrow" style="margin-top:7px"><span class="mbtn ">Nhắc nợ</span><span class="mbtn ">Đặt hạn TT</span><span class="mbtn ">⬇ Xuất Excel</span></div></div></div></div><div style="height:12px"></div><div><div class="mock"><div class="mbar"><span class="dots"><i></i><i></i><i></i></span><span class="ttl">TÀI CHÍNH › Giải ngân trả góp</span></div><div class="mbody">
+<div class="mrow"><span class="minp">Công ty TC: tất cả</span><span class="minp">Ngày bán: Tháng này</span><span class="mbtn">☑ Chỉ khoản quá hạn</span></div>
+<table class="mt"><tr><th>Đơn bán</th><th>Công ty TC</th><th class="r">Số tiền</th><th>Dự kiến</th><th></th></tr>
+<tr><td><b>BH-2610-61833</b><br><small>Phạm Lan Thương</small></td><td>Shinhan</td><td class="r"><b>3.000.000</b></td><td>12/10</td><td><span class="mbtn ok">✓ Đã nhận tiền</span></td></tr>
+<tr style="background:#FDF6F0"><td><b>BH-2610-32410</b><br><small>Lê Minh Hưng</small></td><td>HD Saison</td><td class="r"><b>9.500.000</b></td><td style="color:#DC2F3E"><b>05/10 ⚠</b></td><td><span class="mbtn ok">✓ Đã nhận tiền</span></td></tr></table>
+<div class="cap">Bấm “Đã nhận tiền” → chọn tài khoản ngân hàng nhận → hệ thống tự ghi phiếu thu</div></div></div></div></div></div><div class="guide" id="c5" style="--c:var(--cht)">
+<div class="ghead"><div class="gi">📊</div><div><h3>Tồn kho: Bảng tồn, Kiểm soát tồn, Giấy COC</h3><div class="where">📍 <b>KHO › Bảng tồn tổng hợp / Kiểm soát tồn kho  |  NHẬP XE › Giấy COC</b></div></div></div>
+<div class="gbody"><div><ol class="steps"><li><b>Bảng tồn tổng hợp:</b> xem tồn theo kho/khu vực; có nút xuất CSV (kèm doanh số bán).</li><li><b>Kiểm soát tồn kho:</b> chọn ngày để xem tồn quá khứ, <b>tuổi tồn</b> (≤30, 31–60, 61–90, &gt;90 ngày) và tốc độ bán 30 ngày (lẻ/buôn). Xe tồn &gt;90 ngày cần có phương án bán.</li><li><b>Giấy COC:</b> theo dõi giấy COC đã về / chưa về / đã giao khách; bấm “Xem xe thiếu” để đòi giấy.</li></ol><div class="tip">💡 Báo cáo tồn kho tự gửi lên Discord lúc 17h30 hằng ngày.</div></div><div><div class="mock"><div class="mbar"><span class="dots"><i></i><i></i><i></i></span><span class="ttl">KHO › Kiểm soát tồn kho</span></div><div class="mbody">
+<div class="mrow"><span class="minp">Khu vực: tất cả</span><span class="minp on">Ngày: 10/10/2026</span></div>
+<table class="mt"><tr><th>Xe</th><th class="r">≤30 ngày</th><th class="r">31–60</th><th class="r">61–90</th><th class="r">&gt;90</th><th class="r">Bán 30 ngày</th></tr>
+<tr><td><b>Feliz 2025 Đen</b></td><td class="r">8</td><td class="r">5</td><td class="r">2</td><td class="r" style="color:#DC2F3E"><b>1</b></td><td class="r">14</td></tr>
+<tr><td><b>Evo Grand Lite</b></td><td class="r">4</td><td class="r">3</td><td class="r">0</td><td class="r">0</td><td class="r">9</td></tr></table>
+<div class="cap">Theo dõi tuổi tồn và tốc độ bán; báo cáo tự gửi Discord 17h30</div></div></div></div></div></div><div class="guide" id="c6" style="--c:var(--cht)">
+<div class="ghead"><div class="gi">🧾</div><div><h3>Dịch vụ đăng ký &amp; phụ kiện ngoài</h3><div class="where">📍 <b>TÀI CHÍNH › Dịch vụ đăng ký &amp; phụ kiện ngoài</b></div></div></div>
+<div class="gbody"><div><ol class="steps"><li>Bấm <span class="kbd">+ Ghi khoản</span> cho mỗi khoản <b>thu hộ</b> (lệ phí đăng ký, phụ kiện…); ghi rõ phần <b>lãi của cửa hàng</b>.</li><li>Cuối tháng lập <b>khoản nộp về công ty</b>; Kế toán xác nhận đã nhận.</li></ol></div><div><div class="mock"><div class="mbar"><span class="dots"><i></i><i></i><i></i></span><span class="ttl">TÀI CHÍNH › Dịch vụ đăng ký &amp; phụ kiện ngoài</span></div><div class="mbody">
+<div class="mrow"><span class="mbtn p">+ Ghi khoản</span><span class="minp">Tháng này</span></div>
+<table class="mt"><tr><th>Ngày</th><th>Loại</th><th>Khách</th><th class="r">Thu hộ</th><th class="r">Lãi cửa hàng</th></tr>
+<tr><td>09/10</td><td>Lệ phí đăng ký</td><td>Lã Thị Xuân</td><td class="r">1.500.000</td><td class="r"><b style="color:#0E7A4A">200.000</b></td></tr></table>
+<div class="cap">Cuối tháng: lập khoản nộp về công ty → Kế toán xác nhận</div></div></div></div></div></div></section>
+
+<section id="ketoan"><h2 class="sec"><span class="pill" style="--c:var(--kt)">KẾ TOÁN</span> Dành cho Kế toán</h2><p class="sub">Thu – chi – quỹ – công nợ. Chu kỳ gợi ý: sổ quỹ &amp; đối chiếu <b>hằng ngày</b>, công nợ <b>hằng tuần</b>, chốt quỹ <b>hằng tháng</b>.</p>
+<div class="guide" id="k1" style="--c:var(--kt)">
+<div class="ghead"><div class="gi">📥</div><div><h3>Phiếu thu &amp; Phiếu chi</h3><div class="where">📍 <b>TÀI CHÍNH › Phiếu thu / Phiếu chi</b></div></div></div>
+<div class="gbody"><div><ol class="steps"><li>Bấm <span class="kbd">+ Tạo phiếu thu</span> / <span class="kbd">+ Tạo phiếu chi</span>: chọn <b>quỹ</b>, số tiền, danh mục, đối tượng, diễn giải. <b>Phiếu chi bắt buộc có lý do chi.</b></li><li>Lọc nhanh bằng các nút <b>Hôm nay / Hôm qua / Tuần này / Tháng này / Tháng trước</b>; tick <b>nhiều quỹ, nhiều danh mục, nhiều người tạo</b>; tìm theo <b>khoảng số tiền</b> để đối chiếu sao kê.</li><li>Lọc <b>Chờ duyệt</b> → duyệt <span class="kbd">✓</span> hoặc từ chối <span class="kbd">✗</span> (ghi lý do). Phiếu chi chưa duyệt chưa tính là đã chi.</li><li>Bấm mã trong cột <b>Chứng từ gốc</b> để nhảy tới đơn bán / phiếu dịch vụ. Dùng 💾 Lưu bộ lọc cho bộ lọc hay dùng.</li></ol><div class="warn">⚠️ Phiếu tự động (từ đơn/dịch vụ) không hủy trực tiếp được; chỉ hủy phiếu thủ công.</div></div><div><div class="mock"><div class="mbar"><span class="dots"><i></i><i></i><i></i></span><span class="ttl">TÀI CHÍNH › Phiếu thu</span></div><div class="mbody">
+<div class="mrow"><span class="mbtn p">Hôm nay</span><span class="mbtn ">Hôm qua</span><span class="mbtn ">Tuần này</span><span class="mbtn ">Tháng này</span><span class="mbtn ">Tháng trước</span></div>
+<div class="mrow"><span class="minp on">Quỹ: 2 đã chọn ▾</span><span class="minp">Danh mục: tất cả</span><span class="minp">Người tạo</span><span class="minp">Số tiền từ – đến</span><span class="mbtn ">💾 Lưu bộ lọc</span></div>
+<div class="box" style="margin-bottom:7px;background:#F3F6FB">Theo bộ lọc: <b>12</b> phiếu · Tổng thu: <b class="pos">86.400.000</b></div>
+<table class="mt"><tr><th>Mã phiếu</th><th>Danh mục</th><th>Quỹ</th><th class="r">Số tiền</th><th>Chứng từ gốc</th></tr>
+<tr><td><b style="color:#1D4FB8">PT-2610-10170</b></td><td><span class="mchip c-b">Tự động</span> Bán xe</td><td>Quỹ TM Thành phố</td><td class="r"><b style="color:#0E7A4A">5.000.000</b></td><td style="color:#1D4FB8">BH-2610-79024</td></tr>
+<tr><td><b style="color:#1D4FB8">PT-2610-25607</b></td><td><span class="mchip c-b">Tự động</span> Bán xe</td><td>SHB Ngân Thái Sơn</td><td class="r"><b style="color:#0E7A4A">5.000.000</b></td><td style="color:#1D4FB8">BH-2610-79024</td></tr></table></div></div></div><div style="height:12px"></div><div><div class="mock"><div class="mbar"><span class="dots"><i></i><i></i><i></i></span><span class="ttl">TÀI CHÍNH › Phiếu chi</span></div><div class="mbody">
+<div class="mrow"><span class="mbtn p">+ Tạo phiếu chi</span><span class="minp">Mọi trạng thái duyệt ▾</span></div>
+<table class="mt"><tr><th>Mã phiếu</th><th>Danh mục</th><th class="r">Số tiền</th><th>Lý do chi</th><th></th></tr>
+<tr><td><b>PC-2610-07712</b></td><td>Điện nước <span class="mchip c-a">⏳ Chờ duyệt</span></td><td class="r"><b style="color:#DC2F3E">3.250.000</b></td><td>Tiền điện tháng 9 CH Km40</td><td><span class="mbtn ok">✓</span> <span class="mbtn d">✗</span></td></tr></table>
+<div class="warn" style="margin-top:8px">Phiếu chi <b>bắt buộc có lý do chi</b>. Từ chối phải ghi lý do.</div></div></div></div></div></div><div class="guide" id="k2" style="--c:var(--kt)">
+<div class="ghead"><div class="gi">📒</div><div><h3>Sổ quỹ &amp; chốt quỹ</h3><div class="where">📍 <b>TÀI CHÍNH › Sổ quỹ</b></div></div></div>
+<div class="gbody"><div><ol class="steps"><li>Chọn khoảng ngày, xem khung <b>Đầu kỳ + Thu − Chi = Cuối kỳ</b> và bảng <b>từng quỹ</b>.</li><li>So <b>số dư ngân hàng</b> với sao kê (lọc theo số tiền để tìm khoản lệch).</li><li>Tab <b>Quỹ tiền</b> › <span class="kbd">Chốt quỹ</span>: nhập số dư thực tế; nếu lệch phải ghi nguyên nhân. Lịch sử chốt nằm ở tab <b>Lịch sử chốt quỹ</b>.</li></ol><div class="tip">💡 Báo cáo thu chi tự gửi Discord lúc 17h00. Có nút “📊 Gửi báo cáo thu chi ngày” để gửi lại.</div></div><div><div class="mock"><div class="mbar"><span class="dots"><i></i><i></i><i></i></span><span class="ttl">TÀI CHÍNH › Sổ quỹ</span></div><div class="mbody">
+<div class="mrow" style="justify-content:space-around;text-align:center"><div><small>Tồn đầu kỳ</small><br><b>120.000.000</b></div><div>+</div><div><small>Tổng thu</small><br><b style="color:#0E7A4A">86.400.000</b></div><div>−</div><div><small>Tổng chi</small><br><b style="color:#DC2F3E">12.300.000</b></div><div>=</div><div><small>Tồn cuối kỳ</small><br><b style="color:#1D4FB8">194.100.000</b></div></div>
+<table class="mt"><tr><th>Quỹ</th><th class="r">Đầu kỳ</th><th class="r">Thu</th><th class="r">Chi</th><th class="r">Cuối kỳ</th></tr>
+<tr><td>Quỹ TM Thành phố</td><td class="r">20.000.000</td><td class="r">18.000.000</td><td class="r">3.000.000</td><td class="r"><b>35.000.000</b></td></tr>
+<tr><td>SHB Cty Ngân Thái Sơn</td><td class="r">100.000.000</td><td class="r">68.400.000</td><td class="r">9.300.000</td><td class="r"><b>159.100.000</b></td></tr></table>
+<div class="mrow" style="margin-top:7px"><span class="mbtn ">Quỹ tiền</span><span class="mbtn p">Chốt quỹ</span><span class="mbtn ">📤 Gửi số dư về Discord</span></div></div></div></div></div></div><div class="guide" id="k3" style="--c:var(--kt)">
+<div class="ghead"><div class="gi">🔎</div><div><h3>Đối chiếu Đơn bán ↔ Sổ quỹ</h3><div class="where">📍 <b>TÀI CHÍNH › Đối soát cuối ngày › mục Đối chiếu</b></div></div></div>
+<div class="gbody"><div><ol class="steps"><li>Chọn <b>Hôm nay</b> (hằng ngày) hoặc <b>Tháng này</b> (cuối tháng), bấm <span class="kbd">Quét chênh lệch</span>.</li><li>Danh sách trống = khớp. Có đơn: <b>Thiếu phiếu thu</b> → kiểm tra tiền đã về quỹ chưa rồi ghi nhận khoản thu đúng đơn; <b>Phiếu thừa</b> → tìm đơn tương ứng, đảo ngược khoản thu sai.</li><li>Xử lý hết đơn lệch trước khi khóa sổ tháng.</li></ol></div><div><div class="mock"><div class="mbar"><span class="dots"><i></i><i></i><i></i></span><span class="ttl">Đối soát cuối ngày › 🔎 Đối chiếu Đơn bán ↔ Sổ quỹ</span></div><div class="mbody">
+<div class="mrow"><span class="mbtn p">Tháng này</span><span class="mbtn ">Tháng trước</span><span class="mbtn ok">Quét chênh lệch</span></div>
+<div style="color:#0E7A4A;font-weight:700;margin-bottom:6px">✓ Không có đơn nào lệch trong kỳ.</div>
+<table class="mt"><tr><th>Mã đơn</th><th class="r">Thu trên đơn</th><th class="r">Sổ quỹ</th><th class="r">Chênh</th><th>Kết luận</th></tr>
+<tr><td><b>BH-2610-xxxxx</b></td><td class="r">10.000.000</td><td class="r">0</td><td class="r" style="color:#DC2F3E"><b>10.000.000</b></td><td><span class="mchip c-r">Thiếu phiếu thu</span></td></tr></table>
+<div class="cap">Ví dụ khi có lệch (dòng minh họa)</div></div></div></div></div></div><div class="guide" id="k4" style="--c:var(--kt)">
+<div class="ghead"><div class="gi">📑</div><div><h3>Công nợ phải thu &amp; phải trả (NCC)</h3><div class="where">📍 <b>TÀI CHÍNH › Công nợ phải thu / phải trả</b></div></div></div>
+<div class="gbody"><div><ol class="steps"><li><b>Phải thu:</b> lọc tuổi nợ, điểm bán, nhân viên bán; cập nhật <b>hạn thanh toán</b>, ghi chú nợ; gửi danh sách &gt;30 ngày cho cửa hàng trưởng.</li><li><b>Phải trả:</b> lọc <b>Quá hạn</b> và <b>Đến hạn trong 7 ngày</b>, lập kế hoạch chi; ghi nhận khoản đã trả cho NCC.</li><li><span class="kbd">⬇ Xuất Excel</span> lấy đúng danh sách đang lọc.</li></ol></div><div><div class="mock"><div class="mbar"><span class="dots"><i></i><i></i><i></i></span><span class="ttl">TÀI CHÍNH › Công nợ phải thu</span></div><div class="mbody">
+<div class="mrow"><span class="minp">Điểm bán: tất cả</span><span class="minp">NV bán: tất cả</span><span class="minp on">Tuổi nợ: > 30 ngày</span><span class="minp">Số tiền từ – đến</span></div>
+<table class="mt"><tr><th>Mã đơn</th><th>Khách</th><th class="r">Còn nợ</th><th>Hạn TT</th><th>Nhóm</th></tr>
+<tr><td><b style="color:#1D4FB8">BH-2609-59798</b></td><td>BB Anh Thảo Hà</td><td class="r"><b>10.322.000</b></td><td>25/10</td><td><span class="mchip c-g">Chưa đến hạn</span></td></tr>
+<tr style="background:#FFF6F6"><td><b style="color:#1D4FB8">BH-2608-33011</b></td><td>ĐL Dũng Duyên</td><td class="r"><b>18.900.000</b></td><td>20/09</td><td><span class="mchip c-r">Quá hạn >30 ngày</span></td></tr></table>
+<div class="mrow" style="margin-top:7px"><span class="mbtn ">Nhắc nợ</span><span class="mbtn ">Đặt hạn TT</span><span class="mbtn ">⬇ Xuất Excel</span></div></div></div></div></div></div><div class="guide" id="k5" style="--c:var(--kt)">
+<div class="ghead"><div class="gi">🏦</div><div><h3>Giải ngân trả góp</h3><div class="where">📍 <b>TÀI CHÍNH › Giải ngân trả góp</b></div></div></div>
+<div class="gbody"><div><ol class="steps"><li>Khi công ty tài chính chuyển tiền: tìm khoản (lọc theo công ty, ngày bán, quá hạn).</li><li>Bấm <span class="kbd">✓ Đã nhận tiền</span> → chọn <b>tài khoản ngân hàng nhận</b> → xác nhận. Hệ thống tự ghi phiếu thu <i>Giải ngân trả góp</i>.</li><li>Khoản quá hạn dự kiến hiện ⚠ — liên hệ công ty tài chính.</li></ol></div><div><div class="mock"><div class="mbar"><span class="dots"><i></i><i></i><i></i></span><span class="ttl">TÀI CHÍNH › Giải ngân trả góp</span></div><div class="mbody">
+<div class="mrow"><span class="minp">Công ty TC: tất cả</span><span class="minp">Ngày bán: Tháng này</span><span class="mbtn">☑ Chỉ khoản quá hạn</span></div>
+<table class="mt"><tr><th>Đơn bán</th><th>Công ty TC</th><th class="r">Số tiền</th><th>Dự kiến</th><th></th></tr>
+<tr><td><b>BH-2610-61833</b><br><small>Phạm Lan Thương</small></td><td>Shinhan</td><td class="r"><b>3.000.000</b></td><td>12/10</td><td><span class="mbtn ok">✓ Đã nhận tiền</span></td></tr>
+<tr style="background:#FDF6F0"><td><b>BH-2610-32410</b><br><small>Lê Minh Hưng</small></td><td>HD Saison</td><td class="r"><b>9.500.000</b></td><td style="color:#DC2F3E"><b>05/10 ⚠</b></td><td><span class="mbtn ok">✓ Đã nhận tiền</span></td></tr></table>
+<div class="cap">Bấm “Đã nhận tiền” → chọn tài khoản ngân hàng nhận → hệ thống tự ghi phiếu thu</div></div></div></div></div></div><div class="guide" id="k6" style="--c:var(--kt)">
+<div class="ghead"><div class="gi">✎</div><div><h3>Sửa khoản thu sai &amp; Claim hãng</h3><div class="where">📍 <b>Đơn bán › Sửa đơn › Bước 3  |  TÀI CHÍNH › Claim hãng</b></div></div></div>
+<div class="gbody"><div><ol class="steps"><li>Thu nhầm phương thức/tài khoản: mở <b>Sửa đơn</b>, ở Bước 3 bấm <span class="kbd">✎ Sửa</span> trên khoản đã thu (chỉ Admin / Ban giám đốc). Hệ thống <b>đảo ngược và ghi lại</b> — không cần hoàn tiền.</li><li><b>Bắt buộc ghi lý do sửa</b>. Mọi thay đổi đều để lại dấu vết.</li><li><b>Claim hãng</b> (tiền khách trả thẳng cho hãng): lập hồ sơ claim, ghi kết quả hãng duyệt/từ chối, cuối tháng đối trừ với công nợ hãng.</li></ol></div><div><div class="mock"><div class="mbar"><span class="dots"><i></i><i></i><i></i></span><span class="ttl">Sửa đơn › Bước 3 · Các khoản đã thu trước đó</span></div><div class="mbody">
+<div class="box" style="background:#FFFBF0;border-color:#F0D9A8"><h5 style="color:#A25F00">🔒 Các khoản đã thu trước đó (2)</h5>
+<div class="kv"><span><b>Tiền mặt</b> 5.000.000 · Quỹ TM Thành phố</span><span class="mbtn ">✎ Sửa</span></div>
+<div class="kv"><span><b>Chuyển khoản</b> 5.000.000 · SHB Ngân Thái Sơn</span><span class="mbtn ">✎ Sửa</span></div></div>
+<div class="box hl" style="margin-top:8px;background:#fff"><span class="callout">Admin / BGĐ</span><h5>Sửa khoản thu #141 — đảo ngược và ghi lại</h5>
+<div class="mrow"><span class="minp">Chuyển khoản</span><span class="minp">5.000.000</span><span class="minp">Tài khoản nhận…</span></div><div class="mrow"><span class="minp">Lý do sửa (bắt buộc): chọn nhầm tài khoản</span><span class="mbtn ok">Lưu sửa khoản thu</span></div></div></div></div></div></div></div></section>
+
+<section><h2 class="sec">🔐 Ai được làm gì</h2><p class="sub">Mặc định theo vai trò; Ban giám đốc có thể điều chỉnh ở Phân quyền. Không thấy menu nghĩa là chưa được cấp quyền.</p>
+<table class="ref"><tr><th>Việc</th><th>Sales</th><th>Cửa hàng trưởng</th><th>Kế toán</th></tr><tr><td><b>Cơ hội, Lái thử, Đặt cọc</b></td><td>✔ Tạo & cập nhật</td><td>✔ Duyệt lái thử, xem cả đội</td><td>— </td></tr><tr><td><b>Đơn bán (Wizard, thu thêm, ✓ HĐ)</b></td><td>✔ Tạo, thu thêm, xuất HĐ</td><td>✔ Xem & quản lý cửa hàng</td><td>✔ Xem; ✎ Sửa khoản thu</td></tr><tr><td><b>Tra cứu tồn, Điều chuyển</b></td><td>✔</td><td>✔ + Bảng tồn, Kiểm soát tồn</td><td>✔ Xem</td></tr><tr><td><b>Phiếu thu / Phiếu chi / Sổ quỹ</b></td><td>—</td><td>Xem / tạo theo phân quyền</td><td>✔ Tạo, duyệt chi, chốt quỹ</td></tr><tr><td><b>Đối soát cuối ngày</b></td><td>—</td><td>✔ Xác nhận phần CH trưởng</td><td>✔ Người thu, đối chiếu</td></tr><tr><td><b>Công nợ, Giải ngân trả góp</b></td><td>—</td><td>✔ Xem, nhắc nợ, xác nhận</td><td>✔ Ghi nhận, xác nhận</td></tr><tr><td><b>Dịch vụ ngoài, Claim hãng</b></td><td>—</td><td>✔ Ghi khoản</td><td>✔ Xác nhận nộp, lập claim</td></tr></table></section>
+
+<section id="faq" class="faq"><h2 class="sec">❓ Hỏi đáp nhanh</h2><p class="sub">Những tình huống hay gặp.</p><details><summary>Em nhập sai phương thức thanh toán thì làm sao?</summary><p>Không tự xóa hay sửa. Nhờ Admin / Ban giám đốc bấm ✎ Sửa ở khoản thu trong Sửa đơn (hệ thống đảo ngược và ghi lại, có lý do).</p></details><details><summary>Vì sao không bấm sang Bước 3 trong Wizard được?</summary><p>Ở Bước 2 phải chọn xe và bấm “Làm mới Bảng giá”. Khuyến mại chip đỏ là đã hết hạn.</p></details><details><summary>Đơn hiện “Còn phải trả” dù khách đã đưa tiền?</summary><p>Kiểm tra phần thanh toán: có thể khoản thu chưa được ghi hoặc đã bị hoàn. Thu thêm bằng nút 💵 hoặc báo Kế toán.</p></details><details><summary>Khoản trả góp của đơn đã hủy còn hiện không?</summary><p>Không. Giải ngân trả góp chỉ hiện các khoản còn hiệu lực.</p></details><details><summary>Phiếu chi bị từ chối thì sao?</summary><p>Người tạo xem lý do từ chối, chỉnh lại nội dung và tạo phiếu mới.</p></details><details><summary>Số tiền mặt thực đếm khác hệ thống?</summary><p>Không chốt ngày. Báo Kế toán, tìm nguyên nhân (thiếu phiếu thu, chi chưa ghi…) rồi mới chốt đối soát.</p></details></section>
+</main>
+<footer>Minh Kỳ EV · Tài liệu hướng dẫn sử dụng · Hình minh họa là giao diện mô phỏng với dữ liệu ví dụ.</footer>
+</body></html>
