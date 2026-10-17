@@ -1,0 +1,6 @@
+-- 154: LENH SUA CHUA (GD2) — ghi chu; da ap dung qua MCP 2026-10-17.
+--  repair_orders(code MKEV-WO-yymmdd-0001 (doc_counters prefix 'MKEV-WO', ym=yymmdd), location_code, vehicle_id_ref -> customer_vehicles, customer_id,
+--    snapshot plate/frame/vehicle_desc/warranty, status BAO_GIA|PHAT_HANH|HOAN_THANH_TT|HUY, loai_dich_vu, nhom_sua_chua, uu_tien, ktv, yeu_cau, nguoi_mang_xe, sdt_lai_xe,
+--    odo_km, du_kien_bat_dau/giao_xe, cam_ket_hoan_thanh, phat_hanh_at, quyet_toan_at, huy_ly_do ...). RLS: select cho authenticated; ghi qua RPC.
+--  View v_lenh_sua_chua (+ ten/SDT khach, ten diem). RPC: fn_lsc_tao (perm dv_tiep_nhan), fn_lsc_luu (dv_tiep_nhan), fn_lsc_doi_trang_thai('phat_hanh' dv_bao_gia | 'huy' dv_huy_phieu + ly do).
+--  Cong viec / Vat tu (GD3) chua co.

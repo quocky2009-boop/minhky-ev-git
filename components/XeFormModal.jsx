@@ -28,7 +28,7 @@ export default function XeFormModal({ supabase, brands, vehicles, notify, initia
     setBusy(false);
     if (error) return notify(errMsg(error), "err");
     notify(edit ? "Đã cập nhật hồ sơ xe." : "Đã tạo hồ sơ xe.");
-    onSaved && onSaved(data);
+    onSaved && onSaved(data, f);
   };
 
   return (
