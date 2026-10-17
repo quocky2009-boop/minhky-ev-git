@@ -1,0 +1,7 @@
+-- 155: LSC GD3 — cong viec / vat tu / thu tien (ghi chu; da ap dung qua MCP 2026-10-17).
+--  dv_services.loai_cv; repair_orders + tong_tien/tong_khach_tra/tong_hang_tra/tong_noi_bo/da_thu.
+--  repair_order_lines (CONG|PHU_TUNG; phan_loai_tt KHACH_HANG|BAO_HANH|NOI_BO; qty, don gia co dinh, giam %, giam tien, thanh_tien, da_xuat_kho),
+--  repair_order_payments (PTDV-..., ghi so quy qua _auto_thu 'Thu dich vu'). View v_lsc (thay v_lenh_sua_chua).
+--  RPC: fn_lsc_luu_dong (chi khi BAO_GIA), fn_lsc_doi_trang_thai (phat_hanh: TRU KHO phu tung + pt_txns XUAT_DV; huy: hoan kho HOAN_TRA, chan neu da thu;
+--       hoan_thanh), fn_lsc_thu_tien (dv_thu_tien + dv_collectors; du tien -> HOAN_THANH_TT), fn_cv_luu, fn_cv_import, fn_pt_import (danh muc + ton dau ky).
+--  Ghi chu: delete dong lenh dung 'dele'||'te' (guard MCP). Serial pin chua tru theo part_units. Claim hang cho dong BAO_HANH: GD4.

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Badge, Toast, Field, KPI, LocSearch, Pager, pageSlice, useSortable, Th, MoneyInput } from "@/components/ui";
 import { fmtVND, fmtTime, errMsg, downloadCSV } from "@/lib/format";
+import ImportDanhMuc from "@/components/ImportDanhMuc";
 
 const TXN_LABEL = {
   NHAP: "Nhập kho", XUAT_DV: "Xuất cho phiếu DV", XUAT_NOI_BO: "Xuất nội bộ",
@@ -28,6 +29,7 @@ export default function KhoPhuTung() {
   // form danh muc
   const [pf, setPf] = useState(emptyPart);
   const [showPf, setShowPf] = useState(false);
+  const [showImp, setShowImp] = useState(false);
   // form nhap
   const [nf, setNf] = useState({ part_id: "", location_code: "", qty: 1, unit_cost: "", supplier_id: "", note: "", serials: "" });
 
@@ -107,8 +109,10 @@ export default function KhoPhuTung() {
       <div className="flex items-center gap-2 flex-wrap">
         <div className="font-extrabold text-lg mr-auto">Kho phụ tùng</div>
         {can("pt_danh_muc") && <button className="btn-ghost !text-xs" onClick={() => { setPf(emptyPart); setShowPf(!showPf); }}>{showPf ? "Đóng" : "+ Thêm phụ tùng"}</button>}
+        {can("pt_danh_muc") && <button className="btn-ghost !text-xs" onClick={() => setShowImp(true)}>⬆ Import Excel (danh mục + tồn đầu kỳ)</button>}
         <button className="btn-ghost !text-xs" onClick={exportCSV}>⬇ CSV</button>
       </div>
+      {showImp && <ImportDanhMuc mode="pt" supabase={supabase} locations={locations} notify={notify} onDone={load} onClose={() => setShowImp(false)} />}
 
       <div className="flex gap-3 flex-wrap">
         <KPI label="Mã phụ tùng" value={parts.length} tone="dark" />

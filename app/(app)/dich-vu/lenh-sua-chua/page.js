@@ -37,7 +37,7 @@ export default function LenhSuaChua() {
 
   const load = async () => {
     setBusy(true);
-    const { data, error } = await supabase.from("v_lenh_sua_chua").select("*").order("created_at", { ascending: false }).limit(3000);
+    const { data, error } = await supabase.from("v_lsc").select("*").order("created_at", { ascending: false }).limit(3000);
     if (error) notify(errMsg(error), "err");
     setRows(data || []); setBusy(false);
   };
