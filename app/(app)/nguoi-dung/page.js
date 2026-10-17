@@ -37,7 +37,7 @@ export default function NguoiDung() {
         <div className="font-extrabold mb-1">Người dùng & phân quyền ({users.length})</div>
         <p className="text-xs text-[#5A6572] mb-3">Tạo tài khoản mới: vào Supabase → Authentication → Add user (email + mật khẩu). Tài khoản mới mặc định là Sales, CEO phân quyền lại tại đây. Cửa hàng gán ở đây sẽ tự điền làm "cửa hàng phụ trách" khi nhân viên tạo khách mới.</p>
         <div className="overflow-x-auto"><table className="w-full border-collapse">
-          <thead><tr><th className="th">Người dùng</th><th className="th">Vai trò</th><th className="th">Khu vực (với Quản lý)</th><th className="th">Cửa hàng</th><th className="th">Trạng thái</th></tr></thead>
+          <thead><tr><th className="th">Người dùng</th><th className="th">Vai trò</th><th className="th">Khu vực (Sales/KTV: quỹ tiền mặt & dữ liệu theo khu vực)</th><th className="th">Cửa hàng</th><th className="th">Trạng thái</th></tr></thead>
           <tbody>{users.map((u) => (
             <tr key={u.id}>
               <td className="td font-bold">{u.name}</td>
