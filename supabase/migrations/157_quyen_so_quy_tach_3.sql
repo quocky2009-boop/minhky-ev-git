@@ -3,3 +3,8 @@
 -- Ap dung 2026-10-17: SALES thu_chi_xem=true, thu_chi_ghi=true. SALES thu_chi_chot=false se dat SAU khi trien khai (menu doi sang thu_chi_xem).
 -- Da bo muc "Phan quyen theo vai tro" trong Cai dat (trung voi trang Phan quyen, danh sach cu thieu quyen).
 -- + Policy read_own_cash_txns (cash_txns): nguoi co quyen thu_chi_xem nhung KHONG thuoc CEO/ADMIN/MANAGER chi doc duoc phieu do chinh minh tao (created_by = auth.uid()).
+-- 2026-10-17 (tiep): SALES + TECHNICIAN xem/tao phieu thu chi nhung CHI thay quy TIEN MAT (nhom KINH_DOANH) cua KHU VUC minh (profiles.region = locations.region cua quy)
+--   hoac quy do ho la nguoi quan ly (manager_id). CEO/ADMIN/MANAGER thay het.
+--   _quy_xem_duoc(account_id) (auth.uid() null -> true cho cron/he thong); v_quy_so_du loc theo ham nay; policy read_own_cash_txns them dieu kien quy;
+--   fn_ghi_thu_chi: bat buoc quyen thu_chi_ghi + chi lap tren quy xem duoc. role_perms TECHNICIAN thu_chi_xem/ghi = true.
+--   Luu y: nhan vien chua co profiles.region se khong thay quy nao.
