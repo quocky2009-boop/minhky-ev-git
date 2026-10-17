@@ -2,3 +2,4 @@
 -- Truoc do trang Phan quyen chi co thu_chi_chot trong khi cac trang kiem tra thu_chi_xem -> SALES duoc tich "xem/tao" van bi bao khong co quyen.
 -- Ap dung 2026-10-17: SALES thu_chi_xem=true, thu_chi_ghi=true. SALES thu_chi_chot=false se dat SAU khi trien khai (menu doi sang thu_chi_xem).
 -- Da bo muc "Phan quyen theo vai tro" trong Cai dat (trung voi trang Phan quyen, danh sach cu thieu quyen).
+-- + Policy read_own_cash_txns (cash_txns): nguoi co quyen thu_chi_xem nhung KHONG thuoc CEO/ADMIN/MANAGER chi doc duoc phieu do chinh minh tao (created_by = auth.uid()).
