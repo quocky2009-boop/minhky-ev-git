@@ -1,0 +1,182 @@
+<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hướng dẫn Kỹ thuật viên — Dịch vụ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--brand:#1D4FB8;--brand-d:#173F94;--bg:#F3F5F8;--card:#fff;--ink:#1B2733;--mut:#5A6572;--line:#E3E8EF;
+--ok:#129D61;--okbg:#E5F6EE;--warn:#D97E00;--warnbg:#FDF1DF;--danger:#DC2F3E;--dbg:#FDE8EA;--blue-bg:#E7EFFD;
+--sales:#2563EB;--cht:#D97E00;--kt:#0E9F6E;--nav:#0F1D33;--ktv:#7C3AED}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;font-family:'Be Vietnam Pro',system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink);line-height:1.55;font-size:15px}
+a{color:var(--brand)}
+.wrap{max-width:1080px;margin:0 auto;padding:0 18px}
+/* top nav */
+.top{position:sticky;top:0;z-index:50;background:var(--nav);color:#fff}
+.top .wrap{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:9px 18px}
+.top b{font-weight:800;margin-right:auto;font-size:14px;letter-spacing:.2px}
+.top a{color:#CFE0FF;text-decoration:none;font-size:13px;font-weight:600;padding:6px 11px;border-radius:999px}
+.top a:hover{background:rgba(255,255,255,.12);color:#fff}
+/* hero */
+.hero{background:linear-gradient(135deg,#173F94 0%,#1D4FB8 55%,#2A6AE0 100%);color:#fff;padding:46px 0 70px}
+.hero h1{margin:0 0 8px;font-size:34px;font-weight:800;line-height:1.2}
+.hero p{margin:0;opacity:.9;max-width:640px;font-size:16px}
+.hero .ver{display:inline-block;margin-top:14px;font-size:12px;background:rgba(255,255,255,.16);padding:4px 11px;border-radius:999px}
+.roles{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:-44px}
+.role{background:#fff;border-radius:18px;padding:18px;box-shadow:0 6px 22px rgba(20,40,90,.12);text-decoration:none;color:var(--ink);border-top:5px solid var(--c);transition:.15s}
+.role:hover{transform:translateY(-3px);box-shadow:0 10px 28px rgba(20,40,90,.18)}
+.role .ic{font-size:30px}.role h3{margin:6px 0 4px;font-size:18px}.role p{margin:0;font-size:13px;color:var(--mut)}
+.role .go{display:inline-block;margin-top:10px;font-size:13px;font-weight:700;color:var(--c)}
+/* section */
+section{padding-top:38px}
+h2.sec{font-size:26px;font-weight:800;margin:0 0 4px;display:flex;align-items:center;gap:10px}
+.sub{color:var(--mut);margin:0 0 18px}
+.pill{display:inline-block;font-size:11px;font-weight:800;padding:3px 10px;border-radius:999px;color:#fff;background:var(--c,var(--brand));letter-spacing:.3px}
+.card{background:var(--card);border-radius:16px;box-shadow:0 2px 10px rgba(20,40,90,.07);padding:20px;margin-bottom:16px}
+/* big flow */
+.flow{display:grid;grid-template-columns:repeat(4,1fr);gap:16px 20px}
+.guide,section{scroll-margin-top:62px}
+.fstep{background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:12px 10px;text-align:center;position:relative}
+.fstep:not(:nth-child(4n)):not(:last-child)::after{content:"➜";position:absolute;right:-18px;top:50%;transform:translateY(-50%);color:#9AA7BA;font-size:15px}
+.fstep .n{display:inline-flex;width:22px;height:22px;border-radius:50%;background:var(--brand);color:#fff;font-size:12px;font-weight:800;align-items:center;justify-content:center}
+.fstep .t{font-weight:800;font-size:13.5px;margin:5px 0 2px}.fstep .d{font-size:11.5px;color:var(--mut)}
+.who{display:flex;gap:4px;justify-content:center;margin-top:7px;flex-wrap:wrap}
+.who i{font-style:normal;font-size:10.5px;font-weight:800;color:#fff;border-radius:999px;padding:1px 8px}
+.w-s{background:var(--sales)}.w-c{background:var(--cht)}.w-k{background:var(--kt)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--mut);margin-top:10px;align-items:center}
+.minflow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
+.minflow span{background:#fff;border:1.5px solid var(--c);color:var(--c);font-weight:700;font-size:13px;border-radius:999px;padding:5px 13px}
+.minflow em{color:#9AA7BA;font-style:normal}
+/* guide */
+.guide{background:#fff;border-radius:18px;box-shadow:0 2px 12px rgba(20,40,90,.08);margin-bottom:20px;overflow:hidden;border-left:6px solid var(--c)}
+.ghead{padding:16px 22px 10px;display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap}
+.ghead .gi{font-size:28px;line-height:1}.ghead h3{margin:0;font-size:19px;font-weight:800}
+.where{display:inline-flex;gap:6px;align-items:center;margin-top:4px;font-size:12.5px;color:var(--mut);background:#F0F3F8;border-radius:8px;padding:3px 10px}
+.where b{color:var(--ink)}
+.gbody{display:grid;grid-template-columns:1fr 1.05fr;gap:22px;padding:6px 22px 20px}
+.gbody.one{grid-template-columns:1fr}
+@media(max-width:860px){.flow{grid-template-columns:repeat(2,1fr)}.fstep:nth-child(2n)::after{display:none}.gbody{grid-template-columns:1fr}.roles{grid-template-columns:1fr}.hero h1{font-size:26px}}
+ol.steps{list-style:none;margin:0;padding:0;counter-reset:s}
+ol.steps li{counter-increment:s;position:relative;padding:0 0 11px 36px;font-size:14.5px}
+ol.steps li::before{content:counter(s);position:absolute;left:0;top:0;width:25px;height:25px;border-radius:50%;background:var(--c);color:#fff;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center}
+ol.steps li b{color:var(--ink)}
+.kbd{display:inline-block;background:#EEF2F8;border:1px solid #D6DEEA;border-bottom-width:2px;border-radius:7px;padding:0 7px;font-size:12.5px;font-weight:700;color:#23324A;white-space:nowrap}
+.ex{background:var(--blue-bg);border:1px dashed #9DB8EE;border-radius:12px;padding:10px 13px;font-size:13.5px;margin-top:6px}
+.ex strong:first-child{color:var(--brand)}
+.tip{background:var(--warnbg);border-radius:12px;padding:9px 13px;font-size:13.5px;margin-top:8px}
+.warn{background:var(--dbg);border-radius:12px;padding:9px 13px;font-size:13.5px;margin-top:8px}
+/* mock screens */
+.mock{border:1px solid #D3DBE8;border-radius:12px;overflow:hidden;background:#fff;box-shadow:0 4px 14px rgba(20,40,90,.10);font-size:12.5px}
+.mbar{background:#EEF2F8;border-bottom:1px solid #D3DBE8;padding:6px 10px;display:flex;align-items:center;gap:6px;font-weight:700;color:#3C4A60;font-size:12px}
+.mbar .dots{display:flex;gap:4px}.mbar .dots i{width:9px;height:9px;border-radius:50%;background:#C9D2E0;display:block}
+.mbar .ttl{margin-left:6px}
+.mbody{padding:11px}
+.mrow{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+.mbtn{display:inline-block;border-radius:8px;padding:4px 11px;font-weight:700;font-size:12px;background:#EEF1F4;color:#3C4A60;border:1px solid #DDE3EC}
+.mbtn.p{background:var(--brand);color:#fff;border-color:var(--brand)}.mbtn.ok{background:var(--ok);color:#fff;border-color:var(--ok)}.mbtn.d{background:var(--danger);color:#fff;border-color:var(--danger)}
+.minp{border:1px solid #D3DBE8;border-radius:8px;padding:4px 9px;background:#fff;color:#7C8797;min-width:90px;display:inline-block}
+.minp.on{color:var(--brand);border-color:var(--brand);font-weight:700;background:#F2F7FF}
+.mchip{display:inline-block;border-radius:999px;padding:1px 9px;font-weight:700;font-size:11px}
+.c-g{background:var(--okbg);color:#0E7A4A}.c-a{background:var(--warnbg);color:#A25F00}.c-r{background:var(--dbg);color:#B01E2C}.c-b{background:var(--blue-bg);color:#1D4FB8}.c-x{background:#EEF1F4;color:#5A6572}.c-p{background:#F1EAFB;color:#6B39B8}
+table.mt{width:100%;border-collapse:collapse;font-size:12px}
+table.mt th{text-align:left;font-size:10.5px;text-transform:uppercase;color:#5A6572;border-bottom:2px solid #E6EAEF;padding:5px 6px;white-space:nowrap}
+table.mt td{border-bottom:1px solid #EEF1F4;padding:6px;vertical-align:top}
+table.mt td.r,table.mt th.r{text-align:right}
+.hl{outline:2.5px solid #FF9F1A;outline-offset:1px;border-radius:8px;position:relative}
+.callout{position:absolute;right:-6px;top:-11px;background:#FF9F1A;color:#fff;font-weight:800;font-size:10.5px;border-radius:999px;padding:0 7px;line-height:17px}
+.stepbar{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:9px}
+.stepbar span{font-size:11px;font-weight:700;border-radius:999px;padding:2px 10px;background:#EEF1F4;color:#5A6572}
+.stepbar span.on{background:var(--brand);color:#fff}.stepbar span.dn{background:var(--okbg);color:#0E7A4A}
+.two{display:grid;grid-template-columns:1.4fr 1fr;gap:10px}
+.box{border:1px solid #E3E8EF;border-radius:10px;padding:8px 10px;background:#FAFBFD}
+.box h5{margin:0 0 5px;font-size:12px}
+.kv{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px dashed #E3E8EF;font-size:12px}
+.kv b.neg{color:var(--danger)}.kv b.pos{color:#0E7A4A}
+.cap{font-size:11.5px;color:var(--mut);text-align:center;margin-top:6px}
+.pipe{display:flex;gap:3px;flex-wrap:wrap}
+.pipe span{font-size:10.5px;font-weight:700;border-radius:6px;padding:3px 7px;background:#EEF1F4;color:#5A6572}
+.pipe span.on{background:var(--brand);color:#fff}
+/* tables */
+table.ref{width:100%;border-collapse:collapse;font-size:13.5px;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 2px 10px rgba(20,40,90,.07)}
+table.ref th{background:var(--nav);color:#fff;text-align:left;padding:9px 12px;font-size:12.5px}
+table.ref td{padding:9px 12px;border-bottom:1px solid #EEF1F4;vertical-align:top}
+table.ref tr:last-child td{border-bottom:0}
+.tag{display:inline-block;font-size:11px;font-weight:800;border-radius:999px;padding:1px 9px;color:#fff}
+.faq details{background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(20,40,90,.06);padding:11px 16px;margin-bottom:9px}
+.faq summary{cursor:pointer;font-weight:700}.faq p{margin:8px 0 2px;color:var(--mut);font-size:14px}
+footer{padding:30px 0 50px;color:var(--mut);font-size:12.5px;text-align:center}
+@media print{.top{display:none}body{background:#fff}.guide,.card{box-shadow:none;border:1px solid #ddd;break-inside:avoid}.hero{background:#173F94!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+
+.hero{background:linear-gradient(135deg,#4C1D95 0%,#6D28D9 55%,#8B5CF6 100%)}</style></head><body>
+<div class="top"><div class="wrap"><b>🔧 Minh Kỳ EV · Hướng dẫn Kỹ thuật viên</b><a href="#luong">Luồng</a><a href="#chi-tiet">Hướng dẫn</a><a href="#quyen">Quyền</a><a href="#faq">Hỏi đáp</a></div></div>
+<header class="hero"><div class="wrap"><h1>Hướng dẫn Kỹ thuật viên<br>Module Dịch vụ — Lệnh sửa chữa</h1><p>Tiếp nhận xe, lập báo giá, phát hành, thu tiền và xử lý bảo hành trên app <b>one.xedienminhky.vn</b>.</p><span class="ver">Phiên bản 10/2026</span></div></header>
+<main class="wrap">
+<section id="luong" style="padding-top:28px"><h2 class="sec">🔄 Luồng làm việc</h2><p class="sub">Một lệnh sửa chữa đi từ lúc khách mang xe tới đến khi thu đủ tiền.</p>
+<div class="card"><div class="flow" style="grid-template-columns:repeat(6,1fr)"><div class="fstep"><span class="n" style="background:var(--ktv)">1</span><div class="t">Tiếp nhận xe</div><div class="d">Tìm xe / tạo lệnh</div></div><div class="fstep"><span class="n" style="background:var(--ktv)">2</span><div class="t">Báo giá</div><div class="d">Công việc + phụ tùng</div></div><div class="fstep"><span class="n" style="background:var(--ktv)">3</span><div class="t">Phát hành</div><div class="d">Khách đồng ý, trừ kho</div></div><div class="fstep"><span class="n" style="background:var(--ktv)">4</span><div class="t">Thực hiện</div><div class="d">Sửa chữa / bảo dưỡng</div></div><div class="fstep"><span class="n" style="background:var(--ktv)">5</span><div class="t">Thu tiền</div><div class="d">Tiền mặt / CK</div></div><div class="fstep"><span class="n" style="background:var(--ktv)">6</span><div class="t">Hoàn thành</div><div class="d">Tự chuyển khi thu đủ</div></div></div>
+<div class="legend"><span>Trạng thái lệnh: <span class="mchip c-a">Báo giá</span> → <span class="mchip c-p">Phát hành</span> → <span class="mchip c-g">Hoàn thành thanh toán</span> · <span class="mchip c-r">Hủy</span></span></div></div>
+<div><div class="mock"><div class="mbar"><span class="dots"><i></i><i></i><i></i></span><span class="ttl">DỊCH VỤ › Lệnh sửa chữa</span></div><div class="mbody">
+<div class="mrow"><span class="mbtn p">Tạo lệnh sửa chữa +</span><span class="minp">Trạng thái: tất cả ▾</span><span class="minp">KTV: tất cả ▾</span><span class="minp">Nhập Mã LSC, biển số, số khung…</span></div>
+<table class="mt"><tr><th>Số LSC</th><th>Ngày</th><th>KTV</th><th>Trạng thái</th><th>Loại dịch vụ</th><th>Biển số</th><th>Dự kiến giao</th></tr>
+<tr><td><b style="color:#1D4FB8">MKEV-WO-261017-0004</b></td><td>17/10</td><td>Trương Văn Chuyên</td><td><span class="mchip c-p">Phát hành</span></td><td>Bảo dưỡng định kỳ</td><td><b>22AA36525</b></td><td>18/10</td></tr>
+<tr><td><b style="color:#1D4FB8">MKEV-WO-261017-0003</b></td><td>17/10</td><td>Trương Văn Chuyên</td><td><span class="mchip c-a">Báo giá</span></td><td>Sửa chữa thông thường</td><td><b>TE413797</b></td><td>—</td></tr>
+<tr><td><b style="color:#1D4FB8">MKEV-WO-261015-0001</b></td><td>15/10</td><td>Hà Thế Hoàng</td><td><span class="mchip c-g">Hoàn thành thanh toán</span></td><td>Bảo hành</td><td><b>22AB40949</b></td><td>16/10</td></tr></table></div></div><div class="cap">Báo giá → Phát hành → Hoàn thành thanh toán (hoặc Hủy)</div></div>
+<div class="card" style="margin-top:14px"><b>3 điều cần nhớ</b><ol style="margin:8px 0 0;padding-left:20px"><li>Báo giá xong mới <b>Phát hành</b> — phụ tùng bị trừ kho lúc phát hành.</li><li>Phân loại thanh toán từng dòng: <b>Khách hàng / Bảo hành hãng / Nội bộ</b>.</li><li>Sau khi phát hành muốn sửa → <b>Xin mở lại</b>, đừng tự tạo lệnh mới.</li></ol></div></section>
+<section id="chi-tiet"><h2 class="sec"><span class="pill" style="--c:var(--ktv)">KTV</span> Hướng dẫn từng bước</h2><p class="sub">9 thao tác bạn dùng hằng ngày.</p>
+<div class="guide" id="g1" style="--c:var(--ktv)">
+<div class="ghead"><div class="gi">🔎</div><div><h3>Tìm xe & tạo Lệnh sửa chữa (LSC)</h3><div class="where">📍 <b>DỊCH VỤ › Lệnh sửa chữa › Tạo lệnh sửa chữa +</b></div></div></div>
+<div class="gbody"><div><ol class="steps"><li>Bấm <span class="kbd">Tạo lệnh sửa chữa +</span>.</li><li>Gõ <b>biển số</b> hoặc <b>số khung</b> vào ô tìm — xe đã có trong hệ thống hiện kèm chủ xe và tình trạng bảo hành. Bấm chọn xe.</li><li>Xe lạ / khách lạ chưa có: bấm <b>“+ Thêm xe / khách hàng mới”</b> → nhập chủ xe (tên + SĐT) và biển số hoặc số khung → Lưu. Một khách có thể có nhiều xe.</li><li>Chọn <b>điểm dịch vụ</b> → <span class="kbd">Chấp nhận</span>. Hệ thống tạo lệnh mã <b>MKEV-WO-yymmdd-0001</b> ở trạng thái <b>Báo giá</b> và mở trang chi tiết.</li></ol><div class="ex"><strong>Ví dụ:</strong> Khách mang xe biển 22AA36525 tới → gõ “22AA36525” → chọn xe → chọn điểm → Chấp nhận.</div><div class="tip">💡 Cũng có thể tra / sửa thông tin xe ở <b>Dịch vụ → Hồ sơ xe khách hàng</b>. Trùng biển số hoặc số khung sẽ báo lỗi, tránh tạo xe 2 lần.</div></div><div><div class="mock"><div class="mbar"><span class="dots"><i></i><i></i><i></i></span><span class="ttl">Tạo lệnh sửa chữa</span></div><div class="mbody">
+<div class="box"><h5>Biển số xe / Số khung (VIN)</h5><div class="minp on" style="width:100%">22AA36525</div>
+<div style="margin-top:6px;border:1px solid #E3E8EF;border-radius:8px">
+<div style="padding:6px 9px;border-bottom:1px solid #F2F4F7"><b>22AA36525</b> <small style="font-family:monospace;color:#5A6572">RPXS3LHHVTE…</small><br><small style="color:#5A6572">VinFast · Feliz 2025 Đen · Trương Văn Chuyên · 0912 345 678</small></div>
+<div style="padding:6px 9px;color:#1D4FB8;font-weight:700">+ Thêm xe / khách hàng mới “22AA36525”</div></div></div>
+<div class="box" style="margin-top:7px"><h5>Điểm dịch vụ *</h5><div class="minp on">HY-CH VINFAST Km40</div></div>
+<div class="mrow" style="margin-top:8px"><span class="mbtn ">Hủy</span><span class="mbtn p">Chấp nhận</span></div></div></div><div class="cap">Tìm không ra → thêm xe/khách mới ngay trong cửa sổ</div></div><div style="height:12px"></div><div><div class="mock"><div class="mbar"><span class="dots"><i></i><i></i><i></i></span><span class="ttl">Thêm xe / khách hàng mới</span></div><div class="mbody">
+<div class="box"><h5>Chủ xe *</h5><div class="two"><div class="minp on" style="width:100%">Lê Văn Tám</div><div class="minp on" style="width:100%">0987 111 222</div></div></div>
+<div class="two" style="margin-top:7px"><div class="box"><div class="kv"><span>Biển số</span><b>22AB-123.45</b></div><div class="kv"><span>Số khung</span><b>—</b></div><div class="kv"><span>Hãng</span><b>TAILG</b></div></div>
+<div class="box"><div class="kv"><span>Kiểu xe</span><b>GR54</b></div><div class="kv"><span>Màu</span><b>Hồng</b></div><div class="kv"><span>Năm SX</span><b>2024</b></div></div></div>
+<div class="cap">Nhập biển số hoặc số khung (ít nhất 1 trong 2). Trùng xe đã có sẽ báo lỗi.</div></div></div></div></div></div><div class="guide" id="g2" style="--c:var(--ktv)">
+<div class="ghead"><div class="gi">📝</div><div><h3>Điền thông tin lệnh</h3><div class="where">📍 <b>Chi tiết lệnh › Thông tin lệnh sửa chữa</b></div></div></div>
+<div class="gbody"><div><ol class="steps"><li>Chọn <b>Loại dịch vụ</b> (Sửa chữa thông thường / Bảo dưỡng định kỳ / Bảo hành / Lắp đặt phụ tùng, phụ kiện) — nhóm sửa chữa tự gợi ý theo.</li><li>Chọn <b>KTV</b> phụ trách, nhập <b>KM hiện tại (ODO)</b>, người mang xe và SĐT (nếu khác chủ xe), các ngày dự kiến, <b>yêu cầu của khách</b>. Tick 🔥 nếu cần <b>ưu tiên</b>.</li><li>Bấm <span class="kbd">Lưu</span>. Nút <b>Lưu *</b> (có dấu *) nghĩa là còn thay đổi chưa lưu.</li></ol><div class="tip">💡 Mục Thông tin bảo hành tự lấy từ hồ sơ xe. Xe Minh Kỳ bán chưa có ngày kích hoạt thì để trống.</div></div><div><div class="mock"><div class="mbar"><span class="dots"><i></i><i></i><i></i></span><span class="ttl">MKEV-WO-261017-0003 · Lệnh sửa chữa</span></div><div class="mbody">
+<div class="mrow"><span class="mchip c-a">Báo giá</span><span class="mchip c-r">🔥 Ưu tiên</span><span style="margin-left:auto"></span><span class="mbtn ok">Phát hành LSC</span><span class="mbtn p">Lưu *</span></div>
+<div class="two"><div class="box"><h5>Thông tin xe &amp; chủ xe</h5><div class="kv"><span>Biển số</span><b>TE413797</b></div><div class="kv"><span>Xe</span><b>VinFast · Feliz Neo</b></div><div class="kv"><span>Chủ xe</span><b>Đặng Trung Dũng</b></div></div>
+<div class="box"><h5>Bảo hành</h5><div class="kv"><span>Kích hoạt</span><b>20/09/2026</b></div><div class="kv"><span>Kết thúc</span><b>20/09/2032 <span class="mchip c-g">Còn hạn</span></b></div></div></div>
+<div class="box" style="margin-top:7px"><h5>Thông tin lệnh</h5><div class="mrow"><span class="minp on">Loại: Bảo dưỡng định kỳ</span><span class="minp on">KTV: Trương Văn Chuyên</span><span class="minp">ODO: 958 km</span><span class="minp">Dự kiến giao: 18/10</span></div><div class="minp" style="width:100%">Yêu cầu khách hàng: Bảo dưỡng định kỳ 1000km</div></div></div></div></div></div></div><div class="guide" id="g3" style="--c:var(--ktv)">
+<div class="ghead"><div class="gi">🧾</div><div><h3>Lập báo giá: Công việc & Vật tư / Phụ tùng</h3><div class="where">📍 <b>Chi tiết lệnh › tab Công việc / Vật tư</b></div></div></div>
+<div class="gbody"><div><ol class="steps"><li><b>Tab Công việc:</b> gõ mã hoặc tên công việc → chọn từ danh mục (đơn giá cố định). Sửa được <b>số lượng, giảm giá % hoặc giảm tiền</b>.</li><li><b>Tab Vật tư / Phụ tùng:</b> gõ mã hoặc tên → chọn; gợi ý hiện <b>tồn tại điểm này</b>. Số lượng phụ tùng phải là số nguyên.</li><li>Mỗi dòng có <b>Phân loại thanh toán</b>: <b>Khách hàng</b> (khách trả) · <b>Bảo hành hãng</b> (hãng chịu) · <b>Nội bộ</b> (cửa hàng chịu). Lệnh loại Bảo hành tự mặc định “Bảo hành hãng”.</li><li>Dòng cuối trang hiện <b>Tổng thanh toán cuối cùng (khách trả)</b>, hãng chịu, nội bộ. Bấm Lưu.</li></ol><div class="ex"><strong>Ví dụ:</strong> Bảo dưỡng 1000km: công việc DVC-005 (120.000, giảm 10% = 108.000) + thay lốp 2 cái. Cả hai phân loại Khách hàng.</div><div class="tip">💡 Công việc / phụ tùng chưa có trong danh mục? Thêm ở <b>Dịch vụ → Danh mục công việc</b> hoặc <b>Kho phụ tùng</b> (KTV có quyền sửa danh mục).</div></div><div><div class="mock"><div class="mbar"><span class="dots"><i></i><i></i><i></i></span><span class="ttl">Công việc · Vật tư / Phụ tùng</span></div><div class="mbody">
+<div class="mrow"><span class="mbtn p">Công việc (2)</span><span class="mbtn ">Vật tư / Phụ tùng (1)</span></div>
+<div class="minp on" style="width:100%;margin-bottom:6px">+ Thêm công việc: gõ “bảo dưỡng”…</div>
+<table class="mt"><tr><th>Mã</th><th>Công việc</th><th>Phân loại TT</th><th class="r">SL</th><th class="r">Đơn giá</th><th class="r">Giảm %</th><th class="r">Thành tiền</th></tr>
+<tr><td>DVC-005</td><td>Bảo dưỡng định kỳ tiêu chuẩn</td><td><span class="mchip c-b">Khách hàng</span></td><td class="r">1</td><td class="r">120.000</td><td class="r">10</td><td class="r"><b>108.000</b></td></tr>
+<tr><td>DVC-006</td><td>Kiểm tra / cân chỉnh pin, sạc</td><td><span class="mchip c-g">Bảo hành hãng</span></td><td class="r">1</td><td class="r">50.000</td><td class="r">0</td><td class="r"><b>50.000</b></td></tr></table>
+<div class="box" style="margin-top:8px;background:#F3F6FB"><div class="kv"><span>Tổng thanh toán cuối cùng (khách trả)</span><b style="color:#1D4FB8;font-size:15px">108.000</b></div><div class="kv"><span>Hãng chịu (bảo hành)</span><b class="pos">50.000</b></div></div></div></div><div class="cap">Chọn từ danh mục, đơn giá cố định; sửa được giảm giá và phân loại thanh toán</div></div><div style="height:12px"></div><div><div class="mock"><div class="mbar"><span class="dots"><i></i><i></i><i></i></span><span class="ttl">Vật tư / Phụ tùng</span></div><div class="mbody">
+<div class="minp on" style="width:100%;margin-bottom:6px">+ Thêm phụ tùng: gõ “lốp”…</div>
+<div style="border:1px solid #E3E8EF;border-radius:8px;margin-bottom:6px"><div style="padding:6px 9px"><b>123123</b> · Lốp xe <small style="color:#8A93A0">· 50.000 · tồn tại điểm này: <b style="color:#DC2F3E">1</b></small></div></div>
+<table class="mt"><tr><th>Mã</th><th>Phụ tùng</th><th>Phân loại TT</th><th class="r">SL</th><th class="r">Đơn giá</th><th class="r">Thành tiền</th></tr>
+<tr><td>123123</td><td>Lốp xe<br><small style="color:#8A93A0">tồn tại điểm: 1</small></td><td><span class="mchip c-b">Khách hàng</span></td><td class="r">2</td><td class="r">50.000</td><td class="r"><b>100.000</b></td></tr></table>
+<div class="warn" style="margin-top:8px"><b>Thiếu tồn:</b> Lốp xe chỉ còn 1 tại kho — cần 2. Không phát hành được.</div></div></div><div class="cap">Phụ tùng tự trừ kho khi Phát hành lệnh</div></div></div></div><div class="guide" id="g4" style="--c:var(--ktv)">
+<div class="ghead"><div class="gi">🚀</div><div><h3>Phát hành lệnh (khách đồng ý)</h3><div class="where">📍 <b>Chi tiết lệnh › Phát hành LSC</b></div></div></div>
+<div class="gbody one"><div><ol class="steps"><li>Kiểm tra lại báo giá với khách. Khách đồng ý → bấm <span class="kbd">Phát hành LSC</span> (phải <b>Lưu</b> trước).</li><li>Hệ thống <b>trừ kho phụ tùng ngay</b> tại điểm dịch vụ và ghi vào lịch sử kho (“Xuất cho lệnh sửa chữa”).</li><li>Thiếu tồn: báo rõ <b>phụ tùng nào còn bao nhiêu</b> và không cho phát hành. Báo thủ kho nhập thêm, hoặc đổi sang phụ tùng khác.</li><li>Sau khi phát hành <b>không sửa công việc / vật tư được nữa</b>. Cần sửa → xem bước “Xin mở lại”.</li></ol><div class="warn">⚠️ Lệnh đã phát hành mà khách bỏ không làm: nhờ Quản lý / BGĐ <b>Hủy lệnh</b> (KTV không có quyền hủy). Phụ tùng tự hoàn kho; lệnh đã thu tiền thì phải hoàn tiền trước.</div></div></div></div><div class="guide" id="g5" style="--c:var(--ktv)">
+<div class="ghead"><div class="gi">💵</div><div><h3>Thu tiền & hoàn thành</h3><div class="where">📍 <b>Chi tiết lệnh › Thu tiền khách hàng</b></div></div></div>
+<div class="gbody"><div><ol class="steps"><li>Lệnh <b>Phát hành</b> còn phải thu: chọn <b>phương thức</b> (tiền mặt / chuyển khoản + chọn tài khoản nhận), nhập số tiền (mặc định là còn phải thu), ghi chú.</li><li>Bấm <span class="kbd">Ghi nhận thu</span>. Hệ thống ghi phiếu thu <b>PTDV-…</b> vào sổ quỹ (danh mục “Thu dịch vụ”).</li><li>Thu đủ <b>Tổng thanh toán cuối cùng</b> → lệnh <b>tự chuyển “Hoàn thành thanh toán”</b>.</li><li>Lệnh chỉ có phần hãng chịu / nội bộ (khách trả 0): bấm <b>Hoàn thành thanh toán</b> ở đầu trang.</li></ol><div class="warn">⚠️ Chỉ người <b>được Cửa hàng trưởng gán thu tiền tại điểm</b> (Cài đặt) mới thu được. Báo “KHÔNG TRONG DANH SÁCH” thì nhờ Cửa hàng trưởng gán.</div></div><div><div class="mock"><div class="mbar"><span class="dots"><i></i><i></i><i></i></span><span class="ttl">MKEV-WO-261017-0003 · Thu tiền</span></div><div class="mbody">
+<div class="mrow"><span class="mchip c-p">Phát hành</span><span style="margin-left:auto"></span><span class="mbtn ">🔓 Xin mở lại</span><span class="mbtn ">Hủy lệnh</span></div>
+<div class="box" style="background:#F3F6FB"><div class="kv"><span>Tổng thanh toán cuối cùng</span><b>208.000</b></div><div class="kv"><span>Đã thu</span><b>100.000</b></div><div class="kv"><span>Còn phải thu</span><b class="neg">108.000</b></div></div>
+<div class="box" style="margin-top:7px"><h5>Thu tiền khách hàng</h5><div class="mrow"><span class="minp on">Tiền mặt ▾</span><span class="minp">108.000</span><span class="minp">Ghi chú</span><span class="mbtn ok">Ghi nhận thu</span></div></div>
+<div class="kv" style="margin-top:6px"><span><b>PTDV-2610-0042</b> · Tiền mặt · Chuyên · 14:20</span><b>100.000</b></div></div></div><div class="cap">Thu đủ → lệnh tự chuyển “Hoàn thành thanh toán”</div></div></div></div><div class="guide" id="g6" style="--c:var(--ktv)">
+<div class="ghead"><div class="gi">🛡️</div><div><h3>Lệnh bảo hành (hãng chịu phí)</h3><div class="where">📍 <b>Loại dịch vụ = Bảo hành</b></div></div></div>
+<div class="gbody one"><div><ol class="steps"><li>Tạo lệnh, chọn <b>Loại dịch vụ = Bảo hành</b>. Kiểm tra xe còn hạn bảo hành ở mục Thông tin bảo hành.</li><li>Các dòng công việc / phụ tùng mặc định <b>Bảo hành hãng</b>. Phần nào khách tự chịu (hỏng ngoài bảo hành) đổi sang <b>Khách hàng</b>.</li><li>Phát hành bình thường. Phần hãng chịu sẽ được <b>Kế toán lập hồ sơ claim</b> gửi hãng — KTV không cần làm thêm.</li></ol><div class="tip">💡 Ghi rõ lỗi, ODO và nguyên nhân trong ô Yêu cầu của khách để Kế toán có chứng từ claim.</div></div></div></div><div class="guide" id="g7" style="--c:var(--ktv)">
+<div class="ghead"><div class="gi">🔓</div><div><h3>Sửa lệnh sau khi phát hành / hoàn thành: Xin mở lại</h3><div class="where">📍 <b>Chi tiết lệnh › 🔓 Xin mở lại  |  Dịch vụ › Phê duyệt mở lại LSC</b></div></div></div>
+<div class="gbody"><div><ol class="steps"><li>Bấm <span class="kbd">🔓 Xin mở lại</span>, ghi <b>lý do</b> (VD: quên ghi phụ tùng). Mỗi lệnh chỉ có 1 yêu cầu chờ duyệt.</li><li><b>Cửa hàng trưởng / BGĐ</b> duyệt (không tự duyệt yêu cầu của mình). Từ chối sẽ kèm lý do.</li><li>Được duyệt: lệnh về <b>Phát hành ở chế độ mở lại</b> — sửa công việc / vật tư, Lưu. Phụ tùng tăng/giảm <b>tự điều chỉnh kho</b>.</li><li>Không giảm tổng khách trả xuống thấp hơn số đã thu (phải hoàn tiền trước). Sửa xong, thu đủ hoặc bấm <b>Hoàn thành thanh toán</b>.</li></ol></div><div><div class="mock"><div class="mbar"><span class="dots"><i></i><i></i><i></i></span><span class="ttl">Xin mở lại lệnh</span></div><div class="mbody">
+<div class="mrow"><span class="mchip c-g">Hoàn thành thanh toán</span><span style="margin-left:auto"></span><span class="mbtn p">🔓 Xin mở lại</span></div>
+<div style="background:#EAF2FF;border-radius:10px;padding:8px 10px;margin-bottom:8px">⏳ Yêu cầu mở lại từ <b>Trương Văn Chuyên</b>: “Quên ghi phụ tùng má phanh” — đang chờ duyệt.</div>
+<div style="background:#FDF1DF;border-radius:10px;padding:8px 10px;color:#A25F00">🔓 Lệnh đang ở chế độ <b>mở lại</b>: sửa công việc/vật tư rồi Lưu; phụ tùng tự điều chỉnh kho. Xong bấm “Hoàn thành thanh toán”.</div></div></div><div class="cap">Cửa hàng trưởng / BGĐ duyệt ở Dịch vụ → Phê duyệt mở lại LSC</div></div></div></div><div class="guide" id="g8" style="--c:var(--ktv)">
+<div class="ghead"><div class="gi">🧰</div><div><h3>Tra cứu: Danh mục công việc, Kho phụ tùng, Hồ sơ xe</h3><div class="where">📍 <b>DỊCH VỤ / KHO</b></div></div></div>
+<div class="gbody one"><div><ol class="steps"><li><b>Danh mục công việc:</b> xem mã, loại CV, giá. KTV có quyền thêm / sửa và <b>Import Excel</b> (chỉ làm khi được Quản lý giao, vì ảnh hưởng báo giá mọi lệnh).</li><li><b>Kho phụ tùng:</b> xem tồn từng điểm, nhập kho, kiểm kê. Dùng <b>Import Excel</b> để nhập danh mục + tồn đầu kỳ (không import lại cùng file — sẽ cộng tồn lần nữa).</li><li><b>Hồ sơ xe khách hàng:</b> tìm theo biển số / số khung / tên / SĐT, xem lịch sử chủ xe, sửa thông tin xe.</li></ol></div></div></div><div class="guide" id="g9" style="--c:var(--ktv)">
+<div class="ghead"><div class="gi">💸</div><div><h3>Tạo phiếu chi (mua vật tư nhỏ, chi phí tại điểm)</h3><div class="where">📍 <b>TÀI CHÍNH › Phiếu chi</b></div></div></div>
+<div class="gbody"><div><ol class="steps"><li>Bấm <span class="kbd">+ Tạo phiếu chi</span>. Quỹ chỉ có <b>quỹ tiền mặt của khu vực bạn</b> (theo hồ sơ người dùng).</li><li>Nhập số tiền, danh mục, đối tượng nhận và <b>lý do chi (bắt buộc)</b>.</li><li>Phiếu vào trạng thái <b>⏳ Chờ duyệt</b>; Quản lý / BGĐ duyệt thì mới tính là đã chi. Bạn chỉ thấy phiếu do mình tạo.</li></ol><div class="warn">⚠️ Không thấy quỹ nào? Hồ sơ của bạn chưa có <b>khu vực</b> — nhờ BGĐ gán ở Người dùng.</div></div><div><div class="mock"><div class="mbar"><span class="dots"><i></i><i></i><i></i></span><span class="ttl">TÀI CHÍNH › Phiếu chi</span></div><div class="mbody">
+<div class="mrow"><span class="mbtn p">+ Tạo phiếu chi</span></div>
+<div class="box"><div class="kv"><span>Quỹ chi tiền</span><b>Quỹ tiền mặt Hàm Yên</b></div><div class="kv"><span>Số tiền</span><b>150.000</b></div><div class="kv"><span>Danh mục</span><b>Chi khác</b></div><div class="kv"><span>Lý do chi *</span><b>Mua dầu nhớt, giẻ lau</b></div></div>
+<div class="mrow" style="margin-top:8px"><span class="mchip c-a">⏳ Chờ duyệt</span><small style="color:#5A6572">Quản lý / BGĐ duyệt thì mới tính là đã chi</small></div></div></div><div class="cap">KTV chỉ thấy quỹ tiền mặt của khu vực mình và phiếu do mình tạo</div></div></div></div></section>
+<section id="quyen"><h2 class="sec">🔐 Bạn được làm gì</h2><p class="sub">Mặc định cho vai trò Kỹ thuật viên; BGĐ có thể điều chỉnh ở Phân quyền.</p>
+<table class="ref"><tr><th>Việc</th><th>KTV</th></tr><tr><td><b>Xem / tạo / sửa Lệnh sửa chữa, báo giá, phát hành</b></td><td>✔</td></tr><tr><td><b>Thu tiền dịch vụ</b></td><td>✔ (khi được gán thu tại điểm)</td></tr><tr><td><b>Hủy lệnh</b></td><td>✘ — nhờ Quản lý / BGĐ</td></tr><tr><td><b>Duyệt mở lại lệnh</b></td><td>✘ — chỉ Cửa hàng trưởng / BGĐ (KTV được xin)</td></tr><tr><td><b>Danh mục công việc, Kho phụ tùng (nhập, kiểm kê, import)</b></td><td>✔</td></tr><tr><td><b>Hồ sơ xe khách hàng</b></td><td>✔</td></tr><tr><td><b>Phiếu chi</b></td><td>✔ tạo (chờ duyệt), chỉ quỹ tiền mặt khu vực mình</td></tr><tr><td><b>Claim hãng, báo cáo LSC</b></td><td>✘ — Kế toán / Quản lý</td></tr></table></section>
+<section id="faq" class="faq"><h2 class="sec">❓ Hỏi đáp nhanh</h2><p class="sub">Tình huống hay gặp.</p><details><summary>Gõ biển số không ra xe?</summary><p>Có thể xe mới / chưa có hồ sơ. Chọn “+ Thêm xe / khách hàng mới” ngay trong cửa sổ tạo lệnh. Kiểm tra lại cách gõ (có thể gõ không dấu cách, không dấu gạch).</p></details><details><summary>Phát hành báo “THIẾU TỒN”?</summary><p>Phụ tùng không đủ tại điểm dịch vụ. Báo thủ kho nhập thêm (Kho phụ tùng → Nhập), hoặc điều chuyển từ kho khác, rồi phát hành lại.</p></details><details><summary>Công việc / phụ tùng không sửa được?</summary><p>Lệnh đã Phát hành. Bấm “🔓 Xin mở lại”, chờ Cửa hàng trưởng duyệt.</p></details><details><summary>Không có nút Hủy lệnh?</summary><p>KTV không có quyền hủy. Nhờ Quản lý / BGĐ hủy; lệnh đã thu tiền phải hoàn tiền trước.</p></details><details><summary>Không thu tiền được?</summary><p>Cần được Cửa hàng trưởng gán là người thu tiền tại điểm. Lệnh phải ở trạng thái Phát hành.</p></details><details><summary>Khách có 2 xe (VinFast + TAILG)?</summary><p>Mỗi xe là một hồ sơ riêng gắn cùng một khách. Tạo xe mới nhưng chọn đúng khách đã có.</p></details></section>
+</main>
+<footer>Minh Kỳ EV · Tài liệu hướng dẫn Kỹ thuật viên · Hình minh họa là giao diện mô phỏng với dữ liệu ví dụ.</footer>
+</body></html>
