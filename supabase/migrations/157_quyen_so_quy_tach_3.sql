@@ -1,0 +1,4 @@
+-- 157: Quyen So quy tach 3 muc tren trang Phan quyen: thu_chi_xem (xem/vao menu), thu_chi_ghi (tao phieu), thu_chi_chot (duyet chi/huy/chot quy/tao quy).
+-- Truoc do trang Phan quyen chi co thu_chi_chot trong khi cac trang kiem tra thu_chi_xem -> SALES duoc tich "xem/tao" van bi bao khong co quyen.
+-- Ap dung 2026-10-17: SALES thu_chi_xem=true, thu_chi_ghi=true. SALES thu_chi_chot=false se dat SAU khi trien khai (menu doi sang thu_chi_xem).
+-- Da bo muc "Phan quyen theo vai tro" trong Cai dat (trung voi trang Phan quyen, danh sach cu thieu quyen).

@@ -28,7 +28,9 @@ const PERM_GROUPS = [
     { key: "sua_khuyen_mai_don", label: "Sửa tag chương trình khuyến mại", desc: "Thêm/xóa tag khuyến mại trên đơn đã tạo, kể cả đơn đã xuất HĐ" },
   ]},
   { group: "Sổ quỹ", icon: "💰", items: [
-    { key: "thu_chi_chot", label: "Xem/tạo phiếu thu chi & duyệt", desc: "Truy cập Sổ quỹ, duyệt phiếu chi" },
+    { key: "thu_chi_xem", label: "Xem Sổ quỹ / Phiếu thu / Phiếu chi", desc: "Vào được menu Tài chính (Phiếu thu, Phiếu chi, Sổ quỹ) và xem danh sách quỹ" },
+    { key: "thu_chi_ghi", label: "Tạo phiếu thu / phiếu chi", desc: "Lập phiếu thu, phiếu chi (phiếu chi bắt buộc lý do)" },
+    { key: "thu_chi_chot", label: "Duyệt phiếu chi, hủy phiếu, chốt quỹ", desc: "Quyền quản lý: duyệt/từ chối phiếu chi, hủy phiếu thủ công, tạo quỹ, chốt quỹ" },
     { key: "dvn_ghi", label: "Dịch vụ đăng ký & phụ kiện ngoài", desc: "Cửa hàng trưởng ghi khoản, thu/chi trên quỹ dịch vụ ngoài của mình" },
     { key: "claim_hang", label: "Claim hãng (tiền khách trả thẳng cho hãng)", desc: "Lập hồ sơ claim, ghi kết quả hãng duyệt, đối trừ công nợ hãng" },
     { key: "dvn_xac_nhan_nop", label: "Xác nhận nộp dịch vụ ngoài về công ty", desc: "Kế toán xác nhận khoản nộp cuối tháng" },
