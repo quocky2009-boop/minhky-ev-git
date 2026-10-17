@@ -1,0 +1,9 @@
+-- 153: HO SO XE KHACH HANG (Giai doan 1 module Lenh sua chua) — ghi chu; da ap dung qua MCP 2026-10-17.
+--  customer_vehicles(id, plate, plate_norm, frame_number, frame_norm, engine_number, brand, vehicle_id, model_name, color, year,
+--    customer_id NOT NULL, source MINH_KY|NGOAI, sale_code, warranty_start/end, note, status, ...). Unique (partial, status='Hoat dong') theo plate_norm / frame_norm.
+--  customer_vehicle_owners(vehicle_id, customer_id, from_at, to_at, reason, by_name) — lich su chu xe.
+--  RLS: select cho authenticated; ghi qua RPC SECURITY DEFINER.
+--  Backfill: 577 xe tu sales_orders (don chua huy, co khach + so khung), chu = khach cua don moi nhat.
+--  RPC: fn_khach_tim(q), fn_xe_tim(q, limit), fn_xe_lich_su_chu(id), fn_xe_luu(p jsonb) (tao xe + khach moi neu can / sua),
+--       fn_xe_doi_chu(id, customer_id, ly_do) (CEO/ADMIN/MANAGER).
+--  Trigger _trg_xe_tu_don_ban (sales_orders insert/update customer_id,frame_number,status): tu tao xe / doi chu khi ban xe tai Minh Ky (nuot loi, khong chan ban hang).
