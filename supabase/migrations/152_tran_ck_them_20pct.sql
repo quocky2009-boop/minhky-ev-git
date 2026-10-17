@@ -1,0 +1,4 @@
+-- 152: Tran chiet khau them cua BGD toi da 20% gia xe.
+-- Da ap dung o giao dien Wizard (ban-hang/wizard/page.js: CK_TOI_DA_PCT = 20).
+-- CHUA ap dung o DB (RPC ban hang kiem tra price_snapshot->'ck_them'->>'so_tien' <= 20% price_snapshot->>'gia_xe').
+-- Ly do: luc thuc hien khong co quyen ghi vao Supabase (MCP tu choi). Can ap dung them de chan ca cac duong goi truc tiep.

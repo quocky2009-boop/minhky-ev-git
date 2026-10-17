@@ -150,6 +150,10 @@ function TaoDonWizardInner() {
   const bangGiaCu = bangGiaKey !== keyHienTai;
   // Bang gia hieu luc = Bang gia tinh tu KM + chiet khau them cua BGD (nhap tay, khong can tinh lai)
   const ckSo = Math.max(Number(ckThem.so_tien) || 0, 0);
+  // Tran chiet khau them: toi da 20% gia xe (gia niem yet)
+  const CK_TOI_DA_PCT = 20;
+  const ckToiDa = bangGia ? Math.floor(((Number(bangGia.gia_xe) || 0) * CK_TOI_DA_PCT) / 100) : 0;
+  const ckVuot = !!bangGia && ckSo > ckToiDa;
   const bgEff = bangGia ? (ckSo > 0 ? {
     ...bangGia,
     ck_them: { so_tien: ckSo, ly_do: ckThem.ly_do.trim(), nguoi_duyet_id: ckThem.duyet_id, nguoi_duyet_name: ckThem.duyet_name, tru_hoa_don: !!ckThem.tru_hd },
@@ -311,7 +315,7 @@ function TaoDonWizardInner() {
 
   const locName = (c) => locations.find((l) => l.code === c)?.name || c || "—";
   const canNext1 = kh.customer_name && kh.customer_phone;
-  const canNext2 = picked && Number(giaXe) > 0 && !bangGiaCu && bangGia;
+  const canNext2 = picked && Number(giaXe) > 0 && !bangGiaCu && bangGia && !ckVuot;
   const thieuHD = !hd.tinh_tp ? "Tỉnh / Thành phố" : !hd.phuong_xa ? "Phường / Xã" : !hd.dia_chi.trim() ? "Địa chỉ chi tiết" : "";
 
   const canhBaoMotPTTT = () => {
@@ -328,6 +332,7 @@ function TaoDonWizardInner() {
       if (!ckThem.ly_do.trim()) return notify("Chiết khấu thêm: bắt buộc nhập lý do.", "err");
       if (!ckThem.duyet_id) return notify("Chiết khấu thêm: bắt buộc chọn người duyệt (Ban giám đốc).", "err");
       if (ckSo > (Number(bangGia.gia_can_thanh_toan) || 0)) return notify("Chiết khấu thêm không được lớn hơn giá cần thanh toán.", "err");
+      if (ckVuot) return notify(`Chiết khấu thêm tối đa ${CK_TOI_DA_PCT}% giá xe (${fmtVND(ckToiDa)}). Vui lòng nhập thấp hơn.`, "err");
     }
     if (!diemBan) return notify("Chọn điểm bán.", "err");
     if (thieuHD) return notify(`Thông tin xuất hóa đơn: bắt buộc nhập "${thieuHD}".`, "err");
@@ -633,7 +638,7 @@ function TaoDonWizardInner() {
             {picked && (
               <div className="card">
                 <div className="font-extrabold mb-1">💸 Chiết khấu thêm của Ban giám đốc</div>
-                <p className="text-[11px] text-[#8A93A0] mb-2">Dành cho trường hợp Ban giám đốc đồng ý chiết khấu tiền mặt thêm cho khách sau khi đã áp các chương trình khuyến mại. Bắt buộc ghi lý do và chọn người duyệt.</p>
+                <p className="text-[11px] text-[#8A93A0] mb-2">Dành cho trường hợp Ban giám đốc đồng ý chiết khấu tiền mặt thêm cho khách sau khi đã áp các chương trình khuyến mại. Bắt buộc ghi lý do và chọn người duyệt. <b>Tối đa {CK_TOI_DA_PCT}% giá xe{bangGia ? ` (${fmtVND(ckToiDa)})` : ""}.</b></p>
                 <div className="grid gap-2.5 md:grid-cols-2">
                   <Field label="Số tiền chiết khấu thêm (đ)"><MoneyInput value={ckThem.so_tien} onChange={(v) => setCkThem((p) => ({ ...p, so_tien: v || "" }))} /></Field>
                   <Field label={`Người duyệt (Ban giám đốc)${ckSo > 0 ? " *" : ""}`}>
@@ -648,6 +653,7 @@ function TaoDonWizardInner() {
                   <input type="checkbox" checked={!!ckThem.tru_hd} onChange={(e) => setCkThem((p) => ({ ...p, tru_hd: e.target.checked }))} />
                   Trừ chiết khấu này vào hóa đơn xuất cho khách
                 </label>
+                {ckVuot && <div className="text-[12px] mt-1.5 rounded-lg bg-[#FDE8EA] text-[#B01E2C] font-semibold px-2.5 py-1.5">⚠ Vượt mức tối đa {CK_TOI_DA_PCT}% giá xe ({fmtVND(ckToiDa)}) — không thể lưu đơn.</div>}
                 {ckSo > 0 && <div className="text-[12px] mt-1.5 rounded-lg bg-[#EAF2FF] px-2.5 py-1.5">Giá khách phải trả sau chiết khấu thêm: <b className="text-brand">{fmtVND(bgEff?.gia_can_thanh_toan || 0)}</b>{bgEff ? <> · Tổng xuất hóa đơn: <b>{fmtVND(bgEff.tong_xuat_hd)}</b></> : null}</div>}
               </div>
             )}
@@ -866,6 +872,7 @@ function TaoDonWizardInner() {
               onClick={() => {
                 if (step === 1 && !canNext1) return notify("Chọn hoặc nhập khách hàng.", "err");
                 if (step === 3 && thieuHD) return notify(`Thông tin xuất hóa đơn: bắt buộc nhập "${thieuHD}".`, "err");
+                if (step === 2 && ckVuot) return notify(`Chiết khấu thêm tối đa ${CK_TOI_DA_PCT}% giá xe (${fmtVND(ckToiDa)}).`, "err");
                 if (step === 2 && !canNext2) return notify("Chọn xe và bấm \"Làm mới Bảng giá\" trước khi tiếp tục.", "err");
                 setStep(step + 1);
               }}>Tiếp theo →</button>
