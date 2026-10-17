@@ -26,6 +26,8 @@ export default function ClaimHang() {
   const [debts, setDebts] = useState([]);
   const [soDu, setSoDu] = useState(0);
   const [pick, setPick] = useState({});
+  const [choBh, setChoBh] = useState([]);
+  const [pickBh, setPickBh] = useState({});
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(null);
   const [kq, setKq] = useState({});          // dong id -> {ket_qua, ly_do}
@@ -40,7 +42,7 @@ export default function ClaimHang() {
 
   const load = async () => {
     if (!profile) return;
-    const [a, b, c, d, e, f, g, pm] = await Promise.all([
+    const [a, b, c, d, e, f, g, pm, bh] = await Promise.all([
       supabase.rpc("fn_claim_cho"),
       supabase.from("hang_claim").select("*").order("id", { ascending: false }).limit(200),
       supabase.from("hang_claim_dong").select("*").order("id"),
@@ -49,7 +51,9 @@ export default function ClaimHang() {
       supabase.from("supplier_debts").select("id,code,import_doc,supplier,tong_tien,da_tra,con_no,status").gt("con_no", 0),
       supabase.from("v_quy_so_du").select("so_du,name").eq("name", "Cty VinFast Việt Nam"),
       supabase.from("role_perms").select("perm,allowed").eq("role", profile.role),
+      supabase.rpc("fn_claim_cho_bh"),
     ]);
+    setChoBh(bh.data || []);
     setCho(a.data || []); setClaims(b.data || []); setDongs(c.data || []); setCongNo(d.data || []); setDoiTru(e.data || []);
     setDebts(f.data || []); setSoDu(Number(g.data?.[0]?.so_du || 0));
     const m = {}; (pm.data || []).forEach((x) => { m[x.perm] = x.allowed; }); setPerms(m);
@@ -88,6 +92,15 @@ export default function ClaimHang() {
     if (ok) { setPick({}); setTab("ho_so"); }
   };
 
+  const selBh = choBh.filter((x) => pickBh[x.ro_id]);
+  const tongBh = selBh.reduce((a, b) => a + b.so_tien, 0);
+  const lapBh = async () => {
+    if (selBh.length === 0) return notify("Chọn các lệnh bảo hành cần claim.", "err");
+    const ky = prompt(`Lập hồ sơ claim BẢO HÀNH ${selBh.length} lệnh — ${fmtVND(tongBh)}.\nKỳ claim (VD: T10/2026):`, `T${new Date().getMonth() + 1}/${new Date().getFullYear()}`);
+    if (ky === null) return;
+    const ok = await act("fn_claim_lap_bh", { p: { ro_ids: selBh.map((x) => x.ro_id), ky_claim: ky } }, "Đã lập hồ sơ claim bảo hành (nháp).");
+    if (ok) { setPickBh({}); setTab("ho_so"); }
+  };
   const tabBtn = (k, label) => (
     <button key={k} className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${tab === k ? "bg-brand text-white" : "bg-[#EEF1F4] text-[#5A6572]"}`} onClick={() => setTab(k)}>{label}</button>
   );
@@ -99,6 +112,7 @@ export default function ClaimHang() {
         <div className="font-extrabold text-lg mr-auto">Claim hãng — tiền khách trả thẳng cho VinFast</div>
         <div className="flex gap-1.5 flex-wrap">
           {tabBtn("cho", `Chờ claim (${cho.length})`)}
+          {tabBtn("bh", `Bảo hành chờ claim (${choBh.length})`)}
           {tabBtn("ho_so", `Hồ sơ claim (${claims.length})`)}
           {tabBtn("no", `Hãng còn nợ & đối trừ${conNo > 0 ? ` (${fmtVND(conNo)})` : ""}`)}
         </div>
@@ -160,6 +174,35 @@ export default function ClaimHang() {
         </div>
       )}
 
+      {tab === "bh" && (
+        <div className="card">
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
+            <div className="font-extrabold mr-auto">Lệnh sửa chữa có phần hãng chịu (bảo hành), chưa claim ({choBh.length})</div>
+            <span className="text-[13px]">Đã chọn: <b>{selBh.length}</b> · {fmtVND(tongBh)}</span>
+            <button className="btn-ghost !text-xs" onClick={() => setPickBh(Object.fromEntries(choBh.map((x) => [x.ro_id, true])))}>Chọn tất cả</button>
+            <button className="btn-ghost !text-xs" onClick={() => setPickBh({})}>Bỏ chọn</button>
+            {can && <button className="btn-primary !text-xs" disabled={busy || selBh.length === 0} onClick={lapBh}>Lập hồ sơ claim bảo hành</button>}
+          </div>
+          <div className="tbl-scroll"><table className="w-full border-collapse">
+            <thead><tr><th className="th w-8"></th><th className="th">Ngày</th><th className="th">Lệnh sửa chữa</th><th className="th">Khách</th><th className="th">Biển số / Số khung</th><th className="th text-right">Hãng chịu</th><th className="th text-right">Đã chờ</th></tr></thead>
+            <tbody>
+              {choBh.map((x) => (
+                <tr key={x.ro_id} className={`hover:bg-[#F8FAFC] ${pickBh[x.ro_id] ? "bg-[#EAF2FF]" : ""}`}>
+                  <td className="td"><input type="checkbox" checked={!!pickBh[x.ro_id]} onChange={(e) => setPickBh((p) => ({ ...p, [x.ro_id]: e.target.checked }))} /></td>
+                  <td className="td text-xs whitespace-nowrap">{fmtDate(x.ngay)}</td>
+                  <td className="td font-semibold text-[13px]"><a className="text-brand hover:underline" href={`/dich-vu/lenh-sua-chua/${x.ro_id}`}>{x.ro_code}</a></td>
+                  <td className="td text-[13px]">{x.customer_name}</td>
+                  <td className="td text-[12px]"><b>{x.plate}</b> <span className="font-mono text-[#8A93A0]">{x.frame_number}</span></td>
+                  <td className="td text-right font-bold">{fmtVND(x.so_tien)}</td>
+                  <td className="td text-right"><Badge tone={x.so_ngay > 30 ? "red" : x.so_ngay > 15 ? "amber" : "gray"}>{x.so_ngay} ngày</Badge></td>
+                </tr>
+              ))}
+              {choBh.length === 0 && <tr><td className="td" colSpan={7}>Không có lệnh bảo hành nào chờ claim (lệnh phải ở trạng thái Phát hành / Hoàn thành và có dòng “Bảo hành hãng”).</td></tr>}
+            </tbody>
+          </table></div>
+        </div>
+      )}
+
       {tab === "ho_so" && (
         <div className="flex flex-col gap-2">
           {claims.map((c) => {
@@ -169,7 +212,7 @@ export default function ClaimHang() {
               <div key={c.id} className="card !p-0 overflow-hidden">
                 <button className="w-full text-left p-3 flex items-center gap-2 flex-wrap hover:bg-[#F8FAFC]" onClick={() => setOpen(open === c.id ? null : c.id)}>
                   <div className="mr-auto">
-                    <div className="font-semibold text-sm">{c.code} {c.ky_claim ? `· ${c.ky_claim}` : ""} {c.so_ho_so && c.so_ho_so !== c.code ? `· hồ sơ hãng ${c.so_ho_so}` : ""}</div>
+                    <div className="font-semibold text-sm">{c.code} {c.loai === "BAO_HANH" && <Badge tone="green">Bảo hành</Badge>} {c.ky_claim ? `· ${c.ky_claim}` : ""} {c.so_ho_so && c.so_ho_so !== c.code ? `· hồ sơ hãng ${c.so_ho_so}` : ""}</div>
                     <div className="text-[11px] text-[#8A93A0]">{c.so_khoan} khoản · {c.tu_ngay ? fmtDate(c.tu_ngay) : ""} – {c.den_ngay ? fmtDate(c.den_ngay) : ""} · {c.created_by_name}{c.ngay_nop ? ` · nộp ${fmtDate(c.ngay_nop)}` : ""}{c.ngay_duyet ? ` · duyệt ${fmtDate(c.ngay_duyet)}` : ""}</div>
                   </div>
                   <div className="text-[12px] text-right"><div>Claim <b>{fmtVND(c.tong_tien)}</b></div>{["HANG_DUYET", "DA_DOI_TRU"].includes(c.status) && <div>Duyệt <b className="text-[#0E7A4A]">{fmtVND(c.tien_duyet)}</b></div>}</div>

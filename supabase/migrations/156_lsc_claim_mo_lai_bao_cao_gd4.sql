@@ -1,0 +1,6 @@
+-- 156: LSC GD4 (ghi chu; da ap dung qua MCP 2026-10-17).
+--  Claim hang cho dong BAO_HANH: hang_claim.loai (THU_HO|BAO_HANH), hang_claim_dong.ro_id/ro_code, payment_id nullable;
+--   fn_claim_cho_bh(), fn_claim_lap_bh(p{ro_ids,ky_claim}); fn_claim_doi_tru khong ghi Chi quy "thu ho hang" voi claim BAO_HANH.
+--  Mo lai lenh: repair_orders.dang_mo_lai, repair_order_reopen (CHO|DUYET|TU_CHOI), fn_lsc_xin_mo_lai, fn_lsc_duyet_mo_lai (CEO/MANAGER, khong tu duyet tru CEO);
+--   fn_lsc_luu_dong cho sua khi BAO_GIA hoac PHAT_HANH+dang_mo_lai: dieu chinh kho theo chenh lech (XUAT_DV / HOAN_TRA), chan khi tong khach tra < da thu.
+--  Bao cao LSC o giao dien (khong them bang). Phieu DV cu chua bo.

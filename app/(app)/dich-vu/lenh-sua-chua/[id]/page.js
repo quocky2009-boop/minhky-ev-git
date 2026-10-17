@@ -26,6 +26,7 @@ export default function ChiTietLSC() {
   const [pf, setPf] = useState({ method: "Tiền mặt", account_id: "", amount: "", note: "" });
   const [banks, setBanks] = useState([]);
   const [dirty, setDirty] = useState(false);
+  const [reopens, setReopens] = useState([]);
 
   const load = async () => {
     const { data, error } = await supabase.from("v_lsc").select("*").eq("id", id).maybeSingle();
@@ -35,6 +36,7 @@ export default function ChiTietLSC() {
       nguoi_mang_xe: data.nguoi_mang_xe || "", sdt_lai_xe: data.sdt_lai_xe || "", odo_km: data.odo_km ?? "", du_kien_bat_dau: data.du_kien_bat_dau || "", du_kien_giao_xe: data.du_kien_giao_xe || "", cam_ket_hoan_thanh: data.cam_ket_hoan_thanh || "" });
   };
   const loadLines = async () => {
+    supabase.from("repair_order_reopen").select("*").eq("ro_id", id).order("req_at", { ascending: false }).then(({ data }) => setReopens(data || []));
     const [{ data: ls }, { data: ps }] = await Promise.all([
       supabase.from("repair_order_lines").select("*").eq("ro_id", id).order("sort"),
       supabase.from("repair_order_payments").select("*").eq("ro_id", id).order("created_at"),
@@ -58,6 +60,10 @@ export default function ChiTietLSC() {
   if (!r || !f) return <div className="card">Không tìm thấy lệnh sửa chữa.</div>;
   const st = LSC_STATUS[r.status];
   const khoa = ["HUY", "HOAN_THANH_TT"].includes(r.status);
+  const canEditLines = r.status === "BAO_GIA" || (r.status === "PHAT_HANH" && r.dang_mo_lai);
+  const cho = reopens.find((x) => x.status === "CHO");
+  const laDuyet = ["CEO", "MANAGER"].includes(profile.role);
+  const laTiepNhan = ["CEO", "MANAGER", "ADMIN", "TECHNICIAN"].includes(profile.role);
   const today = new Date().toLocaleDateString("sv-SE");
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
   const nhomGoiY = (loai) => ({ "Bảo dưỡng định kỳ": NHOM_SC[0], "Sửa chữa thông thường": NHOM_SC[1], "Bảo hành": NHOM_SC[2], "Lắp đặt phụ tùng / phụ kiện": NHOM_SC[3] }[loai]);
@@ -66,7 +72,7 @@ export default function ChiTietLSC() {
     setBusy(true);
     const { error } = await supabase.rpc("fn_lsc_luu", { p: { id: r.id, ...f, odo_km: f.odo_km === "" ? null : Number(f.odo_km) } });
     if (error) { setBusy(false); return notify(errMsg(error), "err"); }
-    if (r.status === "BAO_GIA" && dirty) {
+    if (canEditLines && dirty) {
       const { error: e2 } = await supabase.rpc("fn_lsc_luu_dong", { p: { id: r.id, lines: lines.map((l) => ({ line_type: l.line_type, service_id: l.service_id, part_id: l.part_id, ma: l.ma, name: l.name, loai_cv: l.loai_cv, don_vi: l.don_vi, qty: l.qty, unit_price: l.unit_price, giam_pct: l.giam_pct, giam_tien: l.giam_tien, phan_loai_tt: l.phan_loai_tt, serial: l.serial, ghi_chu: l.ghi_chu })) } });
       if (e2) { setBusy(false); return notify(errMsg(e2), "err"); }
     }
@@ -84,6 +90,21 @@ export default function ChiTietLSC() {
   const tong = (pl) => lines.filter((l) => !pl || l.phan_loai_tt === pl).reduce((a, l) => a + tinhTT(l), 0);
   const conPhaiThu = Math.max(Number(r.tong_khach_tra || 0) - Number(r.da_thu || 0), 0);
   const phayCv = lines.filter((l) => l.line_type === "CONG"); const phayPt = lines.filter((l) => l.line_type === "PHU_TUNG");
+
+  const xinMoLai = async () => {
+    const ly = prompt("Lý do xin mở lại lệnh (VD: quên ghi phụ tùng, khách đổi yêu cầu):") || "";
+    if (!ly.trim()) return;
+    const { error } = await supabase.rpc("fn_lsc_xin_mo_lai", { p_id: r.id, p_ly_do: ly });
+    if (error) return notify(errMsg(error), "err");
+    notify("Đã gửi yêu cầu mở lại — chờ duyệt."); loadLines();
+  };
+  const duyetMoLai = async (action) => {
+    let note = "";
+    if (action === "tu_choi") { note = prompt("Lý do từ chối:") || ""; if (!note.trim()) return; }
+    const { error } = await supabase.rpc("fn_lsc_duyet_mo_lai", { p_req: cho.id, p_action: action, p_note: note });
+    if (error) return notify(errMsg(error), "err");
+    notify(action === "duyet" ? "Đã duyệt mở lại lệnh." : "Đã từ chối."); await load(); await loadLines();
+  };
 
   const thuTien = async () => {
     const amount = Number(pf.amount) || conPhaiThu;
@@ -118,10 +139,14 @@ export default function ChiTietLSC() {
         <div className="ml-auto flex gap-2 flex-wrap">
           {r.status === "BAO_GIA" && <button className="btn-ok !text-xs" onClick={() => chuyen("phat_hanh")}>Phát hành LSC</button>}
           {r.status === "PHAT_HANH" && conPhaiThu === 0 && <button className="btn-ok !text-xs" onClick={() => chuyen("hoan_thanh")}>Hoàn thành thanh toán</button>}
+          {["PHAT_HANH", "HOAN_THANH_TT"].includes(r.status) && !r.dang_mo_lai && !cho && laTiepNhan && <button className="btn-ghost !text-xs" onClick={xinMoLai}>🔓 Xin mở lại</button>}
           {!khoa && <button className="btn-ghost !text-xs hover:!text-danger" onClick={() => chuyen("huy")}>Hủy lệnh</button>}
           {!khoa && <button className="btn-primary !text-xs" disabled={busy} onClick={luu}>{busy ? "Đang lưu…" : dirty ? "Lưu *" : "Lưu"}</button>}
         </div>
       </div>
+      {r.dang_mo_lai && <div className="rounded-xl bg-[#FDF1DF] text-[#A25F00] text-[13px] px-3 py-2">🔓 Lệnh đang ở chế độ <b>mở lại</b>: sửa công việc/vật tư rồi Lưu; phụ tùng thay đổi sẽ tự điều chỉnh kho. Xong bấm “Hoàn thành thanh toán” (khi khách đã trả đủ).</div>}
+      {cho && <div className="rounded-xl bg-[#EAF2FF] text-[13px] px-3 py-2 flex items-center gap-2 flex-wrap">⏳ Yêu cầu mở lại từ <b>{cho.req_by_name}</b>: “{cho.ly_do}” — đang chờ duyệt.
+        {laDuyet && <><button className="btn-ok !text-xs !py-1" onClick={() => duyetMoLai("duyet")}>Duyệt</button><button className="btn-ghost !text-xs !py-1 hover:!text-danger" onClick={() => duyetMoLai("tu_choi")}>Từ chối</button></>}</div>}
       {r.status === "HUY" && <div className="rounded-xl bg-[#FDE8EA] text-[#B01E2C] text-[13px] px-3 py-2">Lệnh đã hủy — lý do: <b>{r.huy_ly_do}</b></div>}
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -164,7 +189,7 @@ export default function ChiTietLSC() {
         <div className="flex gap-1.5 mb-3">
           {[["cv", `Công việc (${phayCv.length})`], ["vt", `Vật tư / Phụ tùng (${phayPt.length})`]].map(([k, v]) => <button key={k} className={`btn !px-3 !py-2 !text-xs ${tab === k ? "bg-brand text-white" : "bg-[#EEF1F4]"}`} onClick={() => { setTab(k); setPick(""); }}>{v}</button>)}
         </div>
-        {r.status === "BAO_GIA" && (
+        {canEditLines && (
           <div className="relative mb-3">
             <input className="inp" placeholder={tab === "cv" ? "+ Thêm công việc: gõ mã hoặc tên công việc…" : "+ Thêm phụ tùng: gõ mã hoặc tên phụ tùng…"} value={pick} onChange={(e) => setPick(e.target.value)} />
             {pick.trim().length >= 1 && (
@@ -178,17 +203,17 @@ export default function ChiTietLSC() {
               </div>)}
           </div>)}
         <div className="tbl-scroll"><table className="w-full border-collapse text-[12.5px]">
-          <thead><tr><th className="th">Mã</th><th className="th">{tab === "cv" ? "Công việc" : "Phụ tùng"}</th>{tab === "cv" && <th className="th">Loại CV</th>}<th className="th">Phân loại TT</th><th className="th text-right">SL</th><th className="th text-right">Đơn giá</th><th className="th text-right">Giảm %</th><th className="th text-right">Giảm tiền</th><th className="th text-right">Thành tiền</th>{r.status === "BAO_GIA" && <th className="th"></th>}</tr></thead>
+          <thead><tr><th className="th">Mã</th><th className="th">{tab === "cv" ? "Công việc" : "Phụ tùng"}</th>{tab === "cv" && <th className="th">Loại CV</th>}<th className="th">Phân loại TT</th><th className="th text-right">SL</th><th className="th text-right">Đơn giá</th><th className="th text-right">Giảm %</th><th className="th text-right">Giảm tiền</th><th className="th text-right">Thành tiền</th>{canEditLines && <th className="th"></th>}</tr></thead>
           <tbody>{(tab === "cv" ? phayCv : phayPt).map((l) => (
             <tr key={l.key}>
               <td className="td font-mono text-[11px]">{l.ma}</td><td className="td">{l.name}{l.line_type === "PHU_TUNG" && <div className="text-[10.5px] text-[#8A93A0]">{l.da_xuat_kho ? "✓ đã xuất kho" : `tồn tại điểm: ${tonKho[l.part_id] || 0}`}</div>}</td>
               {tab === "cv" && <td className="td text-[11.5px]">{l.loai_cv}</td>}
-              <td className="td">{r.status === "BAO_GIA" ? <select className="inp !py-1 !text-xs !w-auto" value={l.phan_loai_tt} onChange={(e) => upLine(l.key, "phan_loai_tt", e.target.value)}>{Object.entries(PL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select> : <Badge tone={l.phan_loai_tt === "KHACH_HANG" ? "blue" : l.phan_loai_tt === "BAO_HANH" ? "green" : "gray"}>{PL[l.phan_loai_tt]}</Badge>}</td>
-              {["qty", "unit_price", "giam_pct", "giam_tien"].map((k) => <td key={k} className="td text-right">{r.status === "BAO_GIA" ? <input type="number" min="0" className="inp !py-1 !text-xs !w-24 text-right" value={l[k]} onChange={(e) => upLine(l.key, k, e.target.value)} /> : (k === "unit_price" || k === "giam_tien" ? fmtVND(l[k]) : l[k])}</td>)}
+              <td className="td">{canEditLines ? <select className="inp !py-1 !text-xs !w-auto" value={l.phan_loai_tt} onChange={(e) => upLine(l.key, "phan_loai_tt", e.target.value)}>{Object.entries(PL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select> : <Badge tone={l.phan_loai_tt === "KHACH_HANG" ? "blue" : l.phan_loai_tt === "BAO_HANH" ? "green" : "gray"}>{PL[l.phan_loai_tt]}</Badge>}</td>
+              {["qty", "unit_price", "giam_pct", "giam_tien"].map((k) => <td key={k} className="td text-right">{canEditLines ? <input type="number" min="0" className="inp !py-1 !text-xs !w-24 text-right" value={l[k]} onChange={(e) => upLine(l.key, k, e.target.value)} /> : (k === "unit_price" || k === "giam_tien" ? fmtVND(l[k]) : l[k])}</td>)}
               <td className="td text-right font-bold">{fmtVND(tinhTT(l))}</td>
-              {r.status === "BAO_GIA" && <td className="td"><button className="text-danger font-bold" onClick={() => xoaDong(l.key)}>✕</button></td>}
+              {canEditLines && <td className="td"><button className="text-danger font-bold" onClick={() => xoaDong(l.key)}>✕</button></td>}
             </tr>))}
-            {(tab === "cv" ? phayCv : phayPt).length === 0 && <tr><td className="td text-[#8A93A0]" colSpan={10}>{r.status === "BAO_GIA" ? "Chưa có dòng nào — gõ vào ô phía trên để thêm từ danh mục." : "Không có dòng nào."}</td></tr>}
+            {(tab === "cv" ? phayCv : phayPt).length === 0 && <tr><td className="td text-[#8A93A0]" colSpan={10}>{canEditLines ? "Chưa có dòng nào — gõ vào ô phía trên để thêm từ danh mục." : "Không có dòng nào."}</td></tr>}
           </tbody>
         </table></div>
       </div>
