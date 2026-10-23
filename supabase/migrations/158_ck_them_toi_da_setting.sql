@@ -1,0 +1,4 @@
+-- Đã áp dụng qua MCP. Mức tối đa giảm giá xe (chiết khấu thêm) chỉnh được trong Cài đặt, chỉ CEO.
+-- app_settings.ck_them_toi_da_pct (mặc định 20)
+-- fn_set_ck_them_toi_da(p_pct numeric): chỉ CEO, 0..100
+-- trigger trg_chk_ck_them trên sales_orders: chặn ck_them vượt mức khi tạo mới hoặc khi ck_them thay đổi (đơn cũ không bị ảnh hưởng)

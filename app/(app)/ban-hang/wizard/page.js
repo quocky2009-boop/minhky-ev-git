@@ -151,7 +151,7 @@ function TaoDonWizardInner() {
   // Bang gia hieu luc = Bang gia tinh tu KM + chiet khau them cua BGD (nhap tay, khong can tinh lai)
   const ckSo = Math.max(Number(ckThem.so_tien) || 0, 0);
   // Tran chiet khau them: toi da 20% gia xe (gia niem yet)
-  const CK_TOI_DA_PCT = 20;
+  const CK_TOI_DA_PCT = (settings.ck_them_toi_da_pct ?? "") !== "" && isFinite(Number(settings.ck_them_toi_da_pct)) ? Number(settings.ck_them_toi_da_pct) : 20;
   const ckToiDa = bangGia ? Math.floor(((Number(bangGia.gia_xe) || 0) * CK_TOI_DA_PCT) / 100) : 0;
   const ckVuot = !!bangGia && ckSo > ckToiDa;
   const bgEff = bangGia ? (ckSo > 0 ? {

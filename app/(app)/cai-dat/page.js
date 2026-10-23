@@ -228,6 +228,41 @@ function QuyTaiKhoan({ supabase, notify, locations, tick }) {
   );
 }
 
+function CkToiDa({ supabase, notify, settings, isCeo, refresh }) {
+  const cur = (settings.ck_them_toi_da_pct ?? "") !== "" && isFinite(Number(settings.ck_them_toi_da_pct)) ? Number(settings.ck_them_toi_da_pct) : 20;
+  const [v, setV] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const luu = async () => {
+    const n = Number(String(v).replace(",", "."));
+    if (!isFinite(n) || n < 0 || n > 100) return notify("Nhập số từ 0 đến 100", "err");
+    setBusy(true);
+    const { error } = await supabase.rpc("fn_set_ck_them_toi_da", { p_pct: n });
+    setBusy(false);
+    if (error) return notify(error.message, "err");
+    notify("Đã cập nhật mức tối đa giảm giá xe");
+    setV(null);
+    refresh && refresh();
+  };
+  return (
+    <div className="card">
+      <div className="font-extrabold mb-1">Mức tối đa giảm giá xe (chiết khấu thêm)</div>
+      <p className="text-xs text-[#5A6572] mb-3">Chiết khấu thêm trên đơn bán không được vượt quá tỷ lệ này so với giá xe. Áp dụng cho cả màn hình bán hàng và kiểm tra ở máy chủ. Chỉ Ban giám đốc được thay đổi.</p>
+      {v === null ? (
+        <div className="flex items-center gap-3">
+          <div className="text-xl font-extrabold">{cur}% <span className="text-xs font-normal text-[#5A6572]">giá xe</span></div>
+          {isCeo ? <button className="btn-ghost !text-xs" onClick={() => setV(String(cur))}>✎ Sửa</button> : <span className="text-xs text-[#8A93A0] italic">Chỉ Ban giám đốc được sửa</span>}
+        </div>
+      ) : (
+        <div className="flex items-center gap-2">
+          <input className="input !w-24" inputMode="decimal" value={v} onChange={(e) => setV(e.target.value)} /> <span>%</span>
+          <button className="btn !text-xs" disabled={busy} onClick={luu}>{busy ? "Đang lưu…" : "Lưu"}</button>
+          <button className="btn-ghost !text-xs" onClick={() => setV(null)}>Hủy</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function CaiDat() {
   const { supabase, profile, loading, settings, customFields, brands, locations, refresh, taxRate, regions, diaBan } = useCatalog();
   const { toast, notify } = useToast();
@@ -508,6 +543,8 @@ export default function CaiDat() {
           </table></div>
         </div>
       )}
+
+      <CkToiDa supabase={supabase} notify={notify} settings={settings} isCeo={profile?.role === "CEO"} refresh={refresh} />
 
       <div className="card">
         <div className="font-extrabold mb-1">Phiếu xuất bán (thông tin in trên phiếu)</div>
