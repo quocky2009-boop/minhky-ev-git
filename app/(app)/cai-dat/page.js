@@ -114,7 +114,7 @@ function PhapNhan({ supabase, notify, brands, refresh, onChanged }) {
   );
 }
 
-const EMPTY_ACC = { id: null, name: "", type: "Ngân hàng", location_code: "", company_id: "", bank_info: "", opening_balance: 0, status: "Hoạt động", nhom: "KINH_DOANH", manager_id: "" };
+const EMPTY_ACC = { id: null, name: "", type: "Ngân hàng", location_code: "", company_id: "", bank_info: "", opening_balance: 0, status: "Hoạt động", nhom: "KINH_DOANH", manager_id: "", dung_cho: "CA_HAI", ca_nhan: false };
 function QuyTaiKhoan({ supabase, notify, locations, tick }) {
   const [accs, setAccs] = useState([]);
   const [cos, setCos] = useState([]);
@@ -133,9 +133,9 @@ function QuyTaiKhoan({ supabase, notify, locations, tick }) {
     const a = acc || f;
     if (!a.name.trim()) return notify("Nhập tên tài khoản/quỹ.", "err");
     const ngoai = a.nhom === "DV_NGOAI";
-    if (a.type === "Ngân hàng" && !ngoai && !a.company_id) return notify("Tài khoản ngân hàng bắt buộc chọn Pháp nhân sở hữu.", "err");
+    if (a.type === "Ngân hàng" && !ngoai && !a.ca_nhan && !a.company_id) return notify("Tài khoản ngân hàng bắt buộc chọn Pháp nhân sở hữu.", "err");
     if (ngoai && (!a.manager_id || !a.location_code)) return notify("Quỹ dịch vụ ngoài bắt buộc chọn Người quản lý (cửa hàng trưởng) và Điểm.", "err");
-    const { error } = await supabase.rpc("fn_them_quy", { p: { ...a, company_id: a.company_id || "", location_code: a.location_code || "", manager_id: a.manager_id || "", opening_balance: Number(a.opening_balance) || 0 } });
+    const { error } = await supabase.rpc("fn_them_quy", { p: { ...a, ca_nhan: !!a.ca_nhan, dung_cho: a.dung_cho || "CA_HAI", company_id: a.ca_nhan ? "" : (a.company_id || ""), location_code: a.location_code || "", manager_id: a.manager_id || "", opening_balance: Number(a.opening_balance) || 0 } });
     if (error) return notify(errMsg(error), "err");
     notify(acc ? (acc.status === "Hoạt động" ? "Đã mở lại tài khoản." : "Đã khóa tài khoản — không còn hiện khi chọn nơi nhận tiền.") : "Đã lưu tài khoản.");
     setF(null); load();
@@ -186,7 +186,24 @@ function QuyTaiKhoan({ supabase, notify, locations, tick }) {
                 </select>
               </Field>
             )}
-            {f.type === "Ngân hàng" && !ngoai ? (
+            {f.type === "Ngân hàng" && !ngoai && (
+              <Field label="Chủ tài khoản">
+                <select className="inp" value={f.ca_nhan ? "1" : "0"} onChange={(e) => setF((p) => ({ ...p, ca_nhan: e.target.value === "1", company_id: "", dung_cho: e.target.value === "1" ? "BAN_BUON" : p.dung_cho }))}>
+                  <option value="0">Pháp nhân (công ty)</option>
+                  <option value="1">Cá nhân (giữ hộ pháp nhân)</option>
+                </select>
+              </Field>
+            )}
+            {f.type === "Ngân hàng" && !ngoai && (
+              <Field label="Dùng cho đơn">
+                <select className="inp" value={f.dung_cho || "CA_HAI"} onChange={(e) => setF((p) => ({ ...p, dung_cho: e.target.value }))}>
+                  <option value="CA_HAI">Cả bán lẻ và bán buôn</option>
+                  <option value="BAN_LE">Chỉ bán lẻ</option>
+                  <option value="BAN_BUON">Chỉ bán buôn</option>
+                </select>
+              </Field>
+            )}
+            {f.type === "Ngân hàng" && !ngoai && !f.ca_nhan ? (
               <Field label="Pháp nhân sở hữu" required>
                 <select className="inp" value={f.company_id || ""} onChange={(e) => setF((p) => ({ ...p, company_id: e.target.value }))}>
                   <option value="">— Chọn pháp nhân —</option>
@@ -212,12 +229,15 @@ function QuyTaiKhoan({ supabase, notify, locations, tick }) {
           <div key={a.id} className={`flex items-center gap-2 p-2 rounded-lg border text-[13px] flex-wrap ${a.status === "Hoạt động" ? "border-[#E3E8EF]" : "border-[#EEE] bg-[#FAFAFA] opacity-70"}`}>
             <Badge tone={a.type === "Ngân hàng" ? "blue" : "amber"}>{a.type}</Badge>
             {a.nhom === "DV_NGOAI" && <Badge tone="purple">Quỹ dịch vụ ngoài</Badge>}
+            {a.ca_nhan && <Badge tone="purple">Cá nhân · giữ hộ</Badge>}
+            {a.type === "Ngân hàng" && a.dung_cho === "BAN_BUON" && <Badge tone="amber">Chỉ bán buôn</Badge>}
+            {a.type === "Ngân hàng" && a.dung_cho === "BAN_LE" && <Badge tone="amber">Chỉ bán lẻ</Badge>}
             <b className="mr-auto">{a.name}</b>
             <span className="text-xs text-[#5A6572]">{a.nhom === "DV_NGOAI"
               ? `${locations.find((l) => l.code === a.location_code)?.name || ""} · QL: ${mgrName(a.manager_id)}${a.bank_info ? " · " + a.bank_info : ""}`
-              : a.type === "Ngân hàng" ? `${coName(a.company_id)}${a.bank_info ? " · " + a.bank_info : ""}` : (locations.find((l) => l.code === a.location_code)?.name || "")}</span>
+              : a.type === "Ngân hàng" ? `${a.ca_nhan ? "Cá nhân (không thuộc pháp nhân)" : coName(a.company_id)}${a.bank_info ? " · " + a.bank_info : ""}` : (locations.find((l) => l.code === a.location_code)?.name || "")}</span>
             {a.status !== "Hoạt động" && <Badge tone="dark">Đã khóa</Badge>}
-            <button className="btn-ghost !px-2 !py-1 !text-xs" onClick={() => setF({ ...a, company_id: a.company_id || "", location_code: a.location_code || "", manager_id: a.manager_id || "" })}>✎ Sửa</button>
+            <button className="btn-ghost !px-2 !py-1 !text-xs" onClick={() => setF({ ...a, dung_cho: a.dung_cho || "CA_HAI", company_id: a.company_id || "", location_code: a.location_code || "", manager_id: a.manager_id || "" })}>✎ Sửa</button>
             <button className="btn-ghost !px-2 !py-1 !text-xs" title="Đặt số dư đầu kỳ để số dư tới một ngày bằng số thực tế" onClick={() => chotDauKy(a)}>Chốt số dư</button>
             <button className="btn-ghost !px-2 !py-1 !text-xs" onClick={() => luu({ ...a, company_id: a.company_id || "", manager_id: a.manager_id || "", status: a.status === "Hoạt động" ? "Đã khóa" : "Hoạt động" })}>{a.status === "Hoạt động" ? "Khóa" : "Mở lại"}</button>
           </div>

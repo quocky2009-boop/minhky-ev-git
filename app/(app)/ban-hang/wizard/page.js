@@ -672,7 +672,7 @@ function TaoDonWizardInner() {
               {suaId && payCu && (
                 <PayCuSua pays={payCu} accs={allAccs} cos={companies} locations={locations} extra={extra} supabase={supabase} notify={notify}
                   canEdit={["CEO", "ADMIN"].includes(profile?.role)} onChanged={() => napThuCu(suaCode)}
-                  bankAccounts={bankAccounts} companies={companies} companyId={companyIdCuaDon} PTTT={PTTT} quyTypeOf={quyTypeOf} />
+                  bankAccounts={bankAccounts} companies={companies} companyId={companyIdCuaDon} buon={kh.customer_type === "Khách buôn"} PTTT={PTTT} quyTypeOf={quyTypeOf} />
               )}
               {coc > 0 && (
                 <div className="flex items-center justify-between px-3 py-2 mb-2.5 rounded-lg bg-[#FDF6E3] text-[13.5px]">
@@ -691,7 +691,7 @@ function TaoDonWizardInner() {
                     {quyTypeOf(cocRow.method) === "Ngân hàng" && (
                       <select className="inp !w-auto !py-1.5 !text-xs max-w-full" value={cocRow.account_id || ""} onChange={(e) => setCocRow((r) => ({ ...r, account_id: e.target.value }))}>
                         <option value="">— Tài khoản nhận tiền —</option>
-                        <BankOptions accounts={bankAccounts} companies={companies} companyId={companyIdCuaDon} />
+                        <BankOptions accounts={bankAccounts} companies={companies} companyId={companyIdCuaDon} buon={kh.customer_type === "Khách buôn"} giu={cocRow.account_id} />
                       </select>
                     )}
                   </div>
@@ -725,7 +725,7 @@ function TaoDonWizardInner() {
                         <select className="inp !w-auto !py-1 !text-xs max-w-full" value={p.account_id || ""}
                           onChange={(e) => setPays((x) => x.map((y, j) => j === i ? { ...y, account_id: e.target.value } : y))}>
                           <option value="">— Chọn đúng tài khoản khách đã chuyển vào —</option>
-                          <BankOptions accounts={bankAccounts} companies={companies} companyId={companyIdCuaDon} />
+                          <BankOptions accounts={bankAccounts} companies={companies} companyId={companyIdCuaDon} buon={kh.customer_type === "Khách buôn"} giu={p.account_id} />
                         </select>
                         {bankAccounts.length === 0 && <span className="text-[10.5px] text-danger">Chưa có tài khoản Ngân hàng nào — vào Cài đặt → Tài khoản nhận tiền để tạo.</span>}
                       </div>

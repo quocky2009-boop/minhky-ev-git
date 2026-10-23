@@ -1,0 +1,5 @@
+-- Đã áp dụng qua MCP. Tài khoản nhận tiền bán buôn / tài khoản cá nhân giữ hộ pháp nhân.
+-- cash_accounts.dung_cho ('CA_HAI'|'BAN_LE'|'BAN_BUON'), cash_accounts.ca_nhan (không thuộc pháp nhân)
+-- _quy_xem_duoc: tài khoản cá nhân chỉ CEO/ADMIN thấy số dư/giao dịch
+-- fn_tai_khoan_chon trả thêm dung_cho, ca_nhan; fn_them_quy nhận 2 trường mới
+-- fn_chuyen_tra_phap_nhan(p_from, p_to, p_amount, p_note): CEO/ADMIN ghi PC (TK cá nhân) + PT (TK pháp nhân), category 'Chuyển trả pháp nhân'

@@ -882,7 +882,7 @@ function TaoDonInner() {
                 <select className="inp !w-auto !py-1 !text-xs" value={p.account_id || ""}
                   onChange={(e) => setPays((x) => x.map((y, j) => j === i ? { ...y, account_id: e.target.value } : y))}>
                   <option value="">— Chọn đúng tài khoản khách đã chuyển vào —</option>
-                  <BankOptions accounts={bankAccounts} companies={companies} companyId={companyIdCuaDon} />
+                  <BankOptions accounts={bankAccounts} companies={companies} companyId={companyIdCuaDon} buon={kh.customer_type === "Khách buôn"} giu={p.account_id} />
                 </select>
                 {bankAccounts.length === 0 && <span className="text-[10.5px] text-danger">Chưa có tài khoản Ngân hàng nào — vào Cài đặt → Tài khoản nhận tiền để tạo.</span>}
               </div>
@@ -955,7 +955,7 @@ function TaoDonInner() {
                   ) : quyTypeOf(p.method) === "Ngân hàng" ? (
                     <select className="inp !flex-1" value={p.account_id || ""} onChange={(e) => setDaoNguoc((cur) => ({ ...cur, new_payments: cur.new_payments.map((x, j) => j === i ? { ...x, account_id: e.target.value } : x) }))}>
                       <option value="">— Chọn tài khoản —</option>
-                      <BankOptions accounts={bankAccounts} companies={companies} companyId={companyIdCuaDon} withInfo={false} />
+                      <BankOptions accounts={bankAccounts} companies={companies} companyId={companyIdCuaDon} withInfo={false} buon={kh.customer_type === "Khách buôn"} giu={p.account_id} />
                     </select>
                   ) : <div className="flex-1" />}
                   <div className="!w-32"><MoneyInput value={p.amount} onChange={(v) => setDaoNguoc((cur) => ({ ...cur, new_payments: cur.new_payments.map((x, j) => j === i ? { ...x, amount: v } : x) }))} /></div>

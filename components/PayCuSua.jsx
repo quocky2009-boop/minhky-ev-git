@@ -6,7 +6,7 @@ import BankOptions from "@/components/BankOptions";
 
 // Cac khoan DA THU cua don dang sua (Wizard che do Sua don): hien chi tiet tung khoan; Admin/BGD sua duoc
 // bang cach "dao nguoc + ghi lai" (fn_dao_nguoc_khoan_thu) — sai phuong thuc / sai tai khoan / tach nhieu phuong thuc.
-export default function PayCuSua({ pays, accs, cos, locations, canEdit, supabase, notify, onChanged, bankAccounts, companies, companyId, PTTT, quyTypeOf, extra }) {
+export default function PayCuSua({ pays, accs, cos, locations, canEdit, supabase, notify, onChanged, bankAccounts, companies, companyId, buon, PTTT, quyTypeOf, extra }) {
   const [f, setF] = useState(null);
   const [busy, setBusy] = useState(false);
 
@@ -63,7 +63,7 @@ export default function PayCuSua({ pays, accs, cos, locations, canEdit, supabase
               {quyTypeOf(l.method) === "Ngân hàng" && (
                 <select className="inp !w-auto !py-1.5 !text-xs max-w-full" value={l.account_id} onChange={(e) => setLine(i, "account_id", e.target.value)}>
                   <option value="">— Tài khoản nhận tiền —</option>
-                  <BankOptions accounts={bankAccounts} companies={companies} companyId={companyId} />
+                  <BankOptions accounts={bankAccounts} companies={companies} companyId={companyId} buon={buon} giu={l.account_id} />
                 </select>
               )}
               {f.lines.length > 1 && <button className="text-danger font-bold" onClick={() => setF((x) => ({ ...x, lines: x.lines.filter((_, j) => j !== i) }))}>✕</button>}
