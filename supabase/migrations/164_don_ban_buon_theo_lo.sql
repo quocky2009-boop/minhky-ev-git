@@ -1,0 +1,8 @@
+-- Đã áp dụng qua MCP. Đơn bán buôn theo lô.
+-- don_buon (lô: khách buôn, cửa hàng phụ trách, ngày chốt, trạng thái Mới/Đã hủy), don_buon_dong (model+màu, SL, giá niêm yết kèm pin, ck_pct từ ck_si),
+-- don_buon_thanh_toan (TIEN: ghi quỹ qua _auto_thu, danh mục 'Thu tiền bán buôn (trả trước)', ref '<mã lô>-n'; CAN_TRU: trừ sổ khách buôn)
+-- sales_orders.don_buon_id / don_buon_dong_id; sale_payments.don_buon_id; kb_so_cai.don_buon_id / don_buon_tt_id
+-- sale_payments status thêm 'Trả trước (lô)' (method 'Tiền trả trước lô bán buôn', is_active=false): phân bổ tiền lô xuống từng đơn xe, không phải tiền mới
+-- _lo_tong, v_don_buon (security_invoker), _lo_phan_bo (phân bổ số dư lô vào đơn còn nợ, cũ trước)
+-- fn_lo_luu, fn_lo_huy, fn_lo_thu_tien, fn_lo_can_tru, fn_lo_dao_nguoc_tt (CEO/ADMIN, chỉ phần chưa phân bổ), fn_lo_giao_xe (gọi fn_ban_hang_v2 từng xe, kiểm đúng model/SL)
+-- fn_doi_soat_lech bỏ qua 'Trả trước (lô)'; fn_kb_huy chuyển cấn trừ của lô sang fn_lo_dao_nguoc_tt
