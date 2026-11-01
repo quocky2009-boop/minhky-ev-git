@@ -16,6 +16,9 @@ function NhapHangInner() {
   const { supabase, vehicles, locations, settings, profile, loading, refresh } = useCatalog();
   const { toast, notify } = useToast();
   const [perms, setPerms] = useState({});
+  const canCost = ["CEO", "ADMIN", "MANAGER"].includes(profile?.role);
+  const [poLines, setPoLines] = useState([]);
+  const [chuyen, setChuyen] = useState([]);
   useEffect(() => {
     if (!profile) return;
     supabase.from("role_perms").select("perm,allowed").eq("role", profile.role).then(({ data }) => {
@@ -48,8 +51,10 @@ function NhapHangInner() {
         supabase.from("purchase_order_lines").select("*").eq("po_id", poId).order("id"),
       ]);
       if (!o) return;
+      const { data: sh } = await supabase.from("purchase_order_shipments").select("*, lines:purchase_order_shipment_lines(vehicle_id, qty)").eq("po_id", poId).eq("status", "Dự kiến").order("ngay_du_kien");
+      setPoLines(ln || []); setChuyen(sh || []);
       setShowForm(true); setKetQua(null);
-      setMeta((p) => ({ ...p, location_code: o.location_code || "", po_kv: o.khu_vuc || [], supplier: o.supplier || "", po_id: o.id, po_code: o.code,
+      setMeta((p) => ({ ...p, shipment_id: "", location_code: o.location_code || "", po_kv: o.khu_vuc || [], supplier: o.supplier || "", po_id: o.id, po_code: o.code,
         nguoi_nhap_id: p.nguoi_nhap_id || profile.id, nguoi_nhap_name: p.nguoi_nhap_name || profile.name }));
       const conLai = (ln || []).filter((l) => l.qty_ordered > l.qty_received);
       setLines(conLai.length > 0 ? conLai.map((l) => ({ vehicle_id: l.vehicle_id, frames: [], cost_price: 0, note: "", con_thieu: l.qty_ordered - l.qty_received })) : [{ ...emptyLine }]);
@@ -64,7 +69,7 @@ function NhapHangInner() {
   // ===== FORM =====
   const [showForm, setShowForm] = useState(false);
   const [ketQua, setKetQua] = useState(null);
-  const [meta, setMeta] = useState({ location_code: "", supplier: "", doc: "", note: "", ngay: iso(new Date()), nguoi_nhap_id: "", nguoi_nhap_name: "", po_id: "", po_code: "", po_kv: [] });
+  const [meta, setMeta] = useState({ location_code: "", supplier: "", doc: "", note: "", ngay: iso(new Date()), nguoi_nhap_id: "", nguoi_nhap_name: "", po_id: "", po_code: "", po_kv: [], shipment_id: "" });
   const [lines, setLines] = useState([{ ...emptyLine }]);
   const [congNo, setCongNo] = useState({ ...emptyCongNo });
   const [scanIdx, setScanIdx] = useState(null);
@@ -189,7 +194,7 @@ function NhapHangInner() {
 
   const moForm = () => {
     setShowForm(true); setKetQua(null); setLines([{ ...emptyLine }]); setCongNo({ ...emptyCongNo });
-    setMeta({ location_code: "", supplier: "", doc: "", note: "", ngay: iso(new Date()), nguoi_nhap_id: profile?.id || "", nguoi_nhap_name: profile?.name || "", po_id: "", po_code: "", po_kv: [] });
+    setMeta({ location_code: "", supplier: "", doc: "", note: "", ngay: iso(new Date()), nguoi_nhap_id: profile?.id || "", nguoi_nhap_name: profile?.name || "", po_id: "", po_code: "", po_kv: [], shipment_id: "" });
   };
   const dongForm = () => { setShowForm(false); setKetQua(null); load(); };
 
@@ -198,6 +203,16 @@ function NhapHangInner() {
   const luuPhieu = async () => {
     if (!meta.location_code) return notify("Chọn kho nhập.", "err");
     const ok = lines.filter((l) => l.vehicle_id && l.frames.length > 0);
+    if (meta.po_id) {
+      const conLai = {};
+      poLines.forEach((l) => { conLai[l.vehicle_id] = (conLai[l.vehicle_id] || 0) + (l.qty_ordered - l.qty_received); });
+      const dem = {};
+      for (const l of ok) {
+        if (!(l.vehicle_id in conLai)) return notify(`"${vName(l.vehicle_id)}" không có trong đơn đặt ${meta.po_code} — không thể nhập theo đơn này.`, "err");
+        dem[l.vehicle_id] = (dem[l.vehicle_id] || 0) + l.frames.length;
+        if (dem[l.vehicle_id] > conLai[l.vehicle_id]) return notify(`"${vName(l.vehicle_id)}": nhập ${dem[l.vehicle_id]} xe nhưng đơn đặt chỉ còn thiếu ${conLai[l.vehicle_id]} xe. Cần sửa số lượng đặt trước.`, "err");
+      }
+    }
     if (ok.length === 0) return notify("Chưa có dòng hàng hợp lệ (cần chọn mã xe và nhập số khung).", "err");
 
     // CANH BAO 1: dong dien do do (co mot trong hai: ma xe HOAC so khung, nhung khong ca hai)
@@ -230,7 +245,7 @@ function NhapHangInner() {
       location_code: meta.location_code, supplier: meta.supplier, doc: meta.doc, note: meta.note,
       lines: ok.map((l) => ({ vehicle_id: l.vehicle_id, frames: l.frames, cost_price: Number(l.cost_price) || 0, note: l.note })),
       nguoi_nhap_id: meta.nguoi_nhap_id,
-      po_id: meta.po_id || null,
+      po_id: meta.po_id || null, shipment_id: meta.shipment_id || null,
       ...(congNo.co_tra_cham ? { cong_no: {
         co_tra_cham: true,
         so_ngay: congNo.dots.map((d) => Number(d.so_ngay) || 0),
@@ -310,6 +325,18 @@ function NhapHangInner() {
           <div className="card">
             <div className="font-extrabold mb-2.5">Thông tin bổ sung</div>
             <div className="flex flex-col gap-2.5">
+              {meta.po_id && chuyen.length > 0 && (
+                <Field label="Chuyến xe vận tải (lịch về hàng)">
+                  <select className="inp" value={meta.shipment_id || ""} onChange={(e) => {
+                    const id = e.target.value; setMeta((p) => ({ ...p, shipment_id: id }));
+                    const sh = chuyen.find((c) => String(c.id) === id);
+                    if (sh) setLines(sh.lines.map((x) => ({ vehicle_id: x.vehicle_id, frames: [], cost_price: 0, note: "", con_thieu: x.qty })));
+                  }}>
+                    <option value="">— Không gắn chuyến —</option>
+                    {chuyen.map((c) => <option key={c.id} value={c.id}>{c.ngay_du_kien ? c.ngay_du_kien.split("-").reverse().join("/") : "chưa rõ ngày"}{c.bien_so ? ` · ${c.bien_so}` : ""} · {c.lines.reduce((s, x) => s + x.qty, 0)} xe</option>)}
+                  </select>
+                </Field>
+              )}
               <Field label="Nhập vào kho" required>
                 <LocSearch locations={meta.po_kv?.length ? locations.filter((l) => meta.po_kv.includes(l.region)) : locations} value={meta.location_code} onChange={(v) => setMeta((p) => ({ ...p, location_code: v }))} placeholder="Chọn kho / cửa hàng" />
               </Field>
@@ -350,10 +377,12 @@ function NhapHangInner() {
                     <VehicleSearch vehicles={vehicles} value={l.vehicle_id} onChange={(id) => setLine(i, "vehicle_id", id || "")} />
                     {l.con_thieu > 0 && <div className="text-[11px] text-[#A25F00] mt-1">Đơn đặt còn thiếu {l.con_thieu} xe</div>}
                   </div>
+                  {canCost ? (
                   <div>
                     <label className="lbl">💰 Giá vốn / xe</label>
                     <MoneyInput value={l.cost_price} onChange={(v) => setLine(i, "cost_price", v)} placeholder="Giá nhập thực tế" />
                   </div>
+                  ) : <div className="text-[11px] text-[#8A93A0] self-end pb-2">Giá vốn do Ban giám đốc/Admin bổ sung sau.</div>}
                   <div className="flex items-end gap-2">
                     <div className="flex-1">
                       <label className="lbl">Số lượng</label>
@@ -399,7 +428,7 @@ function NhapHangInner() {
         </div>
 
         {/* CÔNG NỢ TRẢ CHẬM / BẢO LÃNH NCC */}
-        <div className="card">
+        {canCost && <div className="card">
           <div className="flex items-center gap-2 mb-2.5 flex-wrap">
             <div className="font-extrabold mr-auto">Công nợ trả chậm / bảo lãnh NCC</div>
             <label className="flex items-center gap-1.5 text-[13px] cursor-pointer">
@@ -446,7 +475,7 @@ function NhapHangInner() {
               {tongVon === 0 && <div className="text-[11.5px] text-danger">⚠ Chưa khai giá vốn — không thể tính số tiền từng đợt.</div>}
             </div>
           )}
-        </div>
+        </div>}
 
         {/* HÀNG 3: TỔNG KẾT */}
         <div className="grid gap-4 lg:grid-cols-2">

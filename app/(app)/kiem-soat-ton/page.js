@@ -39,6 +39,20 @@ export default function KiemSoatTon() {
   const [skPage, setSkPage] = useState(1);
 
   const allowed = ["CEO", "MANAGER", "ADMIN"].includes(profile?.role);
+  const [dangVe, setDangVe] = useState(null); // hang dang ve: don dat chua nhap du
+  useEffect(() => {
+    if (loading || !profile || !allowed) return;
+    (async () => {
+      const { data: po } = await supabase.from("purchase_orders").select("id,code,supplier,khu_vuc,status,ngay_du_kien").in("status", ["Chưa nhập", "Nhập một phần"]);
+      const ids = (po || []).map((o) => o.id);
+      if (!ids.length) { setDangVe({ pos: [], lines: [], ships: [] }); return; }
+      const [{ data: ln }, { data: sh }] = await Promise.all([
+        supabase.from("purchase_order_lines").select("po_id,vehicle_id,qty_ordered,qty_received").in("po_id", ids),
+        supabase.from("purchase_order_shipments").select("po_id,ngay_du_kien,bien_so,status,lines:purchase_order_shipment_lines(vehicle_id,qty)").in("po_id", ids).eq("status", "Dự kiến").order("ngay_du_kien"),
+      ]);
+      setDangVe({ pos: po || [], lines: ln || [], ships: sh || [] });
+    })();
+  }, [loading, profile]);
 
   useEffect(() => {
     if (loading || !profile || !allowed) return;
@@ -237,6 +251,34 @@ export default function KiemSoatTon() {
             <KPI label="Trên 30 ngày" value={<>{nf(kGt30)}<Delta cur={kGt30} prev={khaCmp ? khaCmp.reduce((a, r) => a + gt30(r), 0) : null} /></>} sub={kpiTon ? `${f1(100 * kGt30 / kpiTon)}% tồn khả dụng` : ""} tone={kGt30 ? "red" : "dark"} />
             <KPI label="Tuổi tồn bình quân" value={Number.isFinite(kTuoi) ? `${f1(kTuoi)} ngày` : "—"} tone="blue" />
           </div>
+
+          {dangVe && dangVe.pos.length > 0 && (() => {
+            const poOk = dangVe.pos.filter((o) => !fRegion || (o.khu_vuc || []).includes(fRegion));
+            const okIds = new Set(poOk.map((o) => o.id));
+            const byVeh = {};
+            dangVe.lines.filter((l) => okIds.has(l.po_id)).forEach((l) => { const c = l.qty_ordered - l.qty_received; if (c > 0) byVeh[l.vehicle_id] = (byVeh[l.vehicle_id] || 0) + c; });
+            const tong = Object.values(byVeh).reduce((x, y) => x + y, 0);
+            const ships = dangVe.ships.filter((c) => okIds.has(c.po_id));
+            const poCode = (id) => dangVe.pos.find((o) => o.id === id)?.code;
+            if (tong === 0) return null;
+            return (
+              <div className="card">
+                <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                  <div className="font-extrabold">Hàng đang về (đơn đặt chưa nhập đủ)</div>
+                  <Badge tone="blue">{tong} xe · {poOk.length} đơn{fRegion ? ` · ${fRegion}` : ""}</Badge>
+                  <a href="/dat-hang-nhap" className="ml-auto text-xs text-brand underline">Xem đơn đặt hàng</a>
+                </div>
+                <div className="text-[12.5px] text-[#5A6572]">
+                  {Object.entries(byVeh).sort((a, b) => b[1] - a[1]).map(([v, n]) => `${(() => { const x = vehicles.find((y) => y.id === v); return x ? `${x.name} ${x.color}` : v; })()} × ${n}`).join(" · ")}
+                </div>
+                {ships.length > 0 && (
+                  <div className="text-[12px] mt-1.5 text-[#0F7B3F]">
+                    Lịch về: {ships.slice(0, 5).map((c) => `${c.ngay_du_kien ? c.ngay_du_kien.split("-").reverse().join("/") : "chưa rõ ngày"} (${poCode(c.po_id)}${c.bien_so ? ` · ${c.bien_so}` : ""} · ${c.lines.reduce((x, y) => x + y.qty, 0)} xe)`).join(" · ")}{ships.length > 5 ? " …" : ""}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {(fRegion || fLoc || fBrand || fModel || fColor) && (
             <div className="flex gap-1.5 flex-wrap items-center text-xs">

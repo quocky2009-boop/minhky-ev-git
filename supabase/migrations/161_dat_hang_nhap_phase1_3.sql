@@ -1,0 +1,12 @@
+-- Đã áp dụng qua MCP. Đặt hàng nhập — Pha 1–3 + giá vốn bổ sung sau.
+-- Bảng mới: purchase_order_receipts (liên kết phiếu nhập–đơn đặt, huy=true khi hủy phiếu), purchase_order_shipments + _lines (lịch về hàng theo chuyến)
+-- purchase_orders: status thêm 'Hoàn thành (giao thiếu)', cột closed_by/closed_by_name/closed_at/close_reason
+-- Helper: _po_cap_nhat_trang_thai, _po_cong_sl (phân bổ SL nhận vào các dòng cùng mã xe), _po_ap_dung_phieu (trừ/cộng lại khi hủy/khôi phục phiếu nhập)
+-- fn_nhap_hang_v2: chặn nhập vượt SL đặt (VUOT_SO_LUONG), chặn xe ngoài đơn (XE_NGOAI_DON), chặn sai khu vực (SAI_KHU_VUC), chặn đơn đã đóng;
+--   ghi receipts + gắn chuyến (shipment_id); giá vốn/công nợ chỉ nhận từ CEO/ADMIN/MANAGER (Sales nhập không giá vốn)
+-- fn_huy_don_nhap / fn_khoi_phuc_don_nhap_huy: trừ/cộng lại SL đã nhận của đơn đặt
+-- fn_tao_don_dat_hang: bắt buộc nhà cung cấp (1 hãng/đơn); fn_sua_don_dat_hang: tính lại trạng thái; fn_huy_don_dat_hang: hủy chuyến dự kiến
+-- fn_dong_don_dat_hang(p_id, p_ly_do) / fn_mo_lai_don_dat_hang(p_id): chỉ CEO/ADMIN
+-- fn_luu_chuyen_dat_hang / fn_huy_chuyen_dat_hang: lịch về hàng theo chuyến (tổng chuyến dự kiến <= phần còn thiếu của đơn)
+-- _dong_bo_no_ncc(doc): co giãn công nợ NCC tự sinh theo tổng giá vốn mới (giữ tỷ lệ đợt, không thấp hơn số đã trả)
+-- fn_bo_sung_gia_von({doc, lines, cong_no?}): chỉ CEO/ADMIN; fn_sua_don_nhap & fn_set_gia_von: giới hạn quyền + đồng bộ công nợ

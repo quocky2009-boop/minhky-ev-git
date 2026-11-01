@@ -9,8 +9,8 @@ import ImportDatHang from "@/components/ImportDatHang";
 const iso = (d) => d.toLocaleDateString("sv-SE");
 const emptyLine = { vehicle_id: "", qty: 1, note: "" };
 
-const TAB_STATUS = { "tat-ca": null, "chua-nhap": "Chưa nhập", "nhap-mot-phan": "Nhập một phần", "hoan-thanh": "Hoàn thành" };
-const STATUS_TONE = { "Chưa nhập": "amber", "Nhập một phần": "blue", "Hoàn thành": "green", "Đã hủy": "dark" };
+const TAB_STATUS = { "tat-ca": null, "chua-nhap": "Chưa nhập", "nhap-mot-phan": "Nhập một phần", "hoan-thanh": ["Hoàn thành", "Hoàn thành (giao thiếu)"] };
+const STATUS_TONE = { "Chưa nhập": "amber", "Nhập một phần": "blue", "Hoàn thành": "green", "Hoàn thành (giao thiếu)": "purple", "Đã hủy": "dark" };
 
 export default function DatHangNhap() {
   const { supabase, vehicles, locations, settings, profile, loading, refresh, regions } = useCatalog();
@@ -48,7 +48,7 @@ export default function DatHangNhap() {
 
   const wanted = TAB_STATUS[tab];
   const filtered = orders.filter((o) => {
-    if (wanted && o.status !== wanted) return false;
+    if (wanted && !(Array.isArray(wanted) ? wanted.includes(o.status) : o.status === wanted)) return false;
     if (!q) return true;
     const kw = q.toLowerCase();
     const xeStr = o.lines.map((l) => vName(l.vehicle_id)).join(" ");
@@ -74,6 +74,7 @@ export default function DatHangNhap() {
   };
 
   const luuDon = async () => {
+    if (!meta.supplier) return notify("Chọn nhà cung cấp.", "err");
     if (meta.khu_vuc.length === 0) return notify("Chọn ít nhất một khu vực.", "err");
     const ok = lines.filter((l) => l.vehicle_id && Number(l.qty) > 0);
     if (ok.length === 0) return notify("Chưa có dòng sản phẩm hợp lệ.", "err");
@@ -101,7 +102,7 @@ export default function DatHangNhap() {
           <div className="card lg:col-span-2">
             <div className="font-extrabold mb-2.5">Thông tin nhà cung cấp</div>
             <div className="grid gap-2.5 md:grid-cols-2">
-              <Field label="Nhà cung cấp">
+              <Field label="Nhà cung cấp (mỗi đơn chỉ một hãng)" required>
                 <select className="inp" value={meta.supplier} onChange={(e) => setMeta((p) => ({ ...p, supplier: e.target.value }))}>
                   <option value="">— Chọn NCC —</option>
                   {sups.map((x) => <option key={x}>{x}</option>)}

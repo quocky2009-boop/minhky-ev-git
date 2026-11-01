@@ -98,6 +98,7 @@ export default function ImportDatHang({ supabase, vehicles, locations, notify, o
         const key = [norm(cn), norm(ncc), String(r.ngay_du_kien ?? "").trim(), norm(gcd)].join("|");
         const g = (gm[key] = gm[key] || { key, cn, ncc, gcd, loc: null, ngay: null, lines: [], errors: [] });
         const err = (m) => g.errors.push({ row: r._row, msg: m });
+        if (!ncc) err("Thiếu Nha_Cung_Cap (mỗi đơn đặt chỉ gửi một hãng)");
         if (!cn) err("Thiếu Chi_Nhanh");
         else { const l = byCode[cn.toLowerCase()] || byName[norm(cn)]; const kv = !l && locs.find((x) => norm(x.region) === norm(cn))?.region; if (l) g.loc = l; else if (kv) g.loc = { code: "", name: kv, region: kv }; else err(`Không tìm thấy điểm/khu vực "${cn}"`); }
         if (!dt.ok) err(`Ngày dự kiến không hợp lệ (${r.ngay_du_kien}) — dùng dd/mm/yyyy`); else g.ngay = dt.val;
