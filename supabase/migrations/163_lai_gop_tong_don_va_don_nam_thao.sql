@@ -1,0 +1,8 @@
+-- Đã áp dụng qua MCP.
+-- 1) v_lai_gop_don: doanh_thu = _tong_don(o) (đã trừ CK xe, CK đơn, bù pin khách buôn); lai_gop = doanh_thu − giá vốn.
+--    Trước đây doanh thu tính theo giá niêm yết, không trừ chiết khấu → lãi gộp cao hơn thực tế.
+-- 2) Dọn dữ liệu ĐL Nam Thảo (KH-2610-75114) theo file theo dõi bán buôn, CEO xác nhận:
+--    - customers.customer_type = 'Khách buôn'; ck_si: EVO LITE 7%, Feliz II 7%, Evo Grand Lite 5,5% từ 01/10/2026
+--    - lô 23/10 (6 đơn) CK 4% → 7%; khoản thu (TK 10) chỉnh về tổng 132.804.000 (trước ghi 137.088.000)
+--    - BH-2611-57817 bỏ chiết khấu đơn nhập tay 15.301.000; tách PT-2611-97645 (86.192.000) xuống 6 đơn lô 01/11
+--    - sổ khách buôn: KM hãng 10.000.000 + bù pin 5.301.000 (BH-2610-45588) → cấn trừ 15.301.000 vào BH-2611-57817
