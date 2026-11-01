@@ -91,6 +91,8 @@ export default function DonBan() {
   const [canSuaKM, setCanSuaKM] = useState(false);
   const [payEdit, setPayEdit] = useState(null);
   const [klEdit, setKlEdit] = useState(null);   // khach le cuoi (don ban buon)
+  const [klKm, setKlKm] = useState({ opts: [], chon: [] }); // khuyen mai hang cho khach le cuoi (cong vao so khach buon)
+  const [kbDong, setKbDong] = useState([]); // cac dong so cong no khach buon cua don dang xem
 
   const load = async () => {
     setBusy(true);
@@ -144,7 +146,7 @@ export default function DonBan() {
     const ckXe = o.vehicle_discount_type === "percent"
       ? Math.round(tienXe * (o.vehicle_discount_value || 0) / 100)
       : (o.vehicle_discount_value || 0);
-    return Math.max(tienXe - ckXe + (itemSum[o.code] || 0) - (o.discount_amount || 0), 0);
+    return Math.max(tienXe - ckXe + (itemSum[o.code] || 0) - (o.discount_amount || 0) - (o.kb_dieu_chinh || 0), 0);
   };
   const canConfirm = ["SALES", "MANAGER", "ADMIN", "CEO"].includes(profile.role);
   const canCancel = ["ADMIN", "CEO"].includes(profile.role);
@@ -201,6 +203,7 @@ export default function DonBan() {
 
   const openDetail = async (o) => {
     setDetail({ ...o, _items: null, _promos: null, _pays: null });
+    setKbDong([]); if (o.customer_type === "Khách buôn") napKbDong(o.code);
     setEditPromo(false);
     const [{ data: di }, { data: sop }, { data: pl }, { data: kms }] = await Promise.all([
       supabase.from("sale_items").select("*").eq("sale_code", o.code),
@@ -239,6 +242,24 @@ export default function DonBan() {
     load();
   };
 
+  const napKbDong = async (code) => {
+    const { data } = await supabase.from("kb_so_cai").select("id,loai,so_tien,note,huy,promotion_id").eq("sale_code", code).eq("huy", false).order("id");
+    setKbDong(data || []);
+  };
+  const moKhachLe = async (init) => {
+    setKlEdit(init);
+    if (detail.customer_type !== "Khách buôn") { setKlKm({ opts: [], chon: [] }); return; }
+    const xe = vOf(detail.vehicle_id);
+    const homNay = new Date().toLocaleDateString("sv-SE");
+    const [{ data: prs }, { data: dang }] = await Promise.all([
+      supabase.from("promotions").select("id,name,brand,vehicle_names,battery_options,value_type,value,start_date,end_date,status").eq("status", "Đang áp dụng"),
+      supabase.from("kb_so_cai").select("promotion_id").eq("sale_code", detail.code).eq("loai", "KHUYEN_MAI").eq("huy", false),
+    ]);
+    const opts = (prs || []).filter((p) => xe && (p.brand || "").trim().toLowerCase() === (xe.brand || "").trim().toLowerCase()
+      && (!(p.vehicle_names || []).length || p.vehicle_names.some((n) => n.trim().toLowerCase() === (xe.name || "").trim().toLowerCase()))
+      && (!p.start_date || p.start_date <= homNay) && (!p.end_date || p.end_date >= homNay));
+    setKlKm({ opts, chon: (dang || []).map((x) => x.promotion_id) });
+  };
   const luuKhachLe = async () => {
     const f = klEdit;
     if (!f.name?.trim() || !f.phone?.trim() || !f.address?.trim() || !f.email?.trim()) {
@@ -251,7 +272,14 @@ export default function DonBan() {
     const { error } = await supabase.rpc("fn_luu_khach_le_cuoi", { p: { id: detail.id, ...f } });
     setBusy(false);
     if (error) return notify(errMsg(error), "err");
-    notify("Đã lưu khách lẻ cuối — hồ sơ đã vào danh mục khách hàng.");
+    let kbMsg = "";
+    if (detail.customer_type === "Khách buôn" && detail.customer_id) {
+      const { data: kb, error: e2 } = await supabase.rpc("fn_kb_ghi_khach_le_cuoi", { p_sale_code: detail.code, p_promotion_ids: klKm.chon });
+      if (e2) notify("Lưu khách lẻ xong nhưng chưa ghi sổ khách buôn: " + errMsg(e2), "err");
+      else if (kb && !kb.bo_qua && (kb.bu_pin > 0 || kb.khuyen_mai > 0)) kbMsg = ` Sổ khách buôn: +${fmtVND((kb.bu_pin || 0) + (kb.khuyen_mai || 0))} (KM ${fmtVND(kb.khuyen_mai || 0)}${kb.bu_pin > 0 ? `, bù pin ${fmtVND(kb.bu_pin)}` : ""}).`;
+      napKbDong(detail.code);
+    }
+    notify("Đã lưu khách lẻ cuối — hồ sơ đã vào danh mục khách hàng." + kbMsg);
     setKlEdit(null);
     const { data } = await supabase.from("sales_orders").select("*").eq("id", detail.id).single();
     if (data) setDetail((d) => ({ ...d, ...data }));
@@ -583,7 +611,7 @@ export default function DonBan() {
     : (detail.vehicle_discount_value || 0);
   const kem = (detail._items || []).reduce((sm, it) => sm + it.amount, 0);
   const tamTinh = tienXe - ckXe + kem;
-  const tong = Math.max(tamTinh - (detail.discount_amount || 0), 0);
+  const tong = Math.max(tamTinh - (detail.discount_amount || 0) - (detail.kb_dieu_chinh || 0), 0);
   return (
             <div className="fixed inset-0 z-[95] bg-black/50 flex items-center justify-center p-3" onClick={() => setDetail(null)}>
               <div className="bg-white rounded-2xl w-[600px] max-w-full max-h-[88vh] overflow-y-auto p-4" onClick={(e) => e.stopPropagation()}>
@@ -708,7 +736,13 @@ export default function DonBan() {
                                 {detail.end_customer_invoice_amount > 0 && <span className="text-[12px] text-brand font-bold">HĐ: {fmtVND(detail.end_customer_invoice_amount)}</span>}
                               </div>
                               <div className="text-[11px] text-[#8A93A0] mt-1">Cập nhật bởi {detail.end_customer_by_name} · {fmtDate(detail.end_customer_at)}</div>
-                              <button className="btn-ghost !text-xs mt-1.5 self-start" onClick={() => setKlEdit({
+                              {detail.customer_type === "Khách buôn" && kbDong.length > 0 && (
+                                <div className="mt-1.5 text-[12px] rounded-lg bg-[#F8F5FF] border border-[#D9CCF5] px-2 py-1">
+                                  {kbDong.map((d) => <div key={d.id}>{d.loai === "BU_PIN" ? "Bù pin" : d.loai === "KHUYEN_MAI" ? "KM hãng" : d.loai === "CAN_TRU" ? "Cấn trừ" : d.loai} <b className={d.so_tien > 0 ? "text-[#5B3FA0]" : "text-danger"}>{d.so_tien > 0 ? "+" : ""}{fmtVND(d.so_tien)}</b></div>)}
+                                  <Link href={`/khach-buon?kh=${detail.customer_id}`} className="text-brand underline text-[11.5px]">Xem sổ khách buôn</Link>
+                                </div>
+                              )}
+                              <button className="btn-ghost !text-xs mt-1.5 self-start" onClick={() => moKhachLe({
                                 name: detail.end_customer_name, phone: detail.end_customer_phone,
                                 email: detail.end_customer_email, address: detail.end_customer_address,
                                 customer_type: detail.end_customer_type || "", invoice_amount: detail.end_customer_invoice_amount || "",
@@ -738,6 +772,22 @@ export default function DonBan() {
                                   </div>
                                 )}
                               </div>
+                              {detail.customer_type === "Khách buôn" && (
+                                <div className="rounded-lg border border-[#D9CCF5] bg-[#F8F5FF] p-2">
+                                  <div className="text-[12px] font-bold text-[#5B3FA0] mb-1">Khuyến mại hãng cho khách lẻ cuối — cộng ngay vào số dư khách buôn</div>
+                                  {klKm.opts.filter((p) => !klEdit.battery_option || !(p.battery_options || []).length || p.battery_options.includes(klEdit.battery_option)).length === 0
+                                    ? <div className="text-[11.5px] text-[#8A93A0]">Không có chương trình đang áp dụng cho xe này{klEdit.battery_option ? ` (${klEdit.battery_option})` : ""}.</div>
+                                    : klKm.opts.filter((p) => !klEdit.battery_option || !(p.battery_options || []).length || p.battery_options.includes(klEdit.battery_option)).map((p) => (
+                                      <label key={p.id} className="flex items-start gap-1.5 text-[12px] cursor-pointer py-0.5">
+                                        <input type="checkbox" className="mt-0.5" checked={klKm.chon.includes(p.id)} onChange={(e) => setKlKm((k) => ({ ...k, chon: e.target.checked ? [...k.chon, p.id] : k.chon.filter((x) => x !== p.id) }))} />
+                                        <span>{p.name} — <b>{p.value_type === "percent" ? `${p.value}%` : fmtVND(p.value)}</b></span>
+                                      </label>
+                                    ))}
+                                  {vOf(detail.vehicle_id)?.model_pin === "Xe đổi pin" && klEdit.battery_option === "Thuê pin" && (
+                                    <div className="text-[11.5px] text-[#B45309] mt-1">Khách lẻ cuối thuê pin: hệ thống tự tính khoản bù = (giá kèm pin − giá thuê pin) × (1 − CK sỉ) và ghi giảm giá đơn này.</div>
+                                  )}
+                                </div>
+                              )}
                               <div className="flex gap-2">
                                 <button className="btn-ok !text-xs" disabled={busy} onClick={luuKhachLe}>{busy ? "Đang lưu…" : "Lưu khách lẻ"}</button>
                                 <button className="btn-ghost !text-xs" onClick={() => setKlEdit(null)}>Hủy</button>
@@ -751,7 +801,7 @@ export default function DonBan() {
                                   ? "Xe VinFast bán buôn — bắt buộc có thông tin khách lẻ cuối trước khi xuất hóa đơn."
                                   : "Đại lý bán lại cho khách lẻ thì bổ sung thông tin ở đây."}
                               </div>
-                              <button className="btn-primary !text-xs" onClick={() => setKlEdit({ name: "", phone: "", email: "", address: "", customer_type: "", invoice_amount: "", battery_option: "" })}>+ Thông tin khách lẻ cuối</button>
+                              <button className="btn-primary !text-xs" onClick={() => moKhachLe({ name: "", phone: "", email: "", address: "", customer_type: "", invoice_amount: "", battery_option: "" })}>+ Thông tin khách lẻ cuối</button>
                             </div>
                           )}
                         </div>
@@ -764,6 +814,7 @@ export default function DonBan() {
                           ...(detail._items && detail._items.length > 0
                             ? detail._items.map((it) => [`${it.name} × ${it.qty}`, fmtVND(it.amount), "font-semibold text-[#5A6572]"])
                             : []),
+                          ...(detail.kb_dieu_chinh > 0 ? [["Bù khách buôn (khách lẻ cuối thuê pin)", "−" + fmtVND(detail.kb_dieu_chinh), "font-semibold text-danger"]] : []),
                           ["Tổng đơn", fmtVND(tong), "font-bold text-brand"],
                           ["Đã thanh toán", fmtVND(detail.paid_amount || 0), "font-bold text-[#0E7A4A]"],
                         ]}

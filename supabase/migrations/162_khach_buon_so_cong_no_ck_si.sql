@@ -1,0 +1,9 @@
+-- Đã áp dụng qua MCP. Khách buôn: bảng CK sỉ + sổ công nợ (KM hãng, bù pin, cấn trừ).
+-- ck_si(customer_id, brand, model, pct, tu_ngay, den_ngay): fn_ck_si_luu / fn_ck_si_xoa (CEO/ADMIN), fn_ck_si_tra(customer, vehicle_id, ngay)
+-- customers.kb_can_tru_mode ('NGAY' | 'CUOI_THANG'); fn_kb_dat_che_do (CEO/ADMIN)
+-- kb_so_cai(loai BU_PIN | KHUYEN_MAI | CAN_TRU | HOAN_CAN_TRU | DIEU_CHINH_TAY, so_tien + = Minh Kỳ nợ khách buôn, − = đã cấn trừ)
+-- sales_orders.kb_dieu_chinh: khoản bù pin giảm giá chính đơn xe (khách lẻ cuối thuê pin); _tong_don và v_lai_gop_don trừ khoản này
+-- fn_kb_ghi_khach_le_cuoi(sale_code, promotion_ids): tự tính bù pin = (giá kèm pin − giá thuê pin) × SL × (1 − CK%) và KM hãng
+-- fn_kb_can_tru(customer, sale_code, amount): ghi sale_payments method 'Cấn trừ công nợ KB' (payment_methods, is_active=false), status 'Cấn trừ' (thêm vào check), không vào quỹ
+-- trigger trg_kb_hoan_can_tru: khoản cấn trừ bị đảo ngược/hoàn → ghi HOAN_CAN_TRU trả lại số dư
+-- fn_kb_so_du, fn_kb_ghi_tay, fn_kb_huy; fn_doi_soat_lech bỏ qua khoản 'Cấn trừ'

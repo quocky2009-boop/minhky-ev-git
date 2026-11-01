@@ -68,7 +68,7 @@ export default function DonBanChiTiet() {
   const tongKem = items.reduce((s, x) => s + x.amount, 0);
   const tamTinh = tienXe - ckXe + tongKem;
   const ckTong = o.discount_type === "percent" ? Math.round(tamTinh * (o.discount_value || 0) / 100) : (o.discount_value || 0);
-  const tongDon = Math.max(tamTinh - ckTong, 0);
+  const tongDon = Math.max(tamTinh - ckTong - (o.kb_dieu_chinh || 0), 0);
   const daTra = o.paid_amount || 0;
   const conLai = Math.max(tongDon - daTra, 0);
 
@@ -254,6 +254,7 @@ export default function DonBanChiTiet() {
                 <tfoot>
                   <tr className="text-[13px]"><td colSpan={4} className="py-1.5 pl-2 text-[#5A6572]">Tổng chưa chiết khấu đơn</td><td className="py-1.5 pr-2 text-right">{fmtVND(tamTinh)}</td></tr>
                   {ckTong > 0 && <tr className="text-[13px] text-[#A25F00]"><td colSpan={4} className="py-1.5 pl-2">Chiết khấu đơn hàng</td><td className="py-1.5 pr-2 text-right">−{fmtVND(ckTong)}</td></tr>}
+                  {(o.kb_dieu_chinh || 0) > 0 && <tr className="text-[13px] text-[#A25F00]"><td colSpan={4} className="py-1.5 pl-2">Bù khách buôn (khách lẻ cuối thuê pin)</td><td className="py-1.5 pr-2 text-right">−{fmtVND(o.kb_dieu_chinh)}</td></tr>}
                   <tr className="font-extrabold text-[14px] bg-[#EAF2FF]"><td colSpan={4} className="py-2 pl-2">Tổng đơn</td><td className="py-2 pr-2 text-right text-brand">{fmtVND(tongDon)}</td></tr>
                 </tfoot>
               </table>

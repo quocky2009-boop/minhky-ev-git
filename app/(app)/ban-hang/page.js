@@ -190,6 +190,22 @@ function TaoDonInner() {
     })();
   }, [params, custs]);
 
+  // Khach buon: tu ap CK si theo bang (khach x model x thoi ky) cho cac xe chua co chiet khau; hien so du cong no khach buon
+  const [kbSoDu, setKbSoDu] = useState(null);
+  useEffect(() => {
+    if (kh.customer_type !== "Khách buôn" || !custId) { setKbSoDu(null); return; }
+    supabase.rpc("fn_kb_so_du", { p_customer: custId }).then(({ data }) => setKbSoDu(data || null));
+    (async () => {
+      const ids = [...new Set(xeRows.filter((x) => !(Number(x.discount_value) > 0)).map((x) => x.vehicle_id))];
+      const m = {};
+      for (const vid of ids) {
+        const { data: pct } = await supabase.rpc("fn_ck_si_tra", { p_customer: custId, p_vehicle_id: vid, p_ngay: null });
+        if (pct !== null && pct !== undefined) m[vid] = Number(pct);
+      }
+      if (Object.keys(m).length) setXeRows((p) => p.map((x) => !(Number(x.discount_value) > 0) && m[x.vehicle_id] !== undefined ? { ...x, discount_type: "percent", discount_value: m[x.vehicle_id] } : x));
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [custId, kh.customer_type]);
   if (loading || !profile) return <div className="card">Đang tải dữ liệu…</div>;
 
   const cfields = (customFields || []).filter((c) => c.entity === "sales_order");
@@ -279,6 +295,10 @@ function TaoDonInner() {
       thieu_coc: u.coc_status === "CHUA_VE" || u.coc_status === "THAT_LAC",
       unit_price: v?.list_price || 0, discount_type: "amount", discount_value: 0,
     }]);
+    if (kh.customer_type === "Khách buôn" && custId) {
+      const { data: pct } = await supabase.rpc("fn_ck_si_tra", { p_customer: custId, p_vehicle_id: u.vehicle_id, p_ngay: null });
+      if (pct !== null && pct !== undefined) setXeRows((p) => p.map((x) => x.frame_number === s ? { ...x, discount_type: "percent", discount_value: Number(pct) } : x));
+    }
     notify(`Đã thêm ${v ? v.name : u.vehicle_id} · ${s}` + (coc > 0 ? ` · đã nhận cọc ${fmtVND(coc)}` : ""));
     if (u.coc_status === "CHUA_VE" || u.coc_status === "THAT_LAC") {
       notify(`⚠ Xe ${s} CHƯA có giấy COC — vẫn bán được nhưng nhớ bổ sung giấy cho khách sau.`, "err");
@@ -543,6 +563,12 @@ function TaoDonInner() {
               <Field label="Loại khách"><select className="inp" value={kh.customer_type} onChange={(e) => setKh((p) => ({ ...p, customer_type: e.target.value }))}>{CUSTOMER_TYPES.map((x) => <option key={x}>{x}</option>)}</select></Field>
               <Field label="Nguồn khách"><select className="inp" value={kh.customer_source} onChange={(e) => setKh((p) => ({ ...p, customer_source: e.target.value }))}>{CUSTOMER_SOURCES.map((x) => <option key={x}>{x}</option>)}</select></Field>
               <Field label="Địa chỉ"><input className="inp" value={kh.customer_address} onChange={(e) => setKh((p) => ({ ...p, customer_address: e.target.value }))} /></Field>
+              {kbSoDu && kbSoDu.tong !== 0 && (
+                <div className="md:col-span-2 p-2 rounded-lg bg-[#F3EEFF] border border-[#D9CCF5] text-[13px] flex justify-between flex-wrap gap-1">
+                  <span className="text-[#5B3FA0] font-semibold">Số dư bù khách buôn (KM hãng, bù pin){kbSoDu.mode === "CUOI_THANG" ? " · cấn trừ theo tháng" : ""}</span>
+                  <span><b className="text-[#5B3FA0]">{fmtVND(kbSoDu.kha_dung)}</b> <span className="text-[11px] text-[#8A93A0]">được cấn trừ — lưu đơn xong vào trang Khách buôn để cấn trừ</span></span>
+                </div>
+              )}
               {custId && (kh.customer_no || 0) > 0 && (
                 <div className="md:col-span-2 p-2 rounded-lg bg-[#FFF6F6] border border-[#F5B5B5] text-[13px] flex justify-between">
                   <span className="text-danger font-semibold">⚠ Nợ phải thu</span>
