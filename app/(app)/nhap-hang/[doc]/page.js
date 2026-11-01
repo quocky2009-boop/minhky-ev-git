@@ -92,7 +92,7 @@ export default function NhapChiTiet() {
     load();
   };
   const soXe = txns.reduce((s, t) => s + (t.qty || 0), 0);
-  const soMa = txns.length;
+  const soMa = new Set(txns.map((t) => t.vehicle_id)).size;
   const tongVon = units.reduce((s, u) => s + (u.cost_price || 0), 0);
 
   return (
