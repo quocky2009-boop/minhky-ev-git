@@ -141,7 +141,7 @@ export default function NhapChiTiet() {
                   <th className="text-right py-2 pr-2">Thành tiền</th>
                 </tr></thead>
                 <tbody>
-                  {txns.map((t) => {
+                  {Object.values(txns.reduce((m, t) => { (m[t.vehicle_id] = m[t.vehicle_id] || { ...t, qty: 0 }).qty += (t.qty || 0); return m; }, {})).map((t) => {
                     const us = units.filter((u) => u.vehicle_id === t.vehicle_id);
                     const gia = us[0]?.cost_price || 0;
                     return (
