@@ -13,7 +13,7 @@ const TAB_STATUS = { "tat-ca": null, "chua-nhap": "Chưa nhập", "nhap-mot-phan
 const STATUS_TONE = { "Chưa nhập": "amber", "Nhập một phần": "blue", "Hoàn thành": "green", "Đã hủy": "dark" };
 
 export default function DatHangNhap() {
-  const { supabase, vehicles, locations, settings, profile, loading, refresh } = useCatalog();
+  const { supabase, vehicles, locations, settings, profile, loading, refresh, regions } = useCatalog();
   const { toast, notify } = useToast();
   const [orders, setOrders] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -25,7 +25,7 @@ export default function DatHangNhap() {
 
   const [showForm, setShowForm] = useState(false);
   const [showImp, setShowImp] = useState(false);
-  const [meta, setMeta] = useState({ location_code: "", supplier: "", ngay_du_kien: "", note: "" });
+  const [meta, setMeta] = useState({ khu_vuc: [], supplier: "", ngay_du_kien: "", note: "" });
   const [lines, setLines] = useState([{ ...emptyLine }]);
 
   const load = async () => {
@@ -42,6 +42,7 @@ export default function DatHangNhap() {
   if (loading || !profile) return <div className="card">Đang tải dữ liệu…</div>;
 
   const locName = (c) => locations.find((l) => l.code === c)?.name || c;
+  const khuVucStr = (o) => (o.khu_vuc && o.khu_vuc.length ? o.khu_vuc.join(", ") : o.location_code ? locName(o.location_code) : "—");
   const vName = (id) => { const v = vehicles.find((x) => x.id === id); return v ? `${v.brand} ${v.name} ${v.color}` : id; };
   const sups = (settings?.suppliers || "VinFast\nTAILG").split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean);
 
@@ -54,7 +55,7 @@ export default function DatHangNhap() {
     return `${o.code} ${o.supplier} ${o.created_by_name} ${xeStr}`.toLowerCase().includes(kw);
   });
   const sorted = sort.sortFn(filtered, {
-    doc: (o) => o.code, date: (o) => o.created_at, kho: (o) => locName(o.location_code),
+    doc: (o) => o.code, date: (o) => o.created_at, kho: (o) => khuVucStr(o),
     ncc: (o) => o.supplier, sl: (o) => o.lines.reduce((s, l) => s + l.qty_ordered, 0), nv: (o) => o.created_by_name,
   });
 
@@ -69,16 +70,16 @@ export default function DatHangNhap() {
 
   const moForm = () => {
     setShowForm(true); setLines([{ ...emptyLine }]);
-    setMeta({ location_code: "", supplier: "", ngay_du_kien: "", note: "" });
+    setMeta({ khu_vuc: [], supplier: "", ngay_du_kien: "", note: "" });
   };
 
   const luuDon = async () => {
-    if (!meta.location_code) return notify("Chọn chi nhánh.", "err");
+    if (meta.khu_vuc.length === 0) return notify("Chọn ít nhất một khu vực.", "err");
     const ok = lines.filter((l) => l.vehicle_id && Number(l.qty) > 0);
     if (ok.length === 0) return notify("Chưa có dòng sản phẩm hợp lệ.", "err");
     setBusy(true);
     const { data, error } = await supabase.rpc("fn_tao_don_dat_hang", { p: {
-      location_code: meta.location_code, supplier: meta.supplier, ngay_du_kien: meta.ngay_du_kien || null, note: meta.note,
+      khu_vuc: meta.khu_vuc, supplier: meta.supplier, ngay_du_kien: meta.ngay_du_kien || null, note: meta.note,
       lines: ok.map((l) => ({ vehicle_id: l.vehicle_id, qty: Number(l.qty), note: l.note })),
     } });
     setBusy(false);
@@ -118,8 +119,16 @@ export default function DatHangNhap() {
           </div>
           <div className="card">
             <div className="font-extrabold mb-2.5">Thông tin đơn đặt hàng</div>
-            <Field label="Chi nhánh" required>
-              <LocSearch locations={locations} value={meta.location_code} onChange={(v) => setMeta((p) => ({ ...p, location_code: v }))} />
+            <Field label="Khu vực" required>
+              <div className="flex flex-wrap gap-x-4 gap-y-2 py-1.5">
+                {regions.map((r) => (
+                  <label key={r} className="inline-flex items-center gap-2 text-sm cursor-pointer">
+                    <input type="checkbox" checked={meta.khu_vuc.includes(r)} onChange={(e) => setMeta((p) => ({ ...p, khu_vuc: e.target.checked ? [...p.khu_vuc, r] : p.khu_vuc.filter((x) => x !== r) }))} />
+                    {r}
+                  </label>
+                ))}
+              </div>
+              <div className="text-[11px] text-[#8A93A0]">Kho nhập thật được chọn khi xe về.</div>
             </Field>
           </div>
         </div>
@@ -196,7 +205,7 @@ export default function DatHangNhap() {
                 <Th label="Mã đơn" k="doc" sort={sort} />
                 <Th label="Ngày tạo" k="date" sort={sort} />
                 <th className="th">Trạng thái</th>
-                <Th label="Chi nhánh" k="kho" sort={sort} />
+                <Th label="Khu vực" k="kho" sort={sort} />
                 <Th label="Nhà cung cấp" k="ncc" sort={sort} />
                 <Th label="Nhân viên tạo" k="nv" sort={sort} />
                 <Th label="SL đặt" k="sl" sort={sort} />
@@ -207,7 +216,7 @@ export default function DatHangNhap() {
                   <td className="td font-bold"><Link href={`/dat-hang-nhap/${o.id}`} className="text-brand hover:underline">{o.code}</Link></td>
                   <td className="td text-xs whitespace-nowrap">{fmtTime(o.created_at)}</td>
                   <td className="td"><Badge tone={STATUS_TONE[o.status]}>{o.status}</Badge></td>
-                  <td className="td text-[13px]">{locName(o.location_code)}</td>
+                  <td className="td text-[13px]">{khuVucStr(o)}</td>
                   <td className="td text-[13px]">{o.supplier || <span className="text-[#8A93A0]">—</span>}</td>
                   <td className="td text-xs">{o.created_by_name}</td>
                   <td className="td text-[13px]">{soLuong(o)}</td>

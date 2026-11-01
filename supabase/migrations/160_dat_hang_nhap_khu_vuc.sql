@@ -1,0 +1,3 @@
+-- Đã áp dụng qua MCP. Đơn đặt hàng nhập chọn theo KHU VỰC (nhiều khu vực), kho nhập thật chọn khi xe về.
+-- purchase_orders.khu_vuc text[] (backfill từ locations.region), location_code cho phép null
+-- fn_tao_don_dat_hang / fn_sua_don_dat_hang nhận khu_vuc (bắt buộc >=1); fn_ai_don_dat_hang left join

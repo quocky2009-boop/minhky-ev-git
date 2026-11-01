@@ -99,7 +99,7 @@ export default function ImportDatHang({ supabase, vehicles, locations, notify, o
         const g = (gm[key] = gm[key] || { key, cn, ncc, gcd, loc: null, ngay: null, lines: [], errors: [] });
         const err = (m) => g.errors.push({ row: r._row, msg: m });
         if (!cn) err("Thiếu Chi_Nhanh");
-        else { const l = byCode[cn.toLowerCase()] || byName[norm(cn)]; if (!l) err(`Không tìm thấy điểm "${cn}"`); else g.loc = l; }
+        else { const l = byCode[cn.toLowerCase()] || byName[norm(cn)]; const kv = !l && locs.find((x) => norm(x.region) === norm(cn))?.region; if (l) g.loc = l; else if (kv) g.loc = { code: "", name: kv, region: kv }; else err(`Không tìm thấy điểm/khu vực "${cn}"`); }
         if (!dt.ok) err(`Ngày dự kiến không hợp lệ (${r.ngay_du_kien}) — dùng dd/mm/yyyy`); else g.ngay = dt.val;
         const mx = String(r.ma_xe ?? "").trim(), mh = String(r.ma_hang ?? "").trim();
         let v = null;
@@ -136,7 +136,7 @@ export default function ImportDatHang({ supabase, vehicles, locations, notify, o
       const m = {};
       g.lines.forEach((l) => { const k = l.vehicle_id; if (m[k]) { m[k].qty += l.qty; if (l.note) m[k].note = (m[k].note ? m[k].note + "; " : "") + l.note; } else m[k] = { ...l }; });
       const { data, error } = await supabase.rpc("fn_tao_don_dat_hang", { p: {
-        location_code: g.loc.code, supplier: g.ncc, ngay_du_kien: g.ngay || null, note: g.gcd,
+        khu_vuc: [g.loc.region], supplier: g.ncc, ngay_du_kien: g.ngay || null, note: g.gcd,
         lines: Object.values(m).map((l) => ({ vehicle_id: l.vehicle_id, qty: l.qty, note: l.note })),
       } });
       if (error) fail.push(`${g.loc.name}/${g.ncc || "—"}: ${errMsg(error)}`); else ok.push(data.code);

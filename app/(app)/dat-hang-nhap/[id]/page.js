@@ -137,7 +137,7 @@ export default function DatHangNhapChiTiet() {
             <div className="flex flex-col gap-1.5 text-[13px]">
               {[
                 ["Mã đơn", po.code],
-                ["Chi nhánh", locName(po.location_code)],
+                ["Khu vực", po.khu_vuc?.length ? po.khu_vuc.join(", ") : locName(po.location_code)],
                 ["Nhân viên tạo", po.created_by_name],
                 ["Ngày tạo", fmtTime(po.created_at)],
                 po.ngay_du_kien && ["Ngày nhập dự kiến", po.ngay_du_kien],

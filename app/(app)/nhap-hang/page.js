@@ -49,7 +49,7 @@ function NhapHangInner() {
       ]);
       if (!o) return;
       setShowForm(true); setKetQua(null);
-      setMeta((p) => ({ ...p, location_code: o.location_code, supplier: o.supplier || "", po_id: o.id, po_code: o.code,
+      setMeta((p) => ({ ...p, location_code: o.location_code || "", po_kv: o.khu_vuc || [], supplier: o.supplier || "", po_id: o.id, po_code: o.code,
         nguoi_nhap_id: p.nguoi_nhap_id || profile.id, nguoi_nhap_name: p.nguoi_nhap_name || profile.name }));
       const conLai = (ln || []).filter((l) => l.qty_ordered > l.qty_received);
       setLines(conLai.length > 0 ? conLai.map((l) => ({ vehicle_id: l.vehicle_id, frames: [], cost_price: 0, note: "", con_thieu: l.qty_ordered - l.qty_received })) : [{ ...emptyLine }]);
@@ -64,7 +64,7 @@ function NhapHangInner() {
   // ===== FORM =====
   const [showForm, setShowForm] = useState(false);
   const [ketQua, setKetQua] = useState(null);
-  const [meta, setMeta] = useState({ location_code: "", supplier: "", doc: "", note: "", ngay: iso(new Date()), nguoi_nhap_id: "", nguoi_nhap_name: "", po_id: "", po_code: "" });
+  const [meta, setMeta] = useState({ location_code: "", supplier: "", doc: "", note: "", ngay: iso(new Date()), nguoi_nhap_id: "", nguoi_nhap_name: "", po_id: "", po_code: "", po_kv: [] });
   const [lines, setLines] = useState([{ ...emptyLine }]);
   const [congNo, setCongNo] = useState({ ...emptyCongNo });
   const [scanIdx, setScanIdx] = useState(null);
@@ -189,7 +189,7 @@ function NhapHangInner() {
 
   const moForm = () => {
     setShowForm(true); setKetQua(null); setLines([{ ...emptyLine }]); setCongNo({ ...emptyCongNo });
-    setMeta({ location_code: "", supplier: "", doc: "", note: "", ngay: iso(new Date()), nguoi_nhap_id: profile?.id || "", nguoi_nhap_name: profile?.name || "", po_id: "", po_code: "" });
+    setMeta({ location_code: "", supplier: "", doc: "", note: "", ngay: iso(new Date()), nguoi_nhap_id: profile?.id || "", nguoi_nhap_name: profile?.name || "", po_id: "", po_code: "", po_kv: [] });
   };
   const dongForm = () => { setShowForm(false); setKetQua(null); load(); };
 
@@ -311,7 +311,7 @@ function NhapHangInner() {
             <div className="font-extrabold mb-2.5">Thông tin bổ sung</div>
             <div className="flex flex-col gap-2.5">
               <Field label="Nhập vào kho" required>
-                <LocSearch locations={locations} value={meta.location_code} onChange={(v) => setMeta((p) => ({ ...p, location_code: v }))} placeholder="Chọn kho / cửa hàng" />
+                <LocSearch locations={meta.po_kv?.length ? locations.filter((l) => meta.po_kv.includes(l.region)) : locations} value={meta.location_code} onChange={(v) => setMeta((p) => ({ ...p, location_code: v }))} placeholder="Chọn kho / cửa hàng" />
               </Field>
               <Field label="Người nhập">
                 <select className="inp" value={meta.nguoi_nhap_id || ""}
