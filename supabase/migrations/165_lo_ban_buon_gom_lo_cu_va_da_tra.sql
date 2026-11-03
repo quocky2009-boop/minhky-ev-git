@@ -1,0 +1,5 @@
+-- Đã áp dụng qua MCP.
+-- _lo_tong: thêm tien_lo; da_tra = (tiền thu ở lô chưa phân bổ) + tổng paid_amount các đơn xe còn hiệu lực của lô
+--   (để lô gom từ đơn cũ — tiền thu trực tiếp trên đơn xe — vẫn tính đúng đã trả). v_don_buon: so_du_chua_phan_bo = tien_lo − phan_bo.
+-- _lo_phan_bo, fn_lo_dao_nguoc_tt dùng tien_lo.
+-- Gom 2 lô cũ ĐL Nam Thảo: BB-2611-0001 (chốt 23/10, 6 xe, 132.804.000) và BB-2611-0002 (chốt 01/11, 6 xe, 101.493.000).

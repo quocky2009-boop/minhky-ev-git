@@ -3,9 +3,10 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Badge, Toast, KPI, Field, MoneyInput, VehicleSearch, LocSearch, SearchPicker } from "@/components/ui";
+import { Badge, Toast, KPI, Field, MoneyInput, VehicleSearch, LocSearch, SearchPicker, MultiCheck, Pager, pageSlice, pageClamp, useSortable, Th } from "@/components/ui";
+import { QuickDates, AmountFilter, SavedFilters, TongLoc, trongKhoang } from "@/components/FinFilters";
 import BankOptions from "@/components/BankOptions";
-import { fmtVND, fmtDate, fmtTime, errMsg } from "@/lib/format";
+import { fmtVND, fmtDate, fmtTime, errMsg, downloadXLSX } from "@/lib/format";
 
 const TT_TONE = { "Chờ giao": "amber", "Đang giao": "blue", "Đã giao đủ": "green", "Đã hủy": "dark" };
 const homNay = () => new Date().toLocaleDateString("sv-SE");
@@ -20,15 +21,33 @@ function BanBuonInner() {
   const [khs, setKhs] = useState([]);
   const [busy, setBusy] = useState(false);
   const [q, setQ] = useState("");
-  const [fTT, setFTT] = useState("");
+  const [fTT, setFTT] = useState([]);
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [fKh, setFKh] = useState([]);
+  const [fLoc, setFLoc] = useState([]);
+  const [fNv, setFNv] = useState([]);
+  const [fTra, setFTra] = useState("");
+  const [aMin, setAMin] = useState("");
+  const [aMax, setAMax] = useState("");
+  const [showHuy, setShowHuy] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [xeLo, setXeLo] = useState({}); // don_buon_id -> "so khung, ma don" de tim kiem
+  const sort = useSortable();
   const [form, setForm] = useState(null); // tao / sua lo
   const [lo, setLo] = useState(null);     // chi tiet lo
   const [banks, setBanks] = useState([]);
   const admin = ["CEO", "ADMIN"].includes(profile?.role);
 
   const loadDs = async () => {
-    const { data } = await supabase.from("v_don_buon").select("*").order("created_at", { ascending: false }).limit(500);
-    setDs(data || []);
+    const [{ data }, { data: os }] = await Promise.all([
+      supabase.from("v_don_buon").select("*").order("ngay_chot", { ascending: false }).order("id", { ascending: false }).limit(2000),
+      supabase.from("sales_orders").select("code,frame_number,don_buon_id,end_customer_name").not("don_buon_id", "is", null).limit(10000),
+    ]);
+    const m = {};
+    (os || []).forEach((o) => { m[o.don_buon_id] = `${m[o.don_buon_id] || ""} ${o.code} ${o.frame_number || ""} ${o.end_customer_name || ""}`; });
+    setDs(data || []); setXeLo(m);
   };
   useEffect(() => {
     if (loading || !profile) return;
@@ -144,7 +163,31 @@ function BanBuonInner() {
     return { ...L, chon: { ...L.chon, [dongId]: next } };
   });
 
-  const dsLoc = ds.filter((d) => (!fTT || d.trang_thai === fTT) && (!q || `${d.code} ${d.customer_name} ${d.customer_code}`.toLowerCase().includes(q.toLowerCase())));
+  const kw = q.trim().toLowerCase();
+  const dsLoc = ds.filter((d) => {
+    if (!showHuy && d.trang_thai === "Đã hủy" && !fTT.includes("Đã hủy")) return false;
+    if (from && d.ngay_chot < from) return false;
+    if (to && d.ngay_chot > to) return false;
+    if (fTT.length && !fTT.includes(d.trang_thai)) return false;
+    if (fKh.length && !fKh.includes(String(d.customer_id))) return false;
+    if (fLoc.length && !fLoc.includes(d.location_code || "")) return false;
+    if (fNv.length && !fNv.includes(d.created_by_name || "")) return false;
+    if (fTra === "con_no" && !(d.con_phai_tra > 0)) return false;
+    if (fTra === "du" && d.con_phai_tra > 0) return false;
+    if (fTra === "chua_tra" && d.da_tra > 0) return false;
+    if (!trongKhoang(d.con_phai_tra, aMin, aMax) && (aMin || aMax)) return false;
+    if (kw && !`${d.code} ${d.customer_name} ${d.customer_code} ${d.customer_phone || ""} ${d.note || ""} ${xeLo[d.id] || ""}`.toLowerCase().includes(kw)) return false;
+    return true;
+  });
+  const dsSort = sort.sortFn(dsLoc, { code: (d) => d.code, ngay: (d) => d.ngay_chot, kh: (d) => d.customer_name, sl: (d) => d.sl_dat, pt: (d) => Number(d.phai_tra), dt: (d) => Number(d.da_tra), con: (d) => Number(d.con_phai_tra), tt: (d) => d.trang_thai });
+  const curPage = pageClamp(page, dsSort.length, pageSize);
+  const nHuy = ds.filter((d) => d.trang_thai === "Đã hủy").length;
+  const dsActive = dsLoc.filter((d) => d.trang_thai !== "Đã hủy");
+  const resetPage = () => setPage(1);
+  const xuatExcel = () => downloadXLSX(`don_ban_buon_${from || "dau"}_den_${to || "nay"}.xlsx`, [
+    ["Mã lô", "Ngày chốt", "Khách buôn", "Mã KH", "Cửa hàng", "SL đặt", "SL giao", "Phải trả", "Đã trả", "Còn phải trả", "Trạng thái", "Người tạo", "Ghi chú"],
+    ...dsSort.map((d) => [d.code, d.ngay_chot, d.customer_name, d.customer_code, locName(d.location_code), d.sl_dat, d.sl_giao, Number(d.phai_tra), Number(d.da_tra), Number(d.con_phai_tra), d.trang_thai, d.created_by_name, d.note || ""]),
+  ], "Don ban buon");
   const tongForm = form ? form.lines.reduce((s, l) => s + tienDong(l), 0) : 0;
 
   return (
@@ -154,31 +197,66 @@ function BanBuonInner() {
       {!form && !lo && (
         <>
           <div className="flex gap-3 flex-wrap">
-            <KPI label="Lô đang mở" value={ds.filter((d) => ["Chờ giao", "Đang giao"].includes(d.trang_thai)).length} />
-            <KPI label="Xe chờ giao" value={ds.filter((d) => d.trang_thai !== "Đã hủy").reduce((s, d) => s + (d.sl_dat - d.sl_giao), 0)} tone="amber" />
-            <KPI label="Khách buôn còn phải trả" value={fmtVND(ds.filter((d) => d.trang_thai !== "Đã hủy").reduce((s, d) => s + Number(d.con_phai_tra), 0))} tone="red" />
+            <KPI label="Số lô (theo bộ lọc)" value={dsActive.length} sub={`${dsActive.filter((d) => ["Chờ giao", "Đang giao"].includes(d.trang_thai)).length} lô đang mở`} />
+            <KPI label="Xe chờ giao" value={dsActive.reduce((s, d) => s + (d.sl_dat - d.sl_giao), 0)} tone="amber" sub={`đã giao ${dsActive.reduce((s, d) => s + d.sl_giao, 0)}/${dsActive.reduce((s, d) => s + d.sl_dat, 0)} xe`} />
+            <KPI label="Doanh số bán buôn" value={fmtVND(dsActive.reduce((s, d) => s + Number(d.phai_tra), 0))} tone="blue" />
+            <KPI label="Khách buôn còn phải trả" value={fmtVND(dsActive.reduce((s, d) => s + Number(d.con_phai_tra), 0))} tone="red" />
           </div>
           <div className="card">
             <div className="flex items-center gap-2 mb-2 flex-wrap">
-              <div className="font-extrabold mr-auto">Đơn bán buôn theo lô</div>
-              <select className="inp !w-auto" value={fTT} onChange={(e) => setFTT(e.target.value)}>
-                <option value="">Mọi trạng thái</option>{Object.keys(TT_TONE).map((k) => <option key={k}>{k}</option>)}
-              </select>
-              <input className="inp !w-56" placeholder="Tìm mã lô, khách buôn…" value={q} onChange={(e) => setQ(e.target.value)} />
+              <div className="font-extrabold mr-auto">Đơn bán buôn theo lô ({dsSort.length})</div>
+              <button className="btn-ghost !text-xs" onClick={xuatExcel}>⬇ Excel</button>
               <button className="btn-primary !text-xs" onClick={moTao}>+ Tạo lô bán buôn</button>
             </div>
+            <div className="flex gap-2 flex-wrap items-center mb-2">
+              <QuickDates from={from} to={to} setFrom={setFrom} setTo={setTo} onChange={resetPage} />
+              <input type="date" className="inp !w-auto !py-1.5 !text-xs" value={from} onChange={(e) => { setFrom(e.target.value); resetPage(); }} />
+              <input type="date" className="inp !w-auto !py-1.5 !text-xs" value={to} onChange={(e) => { setTo(e.target.value); resetPage(); }} />
+              {(from || to) && <button className="btn-ghost !text-xs !py-1" onClick={() => { setFrom(""); setTo(""); resetPage(); }}>Mọi ngày</button>}
+            </div>
+            <div className="flex gap-2 flex-wrap items-center mb-3">
+              <MultiCheck label="Khách buôn: tất cả" value={fKh} onChange={(v) => { setFKh(v); resetPage(); }}
+                options={[...new Map(ds.map((d) => [String(d.customer_id), { key: String(d.customer_id), label: d.customer_name }])).values()].sort((a, b) => a.label.localeCompare(b.label))} />
+              <MultiCheck label="Cửa hàng: tất cả" value={fLoc} onChange={(v) => { setFLoc(v); resetPage(); }}
+                options={[...new Set(ds.map((d) => d.location_code || ""))].map((c) => ({ key: c, label: c ? locName(c) : "(chưa chọn)" }))} />
+              <MultiCheck label="Trạng thái: tất cả" value={fTT} onChange={(v) => { setFTT(v); resetPage(); }} width="w-52"
+                options={Object.keys(TT_TONE).map((k) => ({ key: k, label: k }))} />
+              <select className="inp !w-auto" value={fTra} onChange={(e) => { setFTra(e.target.value); resetPage(); }}>
+                <option value="">Thanh toán: tất cả</option><option value="con_no">Còn phải trả</option><option value="chua_tra">Chưa trả đồng nào</option><option value="du">Đã trả đủ</option>
+              </select>
+              <MultiCheck label="Người tạo: tất cả" value={fNv} onChange={(v) => { setFNv(v); resetPage(); }} width="w-52"
+                options={[...new Set(ds.map((d) => d.created_by_name || ""))].filter(Boolean).sort().map((n) => ({ key: n, label: n }))} />
+              <AmountFilter min={aMin} max={aMax} setMin={setAMin} setMax={setAMax} onChange={resetPage} />
+              <button className={`btn-ghost !text-xs ${showHuy ? "!bg-[#FDEDED] !text-danger" : ""}`} onClick={() => { setShowHuy(!showHuy); resetPage(); }}>{showHuy ? "Đang hiện lô hủy" : `Lô hủy${nHuy ? ` (${nHuy})` : ""}`}</button>
+              <input className="inp !w-64" placeholder="Tìm mã lô, khách, SĐT, số khung, mã đơn xe, khách lẻ cuối…" value={q} onChange={(e) => { setQ(e.target.value); resetPage(); }} />
+              <SavedFilters k="ban-buon" state={{ fKh, fLoc, fTT, fTra, fNv }} apply={(x) => { setFKh(x.fKh || []); setFLoc(x.fLoc || []); setFTT(x.fTT || []); setFTra(x.fTra || ""); setFNv(x.fNv || []); }} />
+            </div>
+            <div className="text-[11px] text-[#8A93A0] -mt-1 mb-2">Ô số tiền lọc theo <b>Còn phải trả</b>.</div>
+            <TongLoc>
+              <span>{dsActive.length} lô · {dsActive.reduce((s, d) => s + d.sl_dat, 0)} xe</span>
+              <span>Phải trả: <b>{fmtVND(dsActive.reduce((s, d) => s + Number(d.phai_tra), 0))}</b></span>
+              <span>Đã trả: <b className="text-[#0E7A4A]">{fmtVND(dsActive.reduce((s, d) => s + Number(d.da_tra), 0))}</b></span>
+              <span>Còn: <b className="text-danger">{fmtVND(dsActive.reduce((s, d) => s + Number(d.con_phai_tra), 0))}</b></span>
+            </TongLoc>
             <div className="overflow-x-auto"><table className="w-full text-[13px]">
-              <thead><tr className="text-left text-[11.5px] text-[#8A93A0] uppercase border-b border-[#E3E8EF]"><th className="py-2">Mã lô</th><th>Ngày chốt</th><th>Khách buôn</th><th className="text-right">Đặt / giao</th><th className="text-right">Phải trả</th><th className="text-right">Đã trả</th><th className="text-right">Còn</th><th>Trạng thái</th></tr></thead>
-              <tbody>{dsLoc.map((d) => (
-                <tr key={d.id} className="border-b border-dashed border-[#F0F2F5] cursor-pointer hover:bg-[#F8FAFC]" onClick={() => { moLo(d.id); router.replace(`/ban-buon?id=${d.id}`); }}>
-                  <td className="py-2 font-bold text-brand">{d.code}</td><td>{fmtDate(d.ngay_chot)}</td><td>{d.customer_name}</td>
+              <thead><tr className="text-left text-[11.5px] text-[#8A93A0] uppercase border-b border-[#E3E8EF]">
+                <Th label="Mã lô" k="code" sort={sort} /><Th label="Ngày chốt" k="ngay" sort={sort} /><Th label="Khách buôn" k="kh" sort={sort} /><th className="th">Cửa hàng</th>
+                <Th label="Đặt / giao" k="sl" sort={sort} className="text-right" /><Th label="Phải trả" k="pt" sort={sort} className="text-right" /><Th label="Đã trả" k="dt" sort={sort} className="text-right" />
+                <Th label="Còn" k="con" sort={sort} className="text-right" /><Th label="Trạng thái" k="tt" sort={sort} /><th className="th">Người tạo</th>
+              </tr></thead>
+              <tbody>{pageSlice(dsSort, curPage, pageSize).map((d) => (
+                <tr key={d.id} className={`border-b border-dashed border-[#F0F2F5] cursor-pointer hover:bg-[#F8FAFC] ${d.trang_thai === "Đã hủy" ? "opacity-50" : ""}`} onClick={() => { moLo(d.id); router.replace(`/ban-buon?id=${d.id}`); }}>
+                  <td className="py-2 font-bold text-brand">{d.code}</td><td>{fmtDate(d.ngay_chot)}</td><td>{d.customer_name}<div className="text-[11px] text-[#8A93A0]">{d.customer_code}</div></td>
+                  <td className="text-[12px]">{locName(d.location_code)}</td>
                   <td className="text-right">{d.sl_giao}/{d.sl_dat}</td><td className="text-right">{fmtVND(d.phai_tra)}</td><td className="text-right">{fmtVND(d.da_tra)}</td>
                   <td className={`text-right font-bold ${d.con_phai_tra > 0 ? "text-danger" : ""}`}>{d.con_phai_tra > 0 ? fmtVND(d.con_phai_tra) : "—"}</td>
                   <td><Badge tone={TT_TONE[d.trang_thai]}>{d.trang_thai}</Badge></td>
+                  <td className="text-[12px] text-[#5A6572]">{d.created_by_name}</td>
                 </tr>
               ))}
-              {dsLoc.length === 0 && <tr><td colSpan={8} className="py-3 text-[#8A93A0]">Chưa có lô bán buôn.</td></tr>}</tbody>
+              {dsSort.length === 0 && <tr><td colSpan={10} className="py-3 text-[#8A93A0]">Không có lô nào theo bộ lọc.</td></tr>}</tbody>
             </table></div>
+            <Pager total={dsSort.length} page={curPage} setPage={setPage} pageSize={pageSize} setPageSize={setPageSize} />
           </div>
         </>
       )}
