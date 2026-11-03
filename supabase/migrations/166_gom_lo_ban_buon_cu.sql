@@ -1,0 +1,6 @@
+-- Đã áp dụng qua MCP.
+-- _lo_tong.phai_tra = phần chưa giao (đơn giá dòng) + tổng thực tế các đơn xe đã giao (_tong_don + kb_dieu_chinh) — luôn khớp đơn thật.
+-- Gom toàn bộ đơn bán buôn cũ (trừ "Khách lẻ Test A") thành lô theo khách × ngày bán: 37 lô mới (tổng 39 lô, 118 xe).
+--   Dòng lô nhóm theo (xe, giá, CK%); CK theo số tiền quy đổi ra %; chiết khấu đơn hàng giữ nguyên trên đơn xe.
+-- Phát hiện (chưa sửa, chờ CEO xác nhận): 4 khách có tiền đã thu trên đơn và phiếu thu quỹ lớn hơn phải trả
+--   (A Đức Thác Bà +316.620.480, A Thảo Hà +170.333.778, Dũng Duyên +60.588.000, A Toàn Huyền +13.632.000) — nghi ghi thu trùng (cả lô ghi vào 1 đơn).
