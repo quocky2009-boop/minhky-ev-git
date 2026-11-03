@@ -563,6 +563,11 @@ function TaoDonInner() {
               <Field label="Loại khách"><select className="inp" value={kh.customer_type} onChange={(e) => setKh((p) => ({ ...p, customer_type: e.target.value }))}>{CUSTOMER_TYPES.map((x) => <option key={x}>{x}</option>)}</select></Field>
               <Field label="Nguồn khách"><select className="inp" value={kh.customer_source} onChange={(e) => setKh((p) => ({ ...p, customer_source: e.target.value }))}>{CUSTOMER_SOURCES.map((x) => <option key={x}>{x}</option>)}</select></Field>
               <Field label="Địa chỉ"><input className="inp" value={kh.customer_address} onChange={(e) => setKh((p) => ({ ...p, customer_address: e.target.value }))} /></Field>
+              {kh.customer_type === "Khách buôn" && (
+                <div className="md:col-span-2 p-2 rounded-lg bg-[#FFF6E5] border border-[#F5D9A8] text-[12.5px] text-[#A25F00]">
+                  Bán buôn nên lên ở <Link className="underline font-semibold" href="/ban-buon">Đơn bán buôn (theo lô)</Link>: thu tiền ở lô và tự chia cho từng xe. Nếu vẫn lên ở đây, tiền thanh toán sẽ ghi vào <b>đơn đầu tiên</b> — <b>không “thu thêm” lại ở các đơn còn lại</b> (gây ghi thu trùng).
+                </div>
+              )}
               {kbSoDu && kbSoDu.tong !== 0 && (
                 <div className="md:col-span-2 p-2 rounded-lg bg-[#F3EEFF] border border-[#D9CCF5] text-[13px] flex justify-between flex-wrap gap-1">
                   <span className="text-[#5B3FA0] font-semibold">Số dư bù khách buôn (KM hãng, bù pin){kbSoDu.mode === "CUOI_THANG" ? " · cấn trừ theo tháng" : ""}</span>
