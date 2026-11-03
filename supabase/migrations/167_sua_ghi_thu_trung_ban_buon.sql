@@ -1,0 +1,6 @@
+-- Đã áp dụng qua MCP (dữ liệu, theo xác nhận CEO). Sửa ghi thu trùng bán buôn: tiền cả lô ghi vào 1 đơn rồi "thu thêm" từng đơn.
+-- BB-2611-0032 (A Đức 04/10): PT-2610-00637 123.310.000 → 26.505.000 (thực thu cả lô 123.074.000, CK Amio đúng 6%).
+-- BB-2611-0024, 0034, 0031, 0035, 0012: đảo ngược các khoản "thu thêm" trùng (phiếu chi 'Đảo ngược thu sai'), chia khoản thu cả lô xuống từng xe (giữ quỹ, ngày thu).
+-- BB-2611-0038: đảo ngược PT-2610-84934 (BH-2610-13991 thu 2 lần).
+-- Khoản sai trước mốc chốt số dư thực tế (quỹ TM 05/10, SHB/BIDV 08/10): bù vào số dư đầu kỳ (so_du_dau_ky_log) để số dư tại ngày chốt không đổi.
+-- Kết quả: Quỹ tiền mặt Thành phố 790.263.000 → 564.242.000 (bỏ 226.021.000 ghi trùng sau 05/10). Còn chờ xác nhận: BB-2611-0008, 0011, 0013, 0039.
