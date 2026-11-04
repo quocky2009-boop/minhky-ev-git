@@ -1,0 +1,9 @@
+-- Đã áp dụng qua MCP.
+-- 1) KTV tạo xe + khách mới ở Lệnh sửa chữa: fn_xe_luu dùng khách sẵn có theo SĐT; fn_luu_khach_hang_v2 cho phép tạo MỚI
+--    (source 'Dịch vụ', SĐT chưa có) khi có quyền dv_tiep_nhan, không cần sua_khach.
+-- 2) Quyền mới (role_perms, CEO luôn có): bb_lo, bb_sua_ck, bb_dao_nguoc, bb_ck_si, kb_can_tru, kb_dieu_chinh,
+--    dhn_tao (mặc định = nhap_hang), dhn_dong, gia_von_nhap, gia_von_bo_sung. Mặc định: CHT có bb_lo, bb_sua_ck, kb_can_tru, dhn_tao, gia_von_nhap.
+--    Các hàm fn_lo_*, fn_ck_si_*, fn_kb_*, fn_*_don_dat_hang, fn_*_chuyen_dat_hang, fn_nhap_hang_v2, fn_bo_sung_gia_von, fn_sua_don_nhap, fn_set_gia_von
+--    đổi sang kiểm tra fn_co_quyen(<quyền>).
+-- 3) Dữ liệu: sửa lô BB-2611-0013 (80tr vào TK bán buôn + 8.088.000 tiền mặt, khách đã trả đủ) và BB-2611-0039 (CK 7%, đảo ngược 2 khoản trùng,
+--    khách trả dư 1.134.000 ghi sổ khách buôn). Bù đầu kỳ cho khoản trước mốc chốt / mở TK.

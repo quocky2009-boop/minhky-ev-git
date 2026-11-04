@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Badge, Toast, KPI, Field, MoneyInput } from "@/components/ui";
 import { fmtVND, fmtDate, errMsg } from "@/lib/format";
+import { usePerms } from "@/lib/usePerms";
 
 const LOAI = { BU_PIN: "Bù pin (thuê pin)", KHUYEN_MAI: "KM hãng", CAN_TRU: "Cấn trừ vào đơn", HOAN_CAN_TRU: "Hoàn cấn trừ", DIEU_CHINH_TAY: "Điều chỉnh tay" };
 const LOAI_TONE = { BU_PIN: "amber", KHUYEN_MAI: "purple", CAN_TRU: "blue", HOAN_CAN_TRU: "dark", DIEU_CHINH_TAY: "gray" };
@@ -37,7 +38,9 @@ function KhachBuonInner() {
   const [ckF, setCkF] = useState(null);
   const [ckKh, setCkKh] = useState("");
   const [q, setQ] = useState("");
-  const admin = ["CEO", "ADMIN"].includes(profile?.role);
+  const can = usePerms(supabase, profile);
+  const admin = can("kb_dieu_chinh"); // dieu chinh tay, huy dong, che do can tru
+  const ckAdmin = can("bb_ck_si");
 
   const loadDs = async () => {
     setBusy(true);
@@ -230,7 +233,7 @@ function KhachBuonInner() {
               </select>
               <button className="btn-ghost !text-xs" onClick={xuatExcel}>⬇ Xuất sao kê Excel</button>
               {admin && <button className="btn-ghost !text-xs" onClick={() => setTayF({ chieu: "+", amount: 0, note: "", ngay: homNay() })}>± Điều chỉnh tay</button>}
-              <button className="btn-primary !text-xs" disabled={!sdChon || sdChon.kd <= 0 || donMo.length === 0} onClick={() => setCtF({ sale_code: donMo[donMo.length - 1]?.code || "", amount: Math.min(sdChon.kd, conLai(donMo[donMo.length - 1] || {})), note: "" })}>Cấn trừ vào đơn</button>
+              <button className="btn-primary !text-xs" disabled={!can("kb_can_tru") || !sdChon || sdChon.kd <= 0 || donMo.length === 0} onClick={() => setCtF({ sale_code: donMo[donMo.length - 1]?.code || "", amount: Math.min(sdChon.kd, conLai(donMo[donMo.length - 1] || {})), note: "" })}>Cấn trừ vào đơn</button>
             </div>
           </div>
 
@@ -304,9 +307,9 @@ function KhachBuonInner() {
               <option value="">Tất cả khách buôn</option>
               {khs.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
-            {admin && <button className="btn-primary !text-xs" onClick={() => setCkF({ id: null, customer_id: ckKh || "", bm: "", pct: "", tu_ngay: homNay(), den_ngay: "", note: "" })}>+ Thêm</button>}
+            {ckAdmin && <button className="btn-primary !text-xs" onClick={() => setCkF({ id: null, customer_id: ckKh || "", bm: "", pct: "", tu_ngay: homNay(), den_ngay: "", note: "" })}>+ Thêm</button>}
           </div>
-          <p className="text-[12px] text-[#5A6572] mb-2">Khi lên đơn cho khách buôn (trang Bán hàng), hệ thống tự điền CK sỉ đang hiệu lực theo model xe. Đổi mức CK thì thêm dòng mới với ngày bắt đầu mới — không sửa lại các đơn đã lên.{!admin && " Chỉ Ban giám đốc/Admin được sửa bảng này."}</p>
+          <p className="text-[12px] text-[#5A6572] mb-2">Khi lên đơn cho khách buôn (trang Bán hàng), hệ thống tự điền CK sỉ đang hiệu lực theo model xe. Đổi mức CK thì thêm dòng mới với ngày bắt đầu mới — không sửa lại các đơn đã lên.{!ckAdmin && " Cần quyền “Sửa bảng chiết khấu sỉ” để thêm/sửa."}</p>
           <div className="overflow-x-auto"><table className="w-full text-[13px]">
             <thead><tr className="text-left text-[11.5px] text-[#8A93A0] uppercase border-b border-[#E3E8EF]"><th className="py-2">Khách buôn</th><th>Model</th><th className="text-right">CK sỉ</th><th>Từ ngày</th><th>Đến ngày</th><th>Ghi chú</th><th></th></tr></thead>
             <tbody>{ckLoc.map((r) => (
@@ -317,7 +320,7 @@ function KhachBuonInner() {
                 <td>{fmtDate(r.tu_ngay)}</td>
                 <td>{r.den_ngay ? fmtDate(r.den_ngay) : "—"} {conHieuLuc(r) && <Badge tone="green">Hiệu lực</Badge>}</td>
                 <td className="text-[12px]">{r.note}</td>
-                <td className="text-right whitespace-nowrap">{admin && <>
+                <td className="text-right whitespace-nowrap">{ckAdmin && <>
                   <button className="btn-ghost !px-2 !py-0.5 !text-xs" onClick={() => setCkF({ id: r.id, customer_id: r.customer_id, bm: `${r.brand}|${r.model}`, pct: r.pct, tu_ngay: r.tu_ngay, den_ngay: r.den_ngay || "", note: r.note })}>✎</button>
                   <button className="btn-ghost !px-2 !py-0.5 !text-xs !text-danger" onClick={() => xoaCk(r)}>✕</button>
                 </>}</td>

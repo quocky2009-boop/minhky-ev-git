@@ -6,6 +6,7 @@ import { useCatalog, useToast } from "@/lib/useData";
 import { Badge, Toast, KPI, Field, MoneyInput, VehicleSearch, LocSearch, SearchPicker, MultiCheck, Pager, pageSlice, pageClamp, useSortable, Th } from "@/components/ui";
 import { QuickDates, AmountFilter, SavedFilters, TongLoc, trongKhoang } from "@/components/FinFilters";
 import BankOptions from "@/components/BankOptions";
+import { usePerms } from "@/lib/usePerms";
 import { fmtVND, fmtDate, fmtTime, errMsg, downloadXLSX } from "@/lib/format";
 
 const TT_TONE = { "Chờ giao": "amber", "Đang giao": "blue", "Đã giao đủ": "green", "Đã hủy": "dark" };
@@ -38,7 +39,8 @@ function BanBuonInner() {
   const [form, setForm] = useState(null); // tao / sua lo
   const [lo, setLo] = useState(null);     // chi tiet lo
   const [banks, setBanks] = useState([]);
-  const admin = ["CEO", "ADMIN"].includes(profile?.role);
+  const can = usePerms(supabase, profile);
+  const admin = can("bb_sua_ck"); // duoc sua % CK si tren lo
 
   const loadDs = async () => {
     const [{ data }, { data: os }] = await Promise.all([
@@ -103,7 +105,7 @@ function BanBuonInner() {
     const lines = form.lines.filter((l) => l.vehicle_id && Number(l.qty) > 0);
     if (!lines.length) return notify("Thêm ít nhất một dòng xe.", "err");
     const thieuCk = lines.filter((l) => l.ck_pct === "" || l.ck_pct === null);
-    if (thieuCk.length && !admin) return notify(`Chưa có CK sỉ cho: ${thieuCk.map((l) => vName(l.vehicle_id)).join(", ")}. Nhờ Ban giám đốc/Admin thêm ở Khách buôn › Bảng chiết khấu sỉ.`, "err");
+    if (thieuCk.length && !admin) return notify(`Chưa có CK sỉ cho: ${thieuCk.map((l) => vName(l.vehicle_id)).join(", ")}. Nhờ người có quyền thêm ở Khách buôn › Bảng chiết khấu sỉ, hoặc người có quyền “Sửa % CK sỉ trên lô” nhập trực tiếp.`, "err");
     setBusy(true);
     const { data, error } = await supabase.rpc("fn_lo_luu", { p: { id: form.id, customer_id: Number(form.customer_id), location_code: form.location_code, ngay_chot: form.ngay_chot, note: form.note,
       lines: lines.map((l) => ({ id: l.id || null, vehicle_id: l.vehicle_id, qty: Number(l.qty), ck_pct: admin && l.ck_pct !== "" ? Number(l.ck_pct) : null, note: l.note || "" })) } });
@@ -297,7 +299,7 @@ function BanBuonInner() {
               <div className="mr-auto text-[13px]">Tổng {form.lines.reduce((s, l) => s + (Number(l.qty) || 0), 0)} xe · <b className="text-brand text-[15px]">Khách buôn cần trả {fmtVND(tongForm)}</b></div>
               <button className="btn-primary" disabled={busy} onClick={luuLo}>{busy ? "Đang lưu…" : "Lưu lô"}</button>
             </div>
-            <div className="text-[11.5px] text-[#8A93A0] mt-1">CK sỉ tự lấy từ Bảng chiết khấu sỉ (Khách buôn › Bảng chiết khấu sỉ) theo khách, model và ngày chốt.{admin ? " Ban giám đốc/Admin có thể sửa % trực tiếp." : ""}</div>
+            <div className="text-[11.5px] text-[#8A93A0] mt-1">CK sỉ tự lấy từ Bảng chiết khấu sỉ (Khách buôn › Bảng chiết khấu sỉ) theo khách, model và ngày chốt.{admin ? " Bạn được quyền sửa % trực tiếp trên lô." : " Cần quyền “Sửa % CK sỉ trên lô” để sửa % trực tiếp."}</div>
           </div>
         </>
       )}
@@ -400,7 +402,7 @@ function BanBuonInner() {
                       <div className="flex gap-2"><button className="btn-ghost !text-xs flex-1" onClick={() => setLo((L) => ({ ...L, pay: null }))}>Hủy</button><button className="btn-ok !text-xs flex-1" disabled={busy} onClick={thuTien}>Ghi thu</button></div>
                     </div>
                   )}
-                  {!huy && lo.kb && lo.kb.kha_dung > 0 && (
+                  {!huy && can("kb_can_tru") && lo.kb && lo.kb.kha_dung > 0 && (
                     <div className="rounded-lg bg-[#F8F5FF] border border-[#D9CCF5] p-2 mb-2 text-[12.5px]">
                       Số dư bù khách buôn được cấn trừ: <b className="text-[#5B3FA0]">{fmtVND(lo.kb.kha_dung)}</b>
                       {lo.ct ? (
@@ -416,7 +418,7 @@ function BanBuonInner() {
                     <div key={t.id} className={`flex items-center gap-2 text-[12.5px] py-1.5 border-b border-dashed border-[#F0F2F5] ${t.is_reversed ? "opacity-50 line-through" : ""}`}>
                       <div className="mr-auto"><b>{t.loai === "CAN_TRU" ? "Cấn trừ công nợ KB" : t.method}</b>{t.cash_txn_code && <span className="text-[#8A93A0]"> · {t.cash_txn_code}</span>}<div className="text-[11px] text-[#8A93A0]">{fmtTime(t.created_at)} · {t.created_by_name}{t.note ? ` · ${t.note}` : ""}</div></div>
                       <b>{fmtVND(t.amount)}</b>
-                      {admin && !t.is_reversed && <button className="btn-ghost !px-2 !py-0.5 !text-xs !text-danger" onClick={() => daoNguoc(t)}>Đảo ngược</button>}
+                      {can("bb_dao_nguoc") && !t.is_reversed && <button className="btn-ghost !px-2 !py-0.5 !text-xs !text-danger" onClick={() => daoNguoc(t)}>Đảo ngược</button>}
                     </div>
                   ))}
                   <div className="text-[11px] text-[#8A93A0] mt-2">Tiền thu ở lô ghi vào quỹ ngay (danh mục “Thu tiền bán buôn (trả trước)”), rồi tự phân bổ xuống từng đơn xe khi giao — không cần thu lại trên đơn xe.</div>

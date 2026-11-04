@@ -16,7 +16,7 @@ function NhapHangInner() {
   const { supabase, vehicles, locations, settings, profile, loading, refresh } = useCatalog();
   const { toast, notify } = useToast();
   const [perms, setPerms] = useState({});
-  const canCost = ["CEO", "ADMIN", "MANAGER"].includes(profile?.role);
+  const canCost = profile?.role === "CEO" || !!perms.gia_von_nhap;
   const [poLines, setPoLines] = useState([]);
   const [chuyen, setChuyen] = useState([]);
   useEffect(() => {

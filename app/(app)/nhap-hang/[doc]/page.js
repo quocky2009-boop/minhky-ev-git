@@ -4,6 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Badge, Toast } from "@/components/ui";
 import Link from "next/link";
+import { usePerms } from "@/lib/usePerms";
 import { fmtVND, fmtDate, fmtTime, errMsg } from "@/lib/format";
 
 export default function NhapChiTiet() {
@@ -19,6 +20,7 @@ export default function NhapChiTiet() {
   const [suaLines, setSuaLines] = useState([]);
   const [huyBusy, setHuyBusy] = useState(false);
   const [canSua, setCanSua] = useState(false);
+  const can = usePerms(supabase, profile);
   const [debts, setDebts] = useState([]);
   const [rcpts, setRcpts] = useState([]);
   const [congNo, setCongNo] = useState({ co_tra_cham: false, dots: [{ so_ngay: 30, ty_le: 100 }] });
@@ -43,8 +45,8 @@ export default function NhapChiTiet() {
   }, [profile]);
 
   const canSuaHuy = units.every((u) => u.status === "TON_KHO");
-  const canCost = ["CEO", "ADMIN", "MANAGER"].includes(profile?.role);
-  const canBoSung = ["CEO", "ADMIN"].includes(profile?.role);
+  const canCost = can("gia_von_nhap");
+  const canBoSung = can("gia_von_bo_sung");
 
   const moSua = () => {
     const byVehicle = {};

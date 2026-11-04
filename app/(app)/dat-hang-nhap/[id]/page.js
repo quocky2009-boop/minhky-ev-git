@@ -5,6 +5,7 @@ import { useCatalog, useToast } from "@/lib/useData";
 import { Badge, Toast, VehicleSearch } from "@/components/ui";
 import Link from "next/link";
 import { fmtTime, fmtDate, errMsg } from "@/lib/format";
+import { usePerms } from "@/lib/usePerms";
 
 const STATUS_TONE = { "Chưa nhập": "amber", "Nhập một phần": "blue", "Hoàn thành": "green", "Hoàn thành (giao thiếu)": "purple", "Đã hủy": "dark" };
 const CHUYEN_TONE = { "Dự kiến": "amber", "Đã về": "green", "Hủy": "dark" };
@@ -20,6 +21,7 @@ export default function DatHangNhapChiTiet() {
   const [suaMode, setSuaMode] = useState(false);
   const [suaLines, setSuaLines] = useState([]);
   const [huyBusy, setHuyBusy] = useState(false);
+  const can = usePerms(supabase, profile);
   const [rcpts, setRcpts] = useState([]);
   const [units, setUnits] = useState([]);
   const [ships, setShips] = useState([]);
@@ -55,7 +57,7 @@ export default function DatHangNhapChiTiet() {
   const soLuongDat = lines.reduce((s, l) => s + l.qty_ordered, 0);
   const soLuongNhan = lines.reduce((s, l) => s + l.qty_received, 0);
   const daDong = ["Hoàn thành", "Hoàn thành (giao thiếu)", "Đã hủy"].includes(po.status);
-  const canDong = ["CEO", "ADMIN"].includes(profile?.role);
+  const canDong = can("dhn_dong");
   const pct = soLuongDat > 0 ? Math.min(100, Math.round((soLuongNhan / soLuongDat) * 100)) : 0;
   const conThieuVeh = (vid) => lines.filter((l) => l.vehicle_id === vid).reduce((s, l) => s + (l.qty_ordered - l.qty_received), 0);
   const vehOpts = [...new Set(lines.map((l) => l.vehicle_id))];
