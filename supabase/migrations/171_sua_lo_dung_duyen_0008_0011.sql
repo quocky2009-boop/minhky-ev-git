@@ -1,0 +1,12 @@
+-- 171: Sửa dữ liệu 2 đơn bán buôn Dũng Duyên BB-2611-0008 (12/08) và BB-2611-0011 (13/08) — theo xác nhận CEO 05/11/2026
+-- (đã chạy trực tiếp qua Supabase MCP; file này là ghi chú)
+-- Thực tế giao: 0008 = 1 EVO LITE + 1 Evo Grand Lite; 0011 = 4 EVO LITE + 4 Evo Grand Lite; CK sỉ 4% cho cả 10 xe.
+-- Thực thu: 150.000.000 tiền mặt + 17.616.000 chuyển khoản vào TK nhận tiền bán buôn (acc 10) = 167.616.000.
+--  - 10 đơn xe: vehicle_discount = 4%, bỏ giảm giá đơn lẫn lộn trước đó.
+--  - Đảo ngược 8 phiếu thu SHB (acc 3) ghi trùng ngày 13/08, tổng 140.844.000:
+--      PT-2608-93814, 57905, 98307, 76428, 01223, 41832, 08791, 09888.
+--  - 0008: giữ PT-2608-65054 tiền mặt quỹ Hàm Yên 33.984.000, chia cho 2 đơn xe.
+--  - 0011: PT-2608-34529 tiền mặt quỹ TP 135.936.000 → 116.016.000; thêm phiếu thu CK 17.616.000 vào acc 10 ngày 13/08;
+--          chia cho 8 đơn xe. Còn nợ 2.304.000 ở đơn BH-2608-92581.
+--  - Các khoản sửa trước mốc chốt (acc 1, 3) / trước ngày mở TK (acc 10) được bù vào opening_balance
+--    (log so_du_dau_ky_log) để số dư thực tế không đổi.
