@@ -10,3 +10,5 @@
 --          chia cho 8 đơn xe. Còn nợ 2.304.000 ở đơn BH-2608-92581.
 --  - Các khoản sửa trước mốc chốt (acc 1, 3) / trước ngày mở TK (acc 10) được bù vào opening_balance
 --    (log so_du_dau_ky_log) để số dư thực tế không đổi.
+-- Bổ sung (CEO xác nhận khách không còn nợ): đơn xe BH-2608-92581 ghi giảm giá đơn 2.304.000
+--   (discount_type 'amount', discount_value = discount_amount = 2.304.000) → BB-2611-0011 phải trả 133.632.000, còn 0.

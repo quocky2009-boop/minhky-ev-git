@@ -62,9 +62,10 @@ function BanBuonInner() {
     supabase.from("customers").select("id,code,name,phone,customer_type").eq("customer_type", "Khách buôn").order("name").limit(2000).then(({ data }) => setKhs(data || []));
     supabase.rpc("fn_tai_khoan_chon").then((r) => setBanks((r.data || []).filter((a) => a.status === "Hoạt động" && a.type === "Ngân hàng")));
   }, [loading, profile]);
-  useEffect(() => { const id = sp.get("id"); if (id && profile) moLo(Number(id)); }, [sp, profile]);
+  useEffect(() => { const id = sp.get("id"); if (id && profile) moLo(Number(id), sp.get("thu") === "1"); }, [sp, profile]);
 
-  const moLo = async (id) => {
+  const moThu = (H) => { setLo((L) => ({ ...L, pay: { method: "Chuyển khoản", account_id: "", amount: H.con_phai_tra > 0 ? H.con_phai_tra : "", note: "" } })); setTimeout(() => document.getElementById("bb-thanh-toan")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); };
+  const moLo = async (id, thu = false) => {
     const [{ data: h }, { data: dg }, { data: tt }, { data: os }] = await Promise.all([
       supabase.from("v_don_buon").select("*").eq("id", id).single(),
       supabase.from("don_buon_dong").select("*").eq("don_id", id).order("id"),
@@ -76,7 +77,8 @@ function BanBuonInner() {
     let ton = [];
     if (vids.length) { const r = await supabase.from("vehicle_units").select("frame_number,vehicle_id,location_code,imported_at").in("vehicle_id", vids).eq("status", "TON_KHO").order("imported_at").limit(2000); ton = r.data || []; }
     const { data: sd } = await supabase.rpc("fn_kb_so_du", { p_customer: h.customer_id });
-    setLo({ h, dong: dg || [], tt: tt || [], orders: os || [], ton, kb: sd || null, chon: {}, giaoLoc: h.location_code || "", giaoNgay: homNay(), pay: null, ct: null });
+    setLo({ h, dong: dg || [], tt: tt || [], orders: os || [], ton, kb: sd || null, chon: {}, giaoLoc: h.location_code || "", giaoNgay: homNay(), pay: thu && h.status !== "Đã hủy" ? { method: "Chuyển khoản", account_id: "", amount: h.con_phai_tra > 0 ? h.con_phai_tra : "", note: "" } : null, ct: null });
+    if (thu) setTimeout(() => document.getElementById("bb-thanh-toan")?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
   };
 
   if (loading || !profile) return <div className="card">Đang tải…</div>;
@@ -266,7 +268,7 @@ function BanBuonInner() {
               <thead><tr className="text-left text-[11.5px] text-[#8A93A0] uppercase border-b border-[#E3E8EF]">
                 <Th label="Mã đơn" k="code" sort={sort} /><Th label="Ngày chốt" k="ngay" sort={sort} /><Th label="Khách buôn" k="kh" sort={sort} /><th className="th">Cửa hàng</th>
                 <Th label="Đặt / giao" k="sl" sort={sort} className="text-right" /><Th label="Phải trả" k="pt" sort={sort} className="text-right" /><Th label="Đã trả" k="dt" sort={sort} className="text-right" />
-                <Th label="Còn" k="con" sort={sort} className="text-right" /><Th label="Trạng thái" k="tt" sort={sort} /><th className="th">Người tạo</th>
+                <Th label="Còn" k="con" sort={sort} className="text-right" /><Th label="Trạng thái" k="tt" sort={sort} /><th className="th">Người tạo</th><th className="th"></th>
               </tr></thead>
               <tbody>{pageSlice(dsSort, curPage, pageSize).map((d) => (
                 <tr key={d.id} className={`border-b border-dashed border-[#F0F2F5] cursor-pointer hover:bg-[#F8FAFC] ${d.trang_thai === "Đã hủy" ? "opacity-50" : ""}`} onClick={() => { moLo(d.id); router.replace(`/ban-buon?id=${d.id}`); }}>
@@ -276,9 +278,10 @@ function BanBuonInner() {
                   <td className={`text-right font-bold ${d.con_phai_tra > 0 ? "text-danger" : ""}`}>{d.con_phai_tra > 0 ? fmtVND(d.con_phai_tra) : "—"}</td>
                   <td><Badge tone={TT_TONE[d.trang_thai]}>{d.trang_thai}</Badge></td>
                   <td className="text-[12px] text-[#5A6572]">{d.created_by_name}</td>
+                  <td>{d.trang_thai !== "Đã hủy" && d.con_phai_tra > 0 && <button className="btn-ok !px-2 !py-1 !text-xs whitespace-nowrap" onClick={(e) => { e.stopPropagation(); router.replace(`/ban-buon?id=${d.id}&thu=1`); }}>💵 Thu tiền</button>}</td>
                 </tr>
               ))}
-              {dsSort.length === 0 && <tr><td colSpan={10} className="py-3 text-[#8A93A0]">Không có đơn nào theo bộ lọc.</td></tr>}</tbody>
+              {dsSort.length === 0 && <tr><td colSpan={11} className="py-3 text-[#8A93A0]">Không có đơn nào theo bộ lọc.</td></tr>}</tbody>
             </table></div>
             <Pager total={dsSort.length} page={curPage} setPage={setPage} pageSize={pageSize} setPageSize={setPageSize} />
           </div>
@@ -340,6 +343,7 @@ function BanBuonInner() {
               <span className="text-xl font-extrabold">{h.code}</span><Badge tone={TT_TONE[h.trang_thai]}>{h.trang_thai}</Badge>
               <span className="text-[13px] text-[#5A6572]">{h.customer_name} · chốt {fmtDate(h.ngay_chot)} · {h.created_by_name}</span>
               <div className="ml-auto flex gap-2">
+                {!huy && h.con_phai_tra > 0 && <button className="btn-ok !text-xs" onClick={() => moThu(h)}>💵 Thu tiền ({fmtVND(h.con_phai_tra)})</button>}
                 <Link className="btn-ghost !text-xs" href={`/khach-buon?kh=${h.customer_id}`}>Sổ khách buôn</Link>
                 {!huy && <button className="btn-ghost !text-xs" onClick={() => setForm({ id: h.id, customer_id: h.customer_id, location_code: h.location_code || "", ngay_chot: h.ngay_chot, note: h.note, lines: lo.dong.map((d) => ({ ...d, gia_ban: d.gia_ban ?? "" })) })}>✎ Sửa đơn</button>}
                 {!huy && lo.orders.length === 0 && <button className="btn-ghost !text-xs !text-danger" onClick={huyLo}>Hủy đơn</button>}
@@ -427,9 +431,9 @@ function BanBuonInner() {
               </div>
 
               <div className="flex flex-col gap-4">
-                <div className="card">
+                <div className="card scroll-mt-20" id="bb-thanh-toan">
                   <div className="flex items-center mb-2"><div className="font-extrabold mr-auto">Thanh toán của đơn bán buôn</div>
-                    {!huy && <button className="btn-primary !text-xs" onClick={() => setLo((L) => ({ ...L, pay: { method: "Chuyển khoản", account_id: "", amount: h.con_phai_tra, note: "" } }))}>+ Thu tiền</button>}</div>
+                    {!huy && <button className="btn-primary !text-xs" onClick={() => moThu(h)}>+ Thu tiền</button>}</div>
                   {lo.pay && (
                     <div className="rounded-lg border-2 border-brand p-2 mb-2 flex flex-col gap-1.5">
                       <select className="inp" value={lo.pay.method} onChange={(e) => setLo((L) => ({ ...L, pay: { ...L.pay, method: e.target.value } }))}><option>Chuyển khoản</option><option>Tiền mặt</option></select>
