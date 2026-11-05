@@ -283,6 +283,43 @@ function CkToiDa({ supabase, notify, settings, isCeo, refresh }) {
   );
 }
 
+function VatDichVu({ supabase, notify, settings, refresh }) {
+  const val = (k) => { const n = parseFloat(settings[k]); return Number.isFinite(n) ? n : 8; };
+  const [f, setF] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const luu = async () => {
+    const cv = Number(String(f.cv).replace(",", ".")), pt = Number(String(f.pt).replace(",", "."));
+    if (![cv, pt].every((n) => Number.isFinite(n) && n >= 0 && n <= 100)) return notify("Nhập % VAT từ 0 đến 100", "err");
+    setBusy(true);
+    const r1 = await supabase.rpc("fn_set_setting", { p_key: "vat_cong_viec_pct", p_value: String(cv) });
+    const r2 = r1.error ? r1 : await supabase.rpc("fn_set_setting", { p_key: "vat_phu_tung_pct", p_value: String(pt) });
+    setBusy(false);
+    if (r2.error) return notify(errMsg(r2.error), "err");
+    notify("Đã cập nhật % thuế VAT dịch vụ. Áp dụng cho các dòng mới thêm vào Lệnh sửa chữa.");
+    setF(null); refresh && refresh();
+  };
+  return (
+    <div className="card">
+      <div className="font-extrabold mb-1">Thuế VAT dịch vụ (Lệnh sửa chữa)</div>
+      <p className="text-xs text-[#5A6572] mb-3">Mức % VAT mặc định cộng vào giá bán (chưa VAT) của <b>Công việc</b> và <b>Vật tư / phụ tùng</b> khi thêm vào Lệnh sửa chữa. Số tiền VAT = % VAT × thành tiền chưa VAT. Công việc / phụ tùng có đặt % VAT riêng trong danh mục thì dùng mức riêng. Dòng đã có trong lệnh cũ giữ nguyên.</p>
+      {f === null ? (
+        <div className="flex items-center gap-5 flex-wrap">
+          <div>Công việc: <b className="text-xl text-brand">{val("vat_cong_viec_pct")}%</b></div>
+          <div>Vật tư / phụ tùng: <b className="text-xl text-brand">{val("vat_phu_tung_pct")}%</b></div>
+          <button className="btn-ghost !text-xs" onClick={() => setF({ cv: String(val("vat_cong_viec_pct")), pt: String(val("vat_phu_tung_pct")) })}>✎ Sửa</button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-sm">Công việc</span><input className="inp !w-20" inputMode="decimal" value={f.cv} onChange={(e) => setF({ ...f, cv: e.target.value })} /><span>%</span>
+          <span className="text-sm ml-3">Vật tư / phụ tùng</span><input className="inp !w-20" inputMode="decimal" value={f.pt} onChange={(e) => setF({ ...f, pt: e.target.value })} /><span>%</span>
+          <button className="btn-primary !text-xs" disabled={busy} onClick={luu}>{busy ? "Đang lưu…" : "Lưu"}</button>
+          <button className="btn-ghost !text-xs" onClick={() => setF(null)}>Hủy</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function CaiDat() {
   const { supabase, profile, loading, settings, customFields, brands, locations, refresh, taxRate, regions, diaBan } = useCatalog();
   const { toast, notify } = useToast();
@@ -565,6 +602,7 @@ export default function CaiDat() {
       )}
 
       <CkToiDa supabase={supabase} notify={notify} settings={settings} isCeo={profile?.role === "CEO"} refresh={refresh} />
+      <VatDichVu supabase={supabase} notify={notify} settings={settings} refresh={refresh} />
 
       <div className="card">
         <div className="font-extrabold mb-1">Phiếu xuất bán (thông tin in trên phiếu)</div>

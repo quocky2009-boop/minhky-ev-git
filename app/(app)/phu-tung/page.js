@@ -2,14 +2,16 @@
 import { useEffect, useState } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Badge, Toast, Field, KPI, LocSearch, Pager, pageSlice, useSortable, Th, MoneyInput } from "@/components/ui";
-import { fmtVND, fmtTime, errMsg, downloadCSV } from "@/lib/format";
+import { fmtVND, fmtTime, errMsg, downloadXLSX } from "@/lib/format";
 import ImportDanhMuc from "@/components/ImportDanhMuc";
+import DieuChinhTon from "@/components/pt/DieuChinhTon";
+import BaoCaoXNT from "@/components/pt/BaoCaoXNT";
 
 const TXN_LABEL = {
   NHAP: "Nhập kho", XUAT_DV: "Xuất cho phiếu DV", XUAT_NOI_BO: "Xuất nội bộ",
-  DIEU_CHUYEN_DI: "Chuyển đi", DIEU_CHUYEN_DEN: "Chuyển đến", KIEM_KE: "Kiểm kê", HOAN_TRA: "Hoàn trả",
+  DIEU_CHUYEN_DI: "Chuyển đi", DIEU_CHUYEN_DEN: "Chuyển đến", KIEM_KE: "Kiểm kê", HOAN_TRA: "Hoàn trả", DIEU_CHINH: "Điều chỉnh tồn",
 };
-const emptyPart = { id: null, code: "", name: "", group_name: "Phụ tùng", unit: "cái", cost_price: 0, sell_price: 0, min_stock: 0, track_serial: false, note: "" };
+const emptyPart = { id: null, code: "", name: "", group_name: "Phụ tùng", unit: "cái", cost_price: 0, sell_price: 0, vat_pct: "", min_stock: 0, track_serial: false, note: "" };
 
 export default function KhoPhuTung() {
   const { supabase, locations, settings, profile, loading } = useCatalog();
@@ -31,6 +33,12 @@ export default function KhoPhuTung() {
   const [showPf, setShowPf] = useState(false);
   const [showImp, setShowImp] = useState(false);
   // form nhap
+  // tra cuu ton
+  const [tLoc, setTLoc] = useState("");
+  const [tKd, setTKd] = useState("");
+  const [tNho, setTNho] = useState("");
+  const [moRong, setMoRong] = useState({});
+  const [vtEdit, setVtEdit] = useState({});
   const [nf, setNf] = useState({ part_id: "", location_code: "", qty: 1, unit_cost: "", supplier_id: "", note: "", serials: "" });
 
   const can = (p) => profile?.role === "CEO" || !!perms[p];
@@ -60,7 +68,7 @@ export default function KhoPhuTung() {
   const savePart = async () => {
     if (!pf.code.trim() || !pf.name.trim()) return notify("Nhập mã và tên phụ tùng.", "err");
     setBusy(true);
-    const { error } = await supabase.rpc("fn_pt_luu_part", { p: pf });
+    const { error } = await supabase.rpc("fn_pt_luu_part", { p: { ...pf, vat_pct: pf.vat_pct === "" || pf.vat_pct == null ? "" : Number(pf.vat_pct) } });
     setBusy(false);
     if (error) return notify(errMsg(error), "err");
     notify(pf.id ? "Đã cập nhật phụ tùng." : "Đã thêm phụ tùng.");
@@ -88,18 +96,33 @@ export default function KhoPhuTung() {
   };
 
   const kw = q.trim().toLowerCase();
+  const vatMd = parseFloat(settings?.vat_phu_tung_pct ?? "8") || 0;
+  const tonKd = (pid) => (tLoc ? qtyOf(pid, tLoc) : totalOf(pid));
+  const khoCua = (pid) => stock.filter((s) => s.part_id === pid && (s.qty > 0 || s.vi_tri));
+  const viTriOf = (pid) => (tLoc ? stock.find((s) => s.part_id === pid && s.location_code === tLoc)?.vi_tri || "" : [...new Set(stock.filter((s) => s.part_id === pid && s.vi_tri).map((s) => s.vi_tri))].join(", "));
   const partRows = sort.sortFn(
-    parts.filter((p) => !kw || `${p.code} ${p.name} ${p.group_name}`.toLowerCase().includes(kw)),
-    { code: (p) => p.code, name: (p) => p.name, group: (p) => p.group_name, ton: (p) => totalOf(p.id), gia: (p) => p.sell_price }
+    parts.filter((p) => (!kw || `${p.code} ${p.name} ${p.group_name}`.toLowerCase().includes(kw))
+      && (!tKd || (tKd === "con" ? tonKd(p.id) > 0 : tonKd(p.id) <= 0))
+      && (tNho === "" || tonKd(p.id) < Number(tNho))
+      && (!tLoc || stock.some((s) => s.part_id === p.id && s.location_code === tLoc) || tKd === "het")),
+    { code: (p) => p.code, name: (p) => p.name, group: (p) => p.group_name, ton: (p) => tonKd(p.id), gia: (p) => p.sell_price, goc: (p) => p.cost_price }
   );
+  const canViTri = can("pt_kiem_ke") || can("pt_danh_muc") || can("pt_nhap");
+  const luuViTri = async (pid, loc) => {
+    const k = pid + "|" + loc;
+    const { error } = await supabase.rpc("fn_pt_luu_vi_tri", { p: { part_id: pid, location_code: loc, vi_tri: vtEdit[k] ?? "" } });
+    if (error) return notify(errMsg(error), "err");
+    notify("Đã lưu vị trí lưu trữ."); setVtEdit((m) => { const n = { ...m }; delete n[k]; return n; }); load();
+  };
   const duoiDinhMuc = parts.filter((p) => p.min_stock > 0 && totalOf(p.id) < p.min_stock);
   const selPart = parts.find((p) => p.id == nf.part_id);
 
   const exportCSV = () => {
-    downloadCSV(`kho_phu_tung_${new Date().toISOString().slice(0, 10)}.csv`,
-      [["Mã", "Tên", "Nhóm", "ĐVT", "Giá nhập", "Giá bán", "Tồn tổng", ...locations.map((l) => l.name), "Định mức"],
-       ...partRows.map((p) => [p.code, p.name, p.group_name, p.unit, p.cost_price, p.sell_price, totalOf(p.id),
-         ...locations.map((l) => qtyOf(p.id, l.code)), p.min_stock])]);
+    const locs = locations.filter((l) => stock.some((s) => s.location_code === l.code));
+    downloadXLSX(`ton_kho_phu_tung_${new Date().toISOString().slice(0, 10)}.xlsx`,
+      [["Mã PT", "Tên phụ tùng", "Nhóm", "ĐVT", "Giá gốc", "Đơn giá bán (chưa VAT)", "VAT %", "Tồn khả dụng", "Vị trí lưu trữ", ...locs.map((l) => `Tồn: ${l.name}`), "Định mức"],
+       ...partRows.map((p) => [p.code, p.name, p.group_name, p.unit, Number(p.cost_price) || 0, Number(p.sell_price) || 0, Number(p.vat_pct ?? vatMd), tonKd(p.id), viTriOf(p.id),
+         ...locs.map((l) => qtyOf(p.id, l.code)), p.min_stock])], "Ton_kho");
     notify(`Đã xuất ${partRows.length} phụ tùng.`);
   };
 
@@ -110,7 +133,7 @@ export default function KhoPhuTung() {
         <div className="font-extrabold text-lg mr-auto">Kho phụ tùng</div>
         {can("pt_danh_muc") && <button className="btn-ghost !text-xs" onClick={() => { setPf(emptyPart); setShowPf(!showPf); }}>{showPf ? "Đóng" : "+ Thêm phụ tùng"}</button>}
         {can("pt_danh_muc") && <button className="btn-ghost !text-xs" onClick={() => setShowImp(true)}>⬆ Import Excel (danh mục + tồn đầu kỳ)</button>}
-        <button className="btn-ghost !text-xs" onClick={exportCSV}>⬇ CSV</button>
+        <button className="btn-ghost !text-xs" onClick={exportCSV}>⬇ Xuất Excel tồn kho</button>
       </div>
       {showImp && <ImportDanhMuc mode="pt" supabase={supabase} locations={locations} notify={notify} onDone={load} onClose={() => setShowImp(false)} />}
 
@@ -130,7 +153,8 @@ export default function KhoPhuTung() {
             <Field label="Nhóm"><select className="inp" value={pf.group_name} onChange={(e) => setPf((p) => ({ ...p, group_name: e.target.value }))}>{groups.map((g) => <option key={g}>{g}</option>)}</select></Field>
             <Field label="Đơn vị"><input className="inp" value={pf.unit} onChange={(e) => setPf((p) => ({ ...p, unit: e.target.value }))} /></Field>
             <Field label="Giá nhập"><MoneyInput value={pf.cost_price} onChange={(v) => setPf((p) => ({ ...p, cost_price: v || 0 }))} /></Field>
-            <Field label="Giá bán"><MoneyInput value={pf.sell_price} onChange={(v) => setPf((p) => ({ ...p, sell_price: v || 0 }))} /></Field>
+            <Field label="Giá bán (chưa VAT)"><MoneyInput value={pf.sell_price} onChange={(v) => setPf((p) => ({ ...p, sell_price: v || 0 }))} /></Field>
+            <Field label={`% thuế VAT giá bán (trống = mặc định ${vatMd}%)`}><input type="number" min="0" max="100" step="0.5" className="inp" value={pf.vat_pct ?? ""} placeholder={`${vatMd}`} onChange={(e) => setPf((p) => ({ ...p, vat_pct: e.target.value }))} /></Field>
             <Field label="Tồn tối thiểu (cảnh báo)"><input type="number" className="inp" value={pf.min_stock} onChange={(e) => setPf((p) => ({ ...p, min_stock: +e.target.value || 0 }))} /></Field>
             <div className="flex items-end">
               <label className="flex items-center gap-2 text-sm font-semibold cursor-pointer">
@@ -148,45 +172,62 @@ export default function KhoPhuTung() {
       )}
 
       <div className="flex gap-1.5 flex-wrap">
-        {[["ton", "Tồn kho"], ["nhap", "Nhập kho"], ["serial", "Serial pin"], ["ls", "Lịch sử"]].map(([k, v]) => (
+        {[["ton", "Tra cứu tồn kho"], ["nhap", "Nhập kho"], ["dc", "Điều chỉnh tồn kho"], ["xnt", "Báo cáo Xuất nhập tồn"], ["serial", "Serial pin"], ["ls", "Lịch sử"]].map(([k, v]) => (
           <button key={k} className={`btn !px-3 !py-2 !text-xs ${tab === k ? "bg-brand text-white" : "bg-[#EEF1F4]"}`} onClick={() => { setTab(k); setPage(1); }}>{v}</button>
         ))}
       </div>
 
       {tab === "ton" && (
         <div className="card">
-          <div className="flex gap-2 items-center mb-3 flex-wrap">
-            <div className="font-extrabold mr-auto">Tồn theo điểm ({partRows.length})</div>
-            <input className="inp !w-56" placeholder="Tìm mã / tên phụ tùng…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
+          <div className="flex gap-2 items-end mb-3 flex-wrap">
+            <div className="font-extrabold mr-auto self-center">Tra cứu tồn kho ({partRows.length})</div>
+            <div className="w-56"><Field label="Kho"><LocSearch locations={locations} value={tLoc} onChange={(v) => { setTLoc(v); setPage(1); }} placeholder="Tất cả kho" /></Field></div>
+            <Field label="Tồn khả dụng"><select className="inp" value={tKd} onChange={(e) => { setTKd(e.target.value); setPage(1); }}><option value="">Tất cả</option><option value="con">Còn hàng</option><option value="het">Hết hàng</option></select></Field>
+            <Field label="Tồn nhỏ hơn"><input type="number" min="0" className="inp !w-24" value={tNho} onChange={(e) => { setTNho(e.target.value); setPage(1); }} placeholder="—" /></Field>
+            <Field label="Tìm kiếm"><input className="inp !w-56" placeholder="Mã / tên phụ tùng…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} /></Field>
           </div>
           <div className="tbl-scroll"><table className="w-full border-collapse tbl-card">
             <thead><tr>
-              <Th label="Mã" k="code" sort={sort} /><Th label="Tên phụ tùng" k="name" sort={sort} /><Th label="Nhóm" k="group" sort={sort} />
-              <Th label="Giá bán" k="gia" sort={sort} /><Th label="Tổng tồn" k="ton" sort={sort} />
-              {locations.map((l) => <th key={l.code} className="th text-center text-[10px]">{l.name}</th>)}
+              <Th label="Mã PT" k="code" sort={sort} /><Th label="Tên phụ tùng" k="name" sort={sort} /><th className="th">ĐVT</th>
+              <Th label="Tồn khả dụng" k="ton" sort={sort} className="text-right" /><th className="th">Vị trí lưu trữ</th><th className="th">Phân bổ kho</th>
+              <Th label="Giá gốc" k="goc" sort={sort} className="text-right" /><Th label="Đơn giá bán" k="gia" sort={sort} className="text-right" />
               <th className="th"></th>
             </tr></thead>
             <tbody>{pageSlice(partRows, page, 20).map((p) => {
-              const tt = totalOf(p.id);
-              const thieu = p.min_stock > 0 && tt < p.min_stock;
-              return (
+              const tt = tonKd(p.id);
+              const thieu = p.min_stock > 0 && totalOf(p.id) < p.min_stock;
+              const ks = khoCua(p.id);
+              const vat = Number(p.vat_pct ?? vatMd) || 0;
+              return [
                 <tr key={p.id} className={thieu ? "bg-[#FFF6F6]" : "hover:bg-[#F8FAFC]"}>
-                  <td className="td font-mono text-xs">{p.code}</td>
-                  <td className="td font-semibold text-[13px]">{p.name}{p.track_serial && <Badge tone="purple">serial</Badge>}</td>
-                  <td className="td text-xs">{p.group_name}</td>
-                  <td className="td">{fmtVND(p.sell_price)}</td>
-                  <td className="td"><b className={thieu ? "text-danger" : ""}>{tt}</b> {p.unit}{thieu && <div className="text-[10px] text-danger">dưới định mức {p.min_stock}</div>}</td>
-                  {locations.map((l) => { const n = qtyOf(p.id, l.code); return <td key={l.code} className={`td text-center tabular-nums ${n === 0 ? "text-[#C6CDD6]" : "font-bold"}`}>{n === 0 ? "·" : n}</td>; })}
-                  <td className="td">{can("pt_danh_muc") && <button className="btn-ghost !px-2 !py-1 !text-xs" onClick={() => { setPf({ ...p }); setShowPf(true); window.scrollTo(0, 0); }}>✎</button>}</td>
-                </tr>
-              );
+                  <td data-label="Mã PT" className="td font-mono text-xs">{p.code}</td>
+                  <td data-label="Tên" className="td font-semibold text-[13px]">{p.name} <span className="text-[10.5px] font-normal text-[#8A93A0]">{p.group_name}</span>{p.track_serial && <Badge tone="purple">serial</Badge>}{p.status !== "Hoạt động" && <Badge tone="gray">{p.status}</Badge>}</td>
+                  <td data-label="ĐVT" className="td text-xs">{p.unit}</td>
+                  <td data-label="Tồn khả dụng" className="td text-right"><b className={tt <= 0 ? "text-danger" : thieu ? "text-danger" : ""}>{tt}</b>{thieu && <div className="text-[10px] text-danger">dưới định mức {p.min_stock}</div>}</td>
+                  <td data-label="Vị trí" className="td text-xs">{viTriOf(p.id) || <span className="text-[#C6CDD6]">—</span>}</td>
+                  <td data-label="Phân bổ kho" className="td">{ks.length ? <button className="text-brand text-xs font-semibold" onClick={() => setMoRong((m) => ({ ...m, [p.id]: !m[p.id] }))}>{moRong[p.id] ? "▾" : "▸"} Phân bổ vào {ks.length} kho</button> : <span className="text-[11px] text-[#8A93A0]">Chưa có tồn</span>}</td>
+                  <td data-label="Giá gốc" className="td text-right">{fmtVND(p.cost_price)}</td>
+                  <td data-label="Đơn giá bán" className="td text-right">{fmtVND(p.sell_price)}<div className="text-[10px] text-[#8A93A0]">VAT {vat}% → {fmtVND(Math.round((Number(p.sell_price) || 0) * (1 + vat / 100)))}</div></td>
+                  <td className="td">{can("pt_danh_muc") && <button className="btn-ghost !px-2 !py-1 !text-xs" onClick={() => { setPf({ ...p, vat_pct: p.vat_pct ?? "" }); setShowPf(true); window.scrollTo(0, 0); }}>✎</button>}</td>
+                </tr>,
+                moRong[p.id] && (
+                  <tr key={p.id + "x"}><td className="td bg-[#F8FAFB]" colSpan={9}>
+                    <table className="border-collapse text-[12.5px] ml-6"><thead><tr><th className="th">Kho</th><th className="th text-right">Tồn</th><th className="th">Vị trí lưu trữ</th></tr></thead>
+                      <tbody>{ks.map((s) => { const k = p.id + "|" + s.location_code; return (
+                        <tr key={k}><td className="td">{locName(s.location_code)}</td><td className="td text-right font-bold">{s.qty}</td>
+                          <td className="td">{canViTri ? <div className="flex gap-1"><input className="inp !py-1 !text-xs !w-36" value={vtEdit[k] ?? s.vi_tri ?? ""} onChange={(e) => setVtEdit((m) => ({ ...m, [k]: e.target.value }))} placeholder="VD: Kệ A1-T2" />{vtEdit[k] != null && vtEdit[k] !== (s.vi_tri || "") && <button className="btn-ok !px-2 !py-1 !text-xs" onClick={() => luuViTri(p.id, s.location_code)}>Lưu</button>}</div> : (s.vi_tri || "—")}</td></tr>); })}</tbody></table>
+                  </td></tr>),
+              ];
             })}
-            {partRows.length === 0 && <tr><td className="td" colSpan={6 + locations.length}>Chưa có phụ tùng nào. Bấm "+ Thêm phụ tùng" để bắt đầu.</td></tr>}
+            {partRows.length === 0 && <tr><td className="td" colSpan={9}>{parts.length ? "Không có phụ tùng nào khớp bộ lọc." : "Chưa có phụ tùng nào. Bấm \"+ Thêm phụ tùng\" để bắt đầu."}</td></tr>}
             </tbody>
           </table></div>
           <Pager total={partRows.length} page={page} setPage={setPage} pageSize={20} setPageSize={() => {}} />
         </div>
       )}
+
+      {tab === "dc" && <DieuChinhTon supabase={supabase} locations={locations} parts={parts} stock={stock} canEdit={can("pt_kiem_ke")} notify={notify} onChanged={load} />}
+      {tab === "xnt" && <BaoCaoXNT supabase={supabase} locations={locations} notify={notify} />}
 
       {tab === "nhap" && (
         <div className="card">

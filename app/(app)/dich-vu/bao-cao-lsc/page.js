@@ -28,7 +28,7 @@ export default function BaoCaoLSC() {
     const ids = (data || []).map((x) => x.id);
     let ls = [];
     for (let i = 0; i < ids.length; i += 300) {
-      const { data: part } = await supabase.from("repair_order_lines").select("ro_id,line_type,ma,name,qty,thanh_tien,phan_loai_tt").in("ro_id", ids.slice(i, i + 300));
+      const { data: part } = await supabase.from("repair_order_lines").select("ro_id,line_type,ma,name,qty,thanh_tien,thanh_tien_vat,phan_loai_tt").in("ro_id", ids.slice(i, i + 300));
       ls = ls.concat(part || []);
     }
     setLines(ls); setBusy(false);
@@ -50,7 +50,7 @@ export default function BaoCaoLSC() {
   const theoLoai = nhom(ok, (r) => r.loai_dich_vu, (r) => r.tong_tien);
   const theoKtv = nhom(ok, (r) => r.ktv_name || "Chưa phân công", (r) => r.tong_tien);
   const theoDiem = nhom(ok, (r) => r.location_name || r.location_code, (r) => r.tong_tien);
-  const topLine = (type) => { const m = {}; ls.filter((l) => l.line_type === type).forEach((l) => { const k = `${l.ma} · ${l.name}`; m[k] = m[k] || { n: 0, v: 0 }; m[k].n += Number(l.qty) || 0; m[k].v += Number(l.thanh_tien) || 0; }); return Object.entries(m).sort((a, b) => b[1].v - a[1].v).slice(0, 10); };
+  const topLine = (type) => { const m = {}; ls.filter((l) => l.line_type === type).forEach((l) => { const k = `${l.ma} · ${l.name}`; m[k] = m[k] || { n: 0, v: 0 }; m[k].n += Number(l.qty) || 0; m[k].v += Number(l.thanh_tien_vat ?? l.thanh_tien) || 0; }); return Object.entries(m).sort((a, b) => b[1].v - a[1].v).slice(0, 10); };
 
   const bang = (title, arr, ncol = "Số lệnh") => (
     <div className="card"><div className="font-extrabold mb-2">{title}</div>

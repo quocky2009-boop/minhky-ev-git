@@ -2,7 +2,8 @@
 import { useEffect, useState } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Badge, Toast, KPI, Field, Pager, pageSlice, useSortable, Th, MoneyInput } from "@/components/ui";
-import { fmtVND, fmtDate, fmtTime, errMsg } from "@/lib/format";
+import { fmtVND, fmtDate, fmtTime, errMsg, downloadXLSX } from "@/lib/format";
+import ImportDanhMuc from "@/components/ImportDanhMuc";
 
 const GROUPS = ["Phụ kiện", "Phụ tùng", "Quà tặng", "Vật tư", "Khác"];
 const UNITS = ["Cái", "Bộ", "Hộp", "Chiếc", "Kg", "Lít", "Cuộn", "Đôi"];
@@ -40,6 +41,7 @@ export default function HangHoa() {
   // Kiem ke
   const [kkLoc, setKkLoc] = useState("");
   const [kkRows, setKkRows] = useState([]); // [{product_id, name, unit, ton, dem}]
+  const [imp, setImp] = useState(false);
 
   const load = async () => {
     setBusy(true);
@@ -204,12 +206,23 @@ export default function HangHoa() {
     setKkLoc(""); setKkRows([]); load();
   };
 
+  // Xuat Excel cung dinh dang file mau (Ton_Dau_Ky de trong de nhap lai khong bi cong ton) + ton hien tai tung kho
+  const xuatExcel = () => {
+    const locs = locations.filter((l) => products.some((p) => (stockMap[p.id] || {})[l.code]));
+    const head = ["Ma_HH", "Ten_Hang_Hoa", "Nhom", "DVT", "Gia_Von", "Gia_Ban", "Ton_Toi_Thieu", "Ma_Vach", "Kho", "Ton_Dau_Ky", "Ghi_Chu", "Trang_Thai", "Tong_Ton", ...locs.map((l) => `Ton: ${l.name}`)];
+    const rows = sorted.map((p) => { const m = stockMap[p.id] || {}; return [p.code || "", p.name, p.group_name || "", p.unit || "", Number(p.cost_price) || 0, Number(p.sale_price) || 0, Number(p.min_qty) || 0, p.barcode || "", p.location_code || "", "", p.note || "", p.status, Object.values(m).reduce((a, v) => a + (Number(v) || 0), 0), ...locs.map((l) => Number(m[l.code]) || 0)]; });
+    downloadXLSX(`hang_hoa_${new Date().toISOString().slice(0, 10)}.xlsx`, [head, ...rows], "Hang_hoa");
+  };
+
   return (
     <div className="flex flex-col gap-4 pb-8">
       <Toast toast={toast} />
+      {imp && <ImportDanhMuc mode="hh" supabase={supabase} locations={locations} notify={notify} onDone={load} onClose={() => setImp(false)} />}
 
       <div className="flex items-center gap-2 flex-wrap">
         <div className="font-extrabold text-lg mr-auto">Quản lý Hàng hóa</div>
+        {tab === "ton" && <button className="btn-ghost !text-xs" onClick={xuatExcel}>⬇ Xuất Excel</button>}
+        {isManager && tab === "ton" && <button className="btn-ghost !text-xs" onClick={() => setImp(true)}>⬆ Nhập Excel</button>}
         {isManager && tab === "ton" && <button className="btn-primary !text-xs" onClick={() => { setEditId(null); setF(emptyF); setShowForm(true); }}>+ Thêm sản phẩm</button>}
       </div>
 
