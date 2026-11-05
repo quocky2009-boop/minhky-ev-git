@@ -27,12 +27,12 @@ const PERM_GROUPS = [
     { key: "gia_von_nhap", label: "Nhập giá vốn khi lập phiếu nhập (và công nợ NCC trả chậm)", desc: "Không có quyền thì ô giá vốn bị ẩn, phiếu nhập lưu không giá vốn" },
     { key: "gia_von_bo_sung", label: "Bổ sung / sửa giá vốn phiếu nhập sau", desc: "Công nợ NCC của phiếu tự cập nhật theo giá vốn mới" },
   ]},
-  { group: "Bán buôn (theo lô) & khách buôn", icon: "🧾", items: [
-    { key: "bb_lo", label: "Đơn bán buôn: tạo / sửa lô, thu tiền lô, giao xe", desc: "Chốt lô model + số lượng, chọn số khung khi giao để tạo đơn từng xe" },
-    { key: "bb_sua_ck", label: "Sửa % chiết khấu sỉ trực tiếp trên lô", desc: "Không có quyền thì % CK lấy tự động từ Bảng chiết khấu sỉ" },
-    { key: "bb_dao_nguoc", label: "Đảo ngược khoản thu / cấn trừ của lô", desc: "Chỉ phần tiền chưa phân bổ xuống đơn xe" },
+  { group: "Đơn bán buôn & khách buôn", icon: "🧾", items: [
+    { key: "bb_lo", label: "Đơn bán buôn: tạo / sửa đơn, thu tiền, giao xe", desc: "Chốt đơn model + số lượng, chọn số khung khi giao để tạo đơn từng xe" },
+    { key: "bb_sua_ck", label: "Sửa % chiết khấu sỉ / giá bán buôn nhập tay trên đơn bán buôn", desc: "Không có quyền thì % CK lấy tự động từ Bảng chiết khấu sỉ" },
+    { key: "bb_dao_nguoc", label: "Đảo ngược khoản thu / cấn trừ của đơn bán buôn", desc: "Chỉ phần tiền chưa phân bổ xuống đơn xe" },
     { key: "bb_ck_si", label: "Sửa Bảng chiết khấu sỉ (khách × model × thời kỳ)", desc: "" },
-    { key: "kb_can_tru", label: "Cấn trừ số dư công nợ khách buôn vào lô / đơn", desc: "Dùng số dư bù (KM hãng, bù thuê pin) trừ vào tiền phải trả" },
+    { key: "kb_can_tru", label: "Cấn trừ số dư công nợ khách buôn vào đơn bán buôn / đơn xe", desc: "Dùng số dư bù (KM hãng, bù thuê pin) trừ vào tiền phải trả" },
     { key: "kb_dieu_chinh", label: "Điều chỉnh tay / hủy dòng / chế độ cấn trừ sổ khách buôn", desc: "" },
   ]},
   { group: "Đơn bán", icon: "🛒", items: [

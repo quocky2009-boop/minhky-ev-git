@@ -11,7 +11,9 @@ import { fmtVND, fmtDate, fmtTime, errMsg, downloadXLSX } from "@/lib/format";
 
 const TT_TONE = { "Chờ giao": "amber", "Đang giao": "blue", "Đã giao đủ": "green", "Đã hủy": "dark" };
 const homNay = () => new Date().toLocaleDateString("sv-SE");
-const tienDong = (l) => (Number(l.qty) || 0) * ((Number(l.gia_niem_yet) || 0) - Math.round((Number(l.gia_niem_yet) || 0) * (Number(l.ck_pct) || 0) / 100));
+const coGiaFix = (l) => l.gia_ban !== "" && l.gia_ban !== null && l.gia_ban !== undefined;
+const donGia = (l) => (coGiaFix(l) ? Number(l.gia_ban) || 0 : (Number(l.gia_niem_yet) || 0) - Math.round((Number(l.gia_niem_yet) || 0) * (Number(l.ck_pct) || 0) / 100));
+const tienDong = (l) => (Number(l.qty) || 0) * donGia(l);
 
 function BanBuonInner() {
   const { supabase, vehicles, locations, profile, loading } = useCatalog();
@@ -66,7 +68,7 @@ function BanBuonInner() {
       supabase.from("don_buon_thanh_toan").select("*").eq("don_id", id).order("id"),
       supabase.from("sales_orders").select("id,code,sale_date,vehicle_id,frame_number,location_code,status,paid_amount,sale_price,quantity,vehicle_discount_type,vehicle_discount_value,discount_amount,kb_dieu_chinh,don_buon_dong_id,end_customer_name").eq("don_buon_id", id).order("id"),
     ]);
-    if (!h) return notify("Không tìm thấy lô.", "err");
+    if (!h) return notify("Không tìm thấy đơn bán buôn.", "err");
     const vids = [...new Set((dg || []).map((d) => d.vehicle_id))];
     let ton = [];
     if (vids.length) { const r = await supabase.from("vehicle_units").select("frame_number,vehicle_id,location_code,imported_at").in("vehicle_id", vids).eq("status", "TON_KHO").order("imported_at").limit(2000); ton = r.data || []; }
@@ -81,7 +83,7 @@ function BanBuonInner() {
   const locName = (c) => locations.find((l) => l.code === c)?.name || c || "—";
 
   // ===== tao / sua lo =====
-  const moTao = () => setForm({ id: null, customer_id: "", location_code: profile.store_code || "", ngay_chot: homNay(), note: "", lines: [{ vehicle_id: "", qty: 1, gia_niem_yet: 0, ck_pct: "", note: "" }] });
+  const moTao = () => setForm({ id: null, customer_id: "", location_code: profile.store_code || "", ngay_chot: homNay(), note: "", lines: [{ vehicle_id: "", qty: 1, gia_niem_yet: 0, ck_pct: "", gia_ban: "", note: "" }] });
   const setLine = async (i, k, v) => {
     setForm((f) => ({ ...f, lines: f.lines.map((l, j) => j === i ? { ...l, [k]: v } : l) }));
     if (k === "vehicle_id" && v) {
@@ -104,14 +106,14 @@ function BanBuonInner() {
     if (!form.customer_id) return notify("Chọn khách buôn.", "err");
     const lines = form.lines.filter((l) => l.vehicle_id && Number(l.qty) > 0);
     if (!lines.length) return notify("Thêm ít nhất một dòng xe.", "err");
-    const thieuCk = lines.filter((l) => l.ck_pct === "" || l.ck_pct === null);
-    if (thieuCk.length && !admin) return notify(`Chưa có CK sỉ cho: ${thieuCk.map((l) => vName(l.vehicle_id)).join(", ")}. Nhờ người có quyền thêm ở Khách buôn › Bảng chiết khấu sỉ, hoặc người có quyền “Sửa % CK sỉ trên lô” nhập trực tiếp.`, "err");
+    const thieuCk = lines.filter((l) => (l.ck_pct === "" || l.ck_pct === null) && !coGiaFix(l));
+    if (thieuCk.length && !admin) return notify(`Chưa có CK sỉ cho: ${thieuCk.map((l) => vName(l.vehicle_id)).join(", ")}. Nhờ người có quyền thêm ở Khách buôn › Bảng chiết khấu sỉ, hoặc người có quyền “Sửa % CK sỉ trên đơn bán buôn” nhập trực tiếp.`, "err");
     setBusy(true);
     const { data, error } = await supabase.rpc("fn_lo_luu", { p: { id: form.id, customer_id: Number(form.customer_id), location_code: form.location_code, ngay_chot: form.ngay_chot, note: form.note,
-      lines: lines.map((l) => ({ id: l.id || null, vehicle_id: l.vehicle_id, qty: Number(l.qty), ck_pct: admin && l.ck_pct !== "" ? Number(l.ck_pct) : null, note: l.note || "" })) } });
+      lines: lines.map((l) => ({ id: l.id || null, vehicle_id: l.vehicle_id, qty: Number(l.qty), ck_pct: admin && l.ck_pct !== "" ? Number(l.ck_pct) : null, gia_ban: admin && coGiaFix(l) ? Number(l.gia_ban) : null, note: l.note || "" })) } });
     setBusy(false);
     if (error) return notify(errMsg(error), "err");
-    notify(`Đã lưu lô ${data.code}.`); setForm(null); loadDs(); moLo(data.id); router.replace(`/ban-buon?id=${data.id}`);
+    notify(`Đã lưu đơn bán buôn ${data.code}.`); setForm(null); loadDs(); moLo(data.id); router.replace(`/ban-buon?id=${data.id}`);
   };
 
   // ===== chi tiet: thu tien / can tru / giao xe =====
@@ -133,7 +135,7 @@ function BanBuonInner() {
     const { error } = await supabase.rpc("fn_lo_can_tru", { p_id: lo.h.id, p_amount: n, p_note: lo.ct.note || "" });
     setBusy(false);
     if (error) return notify(errMsg(error), "err");
-    notify(`Đã cấn trừ ${fmtVND(n)} vào lô.`); reload();
+    notify(`Đã cấn trừ ${fmtVND(n)} vào đơn bán buôn.`); reload();
   };
   const daoNguoc = async (t) => {
     const ly = prompt(`Đảo ngược khoản ${t.loai === "CAN_TRU" ? "cấn trừ" : "thu"} ${fmtVND(t.amount)}? Nhập lý do:`);
@@ -153,11 +155,11 @@ function BanBuonInner() {
     notify(`Đã tạo ${data.so_xe} đơn bán.${data.phan_bo ? ` Phân bổ ${fmtVND(data.phan_bo)} tiền đã trả trước.` : ""}`); reload();
   };
   const huyLo = async () => {
-    const ly = prompt("Hủy lô bán buôn này? Nhập lý do:");
+    const ly = prompt("Hủy đơn bán buôn này? Nhập lý do:");
     if (!ly) return;
     const { error } = await supabase.rpc("fn_lo_huy", { p_id: lo.h.id, p_ly_do: ly });
     if (error) return notify(errMsg(error), "err");
-    notify("Đã hủy lô."); reload();
+    notify("Đã hủy đơn bán buôn."); reload();
   };
   const toggleXe = (dongId, frame, max) => setLo((L) => {
     const cur = L.chon[dongId] || [];
@@ -187,7 +189,7 @@ function BanBuonInner() {
   const dsActive = dsLoc.filter((d) => d.trang_thai !== "Đã hủy");
   const resetPage = () => setPage(1);
   const xuatExcel = () => downloadXLSX(`don_ban_buon_${from || "dau"}_den_${to || "nay"}.xlsx`, [
-    ["Mã lô", "Ngày chốt", "Khách buôn", "Mã KH", "Cửa hàng", "SL đặt", "SL giao", "Phải trả", "Đã trả", "Còn phải trả", "Trạng thái", "Người tạo", "Ghi chú"],
+    ["Mã đơn", "Ngày chốt", "Khách buôn", "Mã KH", "Cửa hàng", "SL đặt", "SL giao", "Phải trả", "Đã trả", "Còn phải trả", "Trạng thái", "Người tạo", "Ghi chú"],
     ...dsSort.map((d) => [d.code, d.ngay_chot, d.customer_name, d.customer_code, locName(d.location_code), d.sl_dat, d.sl_giao, Number(d.phai_tra), Number(d.da_tra), Number(d.con_phai_tra), d.trang_thai, d.created_by_name, d.note || ""]),
   ], "Don ban buon");
   const tongForm = form ? form.lines.reduce((s, l) => s + tienDong(l), 0) : 0;
@@ -199,16 +201,16 @@ function BanBuonInner() {
       {!form && !lo && (
         <>
           <div className="flex gap-3 flex-wrap">
-            <KPI label="Số lô (theo bộ lọc)" value={dsActive.length} sub={`${dsActive.filter((d) => ["Chờ giao", "Đang giao"].includes(d.trang_thai)).length} lô đang mở`} />
+            <KPI label="Số đơn (theo bộ lọc)" value={dsActive.length} sub={`${dsActive.filter((d) => ["Chờ giao", "Đang giao"].includes(d.trang_thai)).length} đơn đang mở`} />
             <KPI label="Xe chờ giao" value={dsActive.reduce((s, d) => s + (d.sl_dat - d.sl_giao), 0)} tone="amber" sub={`đã giao ${dsActive.reduce((s, d) => s + d.sl_giao, 0)}/${dsActive.reduce((s, d) => s + d.sl_dat, 0)} xe`} />
             <KPI label="Doanh số bán buôn" value={fmtVND(dsActive.reduce((s, d) => s + Number(d.phai_tra), 0))} tone="blue" />
             <KPI label="Khách buôn còn phải trả" value={fmtVND(dsActive.reduce((s, d) => s + Number(d.con_phai_tra), 0))} tone="red" />
           </div>
           <div className="card">
             <div className="flex items-center gap-2 mb-2 flex-wrap">
-              <div className="font-extrabold mr-auto">Đơn bán buôn theo lô ({dsSort.length})</div>
+              <div className="font-extrabold mr-auto">Đơn bán buôn ({dsSort.length})</div>
               <button className="btn-ghost !text-xs" onClick={xuatExcel}>⬇ Excel</button>
-              <button className="btn-primary !text-xs" onClick={moTao}>+ Tạo lô bán buôn</button>
+              <button className="btn-primary !text-xs" onClick={moTao}>+ Tạo đơn bán buôn</button>
             </div>
             <div className="flex gap-2 flex-wrap items-center mb-2">
               <QuickDates from={from} to={to} setFrom={setFrom} setTo={setTo} onChange={resetPage} />
@@ -229,20 +231,20 @@ function BanBuonInner() {
               <MultiCheck label="Người tạo: tất cả" value={fNv} onChange={(v) => { setFNv(v); resetPage(); }} width="w-52"
                 options={[...new Set(ds.map((d) => d.created_by_name || ""))].filter(Boolean).sort().map((n) => ({ key: n, label: n }))} />
               <AmountFilter min={aMin} max={aMax} setMin={setAMin} setMax={setAMax} onChange={resetPage} />
-              <button className={`btn-ghost !text-xs ${showHuy ? "!bg-[#FDEDED] !text-danger" : ""}`} onClick={() => { setShowHuy(!showHuy); resetPage(); }}>{showHuy ? "Đang hiện lô hủy" : `Lô hủy${nHuy ? ` (${nHuy})` : ""}`}</button>
-              <input className="inp !w-64" placeholder="Tìm mã lô, khách, SĐT, số khung, mã đơn xe, khách lẻ cuối…" value={q} onChange={(e) => { setQ(e.target.value); resetPage(); }} />
+              <button className={`btn-ghost !text-xs ${showHuy ? "!bg-[#FDEDED] !text-danger" : ""}`} onClick={() => { setShowHuy(!showHuy); resetPage(); }}>{showHuy ? "Đang hiện đơn hủy" : `Lô hủy${nHuy ? ` (${nHuy})` : ""}`}</button>
+              <input className="inp !w-64" placeholder="Tìm mã đơn, khách, SĐT, số khung, mã đơn xe, khách lẻ cuối…" value={q} onChange={(e) => { setQ(e.target.value); resetPage(); }} />
               <SavedFilters k="ban-buon" state={{ fKh, fLoc, fTT, fTra, fNv }} apply={(x) => { setFKh(x.fKh || []); setFLoc(x.fLoc || []); setFTT(x.fTT || []); setFTra(x.fTra || ""); setFNv(x.fNv || []); }} />
             </div>
             <div className="text-[11px] text-[#8A93A0] -mt-1 mb-2">Ô số tiền lọc theo <b>Còn phải trả</b>.</div>
             <TongLoc>
-              <span>{dsActive.length} lô · {dsActive.reduce((s, d) => s + d.sl_dat, 0)} xe</span>
+              <span>{dsActive.length} đơn · {dsActive.reduce((s, d) => s + d.sl_dat, 0)} xe</span>
               <span>Phải trả: <b>{fmtVND(dsActive.reduce((s, d) => s + Number(d.phai_tra), 0))}</b></span>
               <span>Đã trả: <b className="text-[#0E7A4A]">{fmtVND(dsActive.reduce((s, d) => s + Number(d.da_tra), 0))}</b></span>
               <span>Còn: <b className="text-danger">{fmtVND(dsActive.reduce((s, d) => s + Number(d.con_phai_tra), 0))}</b></span>
             </TongLoc>
             <div className="overflow-x-auto"><table className="w-full text-[13px]">
               <thead><tr className="text-left text-[11.5px] text-[#8A93A0] uppercase border-b border-[#E3E8EF]">
-                <Th label="Mã lô" k="code" sort={sort} /><Th label="Ngày chốt" k="ngay" sort={sort} /><Th label="Khách buôn" k="kh" sort={sort} /><th className="th">Cửa hàng</th>
+                <Th label="Mã đơn" k="code" sort={sort} /><Th label="Ngày chốt" k="ngay" sort={sort} /><Th label="Khách buôn" k="kh" sort={sort} /><th className="th">Cửa hàng</th>
                 <Th label="Đặt / giao" k="sl" sort={sort} className="text-right" /><Th label="Phải trả" k="pt" sort={sort} className="text-right" /><Th label="Đã trả" k="dt" sort={sort} className="text-right" />
                 <Th label="Còn" k="con" sort={sort} className="text-right" /><Th label="Trạng thái" k="tt" sort={sort} /><th className="th">Người tạo</th>
               </tr></thead>
@@ -256,7 +258,7 @@ function BanBuonInner() {
                   <td className="text-[12px] text-[#5A6572]">{d.created_by_name}</td>
                 </tr>
               ))}
-              {dsSort.length === 0 && <tr><td colSpan={10} className="py-3 text-[#8A93A0]">Không có lô nào theo bộ lọc.</td></tr>}</tbody>
+              {dsSort.length === 0 && <tr><td colSpan={10} className="py-3 text-[#8A93A0]">Không có đơn nào theo bộ lọc.</td></tr>}</tbody>
             </table></div>
             <Pager total={dsSort.length} page={curPage} setPage={setPage} pageSize={pageSize} setPageSize={setPageSize} />
           </div>
@@ -265,7 +267,7 @@ function BanBuonInner() {
 
       {form && (
         <>
-          <div className="flex items-center gap-2"><button className="btn-ghost !text-xs" onClick={() => setForm(null)}>← Quay lại</button><div className="font-extrabold text-lg">{form.id ? "Sửa lô bán buôn" : "Tạo lô bán buôn (chốt đơn, chưa có số khung)"}</div></div>
+          <div className="flex items-center gap-2"><button className="btn-ghost !text-xs" onClick={() => setForm(null)}>← Quay lại</button><div className="font-extrabold text-lg">{form.id ? "Sửa đơn bán buôn" : "Tạo đơn bán buôn (chốt đơn, chưa có số khung)"}</div></div>
           <div className="card">
             <div className="grid gap-x-3 md:grid-cols-4 sm:grid-cols-2">
               <Field label="Khách buôn" required>
@@ -282,24 +284,27 @@ function BanBuonInner() {
             <div className="font-extrabold mb-2">Xe đặt (model + màu, chưa chọn số khung)</div>
             <div className="flex flex-col gap-2">
               {form.lines.map((l, i) => (
-                <div key={i} className="grid gap-2 md:grid-cols-[2fr_80px_140px_100px_140px_32px] items-end border-b border-dashed border-[#F0F2F5] pb-2">
+                <div key={i} className="grid gap-2 md:grid-cols-[2fr_70px_130px_90px_160px_140px_32px] items-end border-b border-dashed border-[#F0F2F5] pb-2">
                   <div><label className="lbl">Model + màu</label><VehicleSearch vehicles={vehicles} value={l.vehicle_id} onChange={(v) => setLine(i, "vehicle_id", v || "")} /></div>
                   <div><label className="lbl">SL</label><input type="number" min="1" className="inp" value={l.qty} onChange={(e) => setLine(i, "qty", e.target.value)} /></div>
                   <div><label className="lbl">Giá niêm yết (kèm pin)</label><div className="inp bg-[#F8FAFC]">{fmtVND(l.gia_niem_yet)}</div></div>
                   <div><label className="lbl">CK sỉ %</label>{admin
                     ? <input type="number" step="0.1" className="inp" value={l.ck_pct} placeholder="—" onChange={(e) => setLine(i, "ck_pct", e.target.value)} />
-                    : <div className={`inp ${l.ck_pct === "" ? "text-danger" : "bg-[#F8FAFC]"}`}>{l.ck_pct === "" ? "chưa có" : `${l.ck_pct}%`}</div>}</div>
+                    : <div className={`inp ${l.ck_pct === "" && !coGiaFix(l) ? "text-danger" : "bg-[#F8FAFC]"}`}>{coGiaFix(l) ? "—" : l.ck_pct === "" ? "chưa có" : `${l.ck_pct}%`}</div>}</div>
+                  <div><label className="lbl" title="Nhập giá bán buôn cố định cho mỗi xe — bỏ qua % CK sỉ">Giá bán buôn/xe (nhập tay)</label>{admin
+                    ? <MoneyInput className={coGiaFix(l) ? "!border-brand" : ""} value={l.gia_ban} placeholder="theo % CK" onChange={(v) => setLine(i, "gia_ban", v === null || v === undefined ? "" : v)} />
+                    : <div className="inp bg-[#F8FAFC]">{coGiaFix(l) ? fmtVND(l.gia_ban) : "theo % CK"}</div>}</div>
                   <div><label className="lbl">Thành tiền</label><div className="inp bg-[#F8FAFC] font-bold">{fmtVND(tienDong(l))}</div></div>
                   <button className="btn-ghost !px-2 !py-2 !text-xs !text-danger" onClick={() => setForm((f) => ({ ...f, lines: f.lines.filter((_, j) => j !== i) }))}>✕</button>
                 </div>
               ))}
             </div>
-            <button className="btn-ghost !text-xs mt-2" onClick={() => setForm((f) => ({ ...f, lines: [...f.lines, { vehicle_id: "", qty: 1, gia_niem_yet: 0, ck_pct: "", note: "" }] }))}>⊕ Thêm dòng xe</button>
+            <button className="btn-ghost !text-xs mt-2" onClick={() => setForm((f) => ({ ...f, lines: [...f.lines, { vehicle_id: "", qty: 1, gia_niem_yet: 0, ck_pct: "", gia_ban: "", note: "" }] }))}>⊕ Thêm dòng xe</button>
             <div className="flex items-center gap-3 mt-3 flex-wrap">
               <div className="mr-auto text-[13px]">Tổng {form.lines.reduce((s, l) => s + (Number(l.qty) || 0), 0)} xe · <b className="text-brand text-[15px]">Khách buôn cần trả {fmtVND(tongForm)}</b></div>
-              <button className="btn-primary" disabled={busy} onClick={luuLo}>{busy ? "Đang lưu…" : "Lưu lô"}</button>
+              <button className="btn-primary" disabled={busy} onClick={luuLo}>{busy ? "Đang lưu…" : "Lưu đơn"}</button>
             </div>
-            <div className="text-[11.5px] text-[#8A93A0] mt-1">CK sỉ tự lấy từ Bảng chiết khấu sỉ (Khách buôn › Bảng chiết khấu sỉ) theo khách, model và ngày chốt.{admin ? " Bạn được quyền sửa % trực tiếp trên lô." : " Cần quyền “Sửa % CK sỉ trên lô” để sửa % trực tiếp."}</div>
+            <div className="text-[11.5px] text-[#8A93A0] mt-1">CK sỉ tự lấy từ Bảng chiết khấu sỉ (Khách buôn › Bảng chiết khấu sỉ) theo khách, model và ngày chốt. Nhập “Giá bán buôn/xe” để bán theo giá cố định (VD xe TAILG) — khi có giá này thì không tính % CK; xóa trống để quay lại tính theo %.{admin ? " Bạn được quyền sửa % và giá trực tiếp trên đơn." : " Cần quyền “Sửa % CK sỉ trên đơn bán buôn” để sửa % / giá trực tiếp."}</div>
           </div>
         </>
       )}
@@ -311,13 +316,13 @@ function BanBuonInner() {
         return (
           <>
             <div className="flex items-center gap-2 flex-wrap">
-              <button className="btn-ghost !text-xs" onClick={() => { setLo(null); router.replace("/ban-buon"); }}>← Danh sách lô</button>
+              <button className="btn-ghost !text-xs" onClick={() => { setLo(null); router.replace("/ban-buon"); }}>← Danh sách đơn bán buôn</button>
               <span className="text-xl font-extrabold">{h.code}</span><Badge tone={TT_TONE[h.trang_thai]}>{h.trang_thai}</Badge>
               <span className="text-[13px] text-[#5A6572]">{h.customer_name} · chốt {fmtDate(h.ngay_chot)} · {h.created_by_name}</span>
               <div className="ml-auto flex gap-2">
                 <Link className="btn-ghost !text-xs" href={`/khach-buon?kh=${h.customer_id}`}>Sổ khách buôn</Link>
-                {!huy && <button className="btn-ghost !text-xs" onClick={() => setForm({ id: h.id, customer_id: h.customer_id, location_code: h.location_code || "", ngay_chot: h.ngay_chot, note: h.note, lines: lo.dong.map((d) => ({ ...d })) })}>✎ Sửa lô</button>}
-                {!huy && lo.orders.length === 0 && <button className="btn-ghost !text-xs !text-danger" onClick={huyLo}>Hủy lô</button>}
+                {!huy && <button className="btn-ghost !text-xs" onClick={() => setForm({ id: h.id, customer_id: h.customer_id, location_code: h.location_code || "", ngay_chot: h.ngay_chot, note: h.note, lines: lo.dong.map((d) => ({ ...d, gia_ban: d.gia_ban ?? "" })) })}>✎ Sửa đơn</button>}
+                {!huy && lo.orders.length === 0 && <button className="btn-ghost !text-xs !text-danger" onClick={huyLo}>Hủy đơn</button>}
               </div>
             </div>
             {huy && <div className="rounded-lg bg-[#F3F5F8] px-3 py-2 text-[13px]">Lô đã hủy: {h.huy_ly_do}</div>}
@@ -340,7 +345,7 @@ function BanBuonInner() {
                       <div key={d.id} className="border border-[#E3E8EF] rounded-xl p-2.5 mb-2">
                         <div className="flex items-center gap-2 flex-wrap text-[13px]">
                           <b className="mr-auto">{vName(d.vehicle_id)}</b>
-                          <span>{fmtVND(d.gia_niem_yet)} · CK {Number(d.ck_pct)}% → <b>{fmtVND(d.gia_niem_yet - Math.round(d.gia_niem_yet * d.ck_pct / 100))}</b>/xe</span>
+                          <span>{coGiaFix(d) ? <>Giá niêm yết {fmtVND(d.gia_niem_yet)} · <b>Giá bán buôn cố định {fmtVND(d.gia_ban)}</b>/xe</> : <>{fmtVND(d.gia_niem_yet)} · CK {Number(d.ck_pct)}% → <b>{fmtVND(donGia(d))}</b>/xe</>}</span>
                           <Badge tone={con === 0 ? "green" : "amber"}>Giao {g}/{d.qty}</Badge>
                         </div>
                         {!huy && con > 0 && (
@@ -387,7 +392,7 @@ function BanBuonInner() {
 
               <div className="flex flex-col gap-4">
                 <div className="card">
-                  <div className="flex items-center mb-2"><div className="font-extrabold mr-auto">Thanh toán của lô</div>
+                  <div className="flex items-center mb-2"><div className="font-extrabold mr-auto">Thanh toán của đơn bán buôn</div>
                     {!huy && <button className="btn-primary !text-xs" onClick={() => setLo((L) => ({ ...L, pay: { method: "Chuyển khoản", account_id: "", amount: h.con_phai_tra, note: "" } }))}>+ Thu tiền</button>}</div>
                   {lo.pay && (
                     <div className="rounded-lg border-2 border-brand p-2 mb-2 flex flex-col gap-1.5">
@@ -409,9 +414,9 @@ function BanBuonInner() {
                         <div className="flex flex-col gap-1.5 mt-1.5">
                           <MoneyInput value={lo.ct.amount} onChange={(v) => setLo((L) => ({ ...L, ct: { ...L.ct, amount: v || 0 } }))} />
                           <input className="inp" placeholder="Ghi chú, VD: chốt tháng 10" value={lo.ct.note} onChange={(e) => setLo((L) => ({ ...L, ct: { ...L.ct, note: e.target.value } }))} />
-                          <div className="flex gap-2"><button className="btn-ghost !text-xs flex-1" onClick={() => setLo((L) => ({ ...L, ct: null }))}>Hủy</button><button className="btn-primary !text-xs flex-1" disabled={busy} onClick={canTru}>Cấn trừ vào lô</button></div>
+                          <div className="flex gap-2"><button className="btn-ghost !text-xs flex-1" onClick={() => setLo((L) => ({ ...L, ct: null }))}>Hủy</button><button className="btn-primary !text-xs flex-1" disabled={busy} onClick={canTru}>Cấn trừ vào đơn</button></div>
                         </div>
-                      ) : <button className="btn-ghost !text-xs mt-1" onClick={() => setLo((L) => ({ ...L, ct: { amount: Math.min(L.kb.kha_dung, h.con_phai_tra), note: "" } }))}>Cấn trừ vào lô này</button>}
+                      ) : <button className="btn-ghost !text-xs mt-1" onClick={() => setLo((L) => ({ ...L, ct: { amount: Math.min(L.kb.kha_dung, h.con_phai_tra), note: "" } }))}>Cấn trừ vào đơn này</button>}
                     </div>
                   )}
                   {lo.tt.length === 0 ? <div className="text-[12.5px] text-[#8A93A0]">Chưa có khoản thanh toán.</div> : lo.tt.map((t) => (
@@ -421,7 +426,7 @@ function BanBuonInner() {
                       {can("bb_dao_nguoc") && !t.is_reversed && <button className="btn-ghost !px-2 !py-0.5 !text-xs !text-danger" onClick={() => daoNguoc(t)}>Đảo ngược</button>}
                     </div>
                   ))}
-                  <div className="text-[11px] text-[#8A93A0] mt-2">Tiền thu ở lô ghi vào quỹ ngay (danh mục “Thu tiền bán buôn (trả trước)”), rồi tự phân bổ xuống từng đơn xe khi giao — không cần thu lại trên đơn xe.</div>
+                  <div className="text-[11px] text-[#8A93A0] mt-2">Tiền thu ở đơn bán buôn ghi vào quỹ ngay (danh mục “Thu tiền bán buôn (trả trước)”), rồi tự phân bổ xuống từng đơn xe khi giao — không cần thu lại trên đơn xe.</div>
                 </div>
               </div>
             </div>

@@ -460,7 +460,7 @@ export default function DonBan() {
         <div className="flex gap-2 flex-wrap items-center mb-3">
           <div className="font-extrabold mr-auto">Danh sách đơn bán ({sorted.length})</div>
           <Link href="/ban-hang/wizard" className="btn-primary !text-xs">+ Tạo đơn bán mới</Link>
-          <Link href="/ban-buon" className="btn-ghost !text-xs" title="Chốt lô với khách buôn, thu tiền ở lô, khi giao mới chọn số khung — tiền tự chia cho từng xe">+ Tạo đơn bán buôn (theo lô)</Link>
+          <Link href="/ban-buon" className="btn-ghost !text-xs" title="Chốt đơn với khách buôn, thu tiền ở đơn bán buôn, khi giao mới chọn số khung — tiền tự chia cho từng xe">+ Tạo đơn bán buôn</Link>
           <input type="date" className="inp !w-auto" value={from} onChange={(e) => setFrom(e.target.value)} />
           <input type="date" className="inp !w-auto" value={to} onChange={(e) => setTo(e.target.value)} />
           <MultiCheck label="Cửa hàng: tất cả" value={fLoc} onChange={(v) => { setFLoc(v); setPage(1); }}
@@ -824,7 +824,7 @@ export default function DonBan() {
                       {payEdit && (
                         <div className="p-3 rounded-xl border-2 border-brand bg-[#F8FAFC] flex flex-col gap-2.5">
                           <div className="font-bold text-[13.5px]">Thu thêm tiền</div>
-                          {detail.don_buon_id && <div className="text-[12px] rounded-lg bg-[#FFF6E5] text-[#A25F00] px-2.5 py-1.5">⚠ Đơn này thuộc một <b>lô bán buôn</b>. Tiền khách buôn trả nên thu ở <Link className="underline" href={`/ban-buon?id=${detail.don_buon_id}`}>trang lô</Link> — hệ thống tự chia cho từng xe. Chỉ thu thêm ở đây khi chắc chắn khoản này chưa được ghi ở đơn khác của lô.</div>}
+                          {detail.don_buon_id && <div className="text-[12px] rounded-lg bg-[#FFF6E5] text-[#A25F00] px-2.5 py-1.5">⚠ Đơn này thuộc một <b>đơn bán buôn</b>. Tiền khách buôn trả nên thu ở <Link className="underline" href={`/ban-buon?id=${detail.don_buon_id}`}>trang đơn bán buôn</Link> — hệ thống tự chia cho từng xe. Chỉ thu thêm ở đây khi chắc chắn khoản này chưa được ghi ở xe khác của đơn bán buôn.</div>}
                           <div className="flex gap-1.5 flex-wrap">
                             {conLai > 0 && (
                               <button className="btn-ok !px-3 !py-1.5 !text-xs"

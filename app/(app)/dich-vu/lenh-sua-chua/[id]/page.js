@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Badge, Toast, Field, LocSearch } from "@/components/ui";
+import { Badge, Toast, Field, LocSearch, MoneyInput } from "@/components/ui";
 import { fmtDate, fmtTime, fmtVND, errMsg } from "@/lib/format";
 import BankOptions from "@/components/BankOptions";
 import { LOAI_DV, NHOM_SC, LSC_STATUS } from "@/lib/lsc";
@@ -24,7 +24,8 @@ export default function ChiTietLSC() {
   const [tonKho, setTonKho] = useState({});
   const [pays, setPays] = useState([]);
   const [pick, setPick] = useState("");
-  const [pf, setPf] = useState({ method: "Tiền mặt", account_id: "", amount: "", note: "" });
+  const [tts, setTts] = useState([]); // [{method, account_id, amount}]
+  const [ttNote, setTtNote] = useState("");
   const [banks, setBanks] = useState([]);
   const [dirty, setDirty] = useState(false);
   const [reopens, setReopens] = useState([]);
@@ -92,6 +93,10 @@ export default function ChiTietLSC() {
   const PL = { KHACH_HANG: "Khách hàng", BAO_HANH: "Bảo hành hãng", NOI_BO: "Nội bộ" };
   const tong = (pl) => lines.filter((l) => !pl || l.phan_loai_tt === pl).reduce((a, l) => a + tinhTTV(l), 0);
   const conPhaiThu = Math.max(Number(r.tong_khach_tra || 0) - Number(r.da_thu || 0), 0);
+  const tongTt = tts.reduce((a, x) => a + (Number(x.amount) || 0), 0);
+  const conLaiTt = Math.max(conPhaiThu - tongTt, 0);
+  const DS_PTTT = paymentMethods.length ? paymentMethods.filter((m) => m.code !== "Trả góp" && m.is_active !== false).map((m) => m.code) : ["Tiền mặt", "Chuyển khoản"];
+  const upTt = (i, k, v) => setTts((x) => x.map((y, j) => (j === i ? { ...y, [k]: v, ...(k === "method" ? { account_id: "" } : {}) } : y)));
   const phayCv = lines.filter((l) => l.line_type === "CONG"); const phayPt = lines.filter((l) => l.line_type === "PHU_TUNG");
 
   const xinMoLai = async () => {
@@ -109,15 +114,18 @@ export default function ChiTietLSC() {
     notify(action === "duyet" ? "Đã duyệt mở lại lệnh." : "Đã từ chối."); await load(); await loadLines();
   };
 
+  const quyTypeOf = (m) => paymentMethods.find((x) => x.code === m)?.quy_type;
   const thuTien = async () => {
-    const amount = Number(pf.amount) || conPhaiThu;
-    const nh = paymentMethods.find((m) => m.code === pf.method)?.quy_type === "Ngân hàng";
-    if (nh && !pf.account_id) return notify("Chọn tài khoản ngân hàng nhận tiền.", "err");
+    const pays = tts.filter((x) => Number(x.amount) > 0);
+    if (!pays.length) return notify("Nhập số tiền cho ít nhất một phương thức.", "err");
+    const thieuTk = pays.find((x) => quyTypeOf(x.method) === "Ngân hàng" && !x.account_id);
+    if (thieuTk) return notify(`Chọn tài khoản ngân hàng nhận tiền cho khoản ${thieuTk.method}.`, "err");
+    if (tongTt > conPhaiThu) return notify(`Tổng thu ${fmtVND(tongTt)} vượt quá số còn phải trả ${fmtVND(conPhaiThu)}.`, "err");
     setBusy(true);
-    const { error } = await supabase.rpc("fn_lsc_thu_tien", { p: { id: r.id, method: pf.method, account_id: pf.account_id || null, amount, note: pf.note } });
+    const { data, error } = await supabase.rpc("fn_lsc_thu_tien_nhieu", { p: { id: r.id, note: ttNote, pays: pays.map((x) => ({ method: x.method, account_id: x.account_id || null, amount: Number(x.amount) })) } });
     setBusy(false);
     if (error) return notify(errMsg(error), "err");
-    notify("Đã ghi nhận thu tiền."); setPf({ method: "Tiền mặt", account_id: "", amount: "", note: "" }); await load(); await loadLines();
+    notify(`Đã ghi nhận thu ${fmtVND(data.tong)} (${(data.phieu || []).join(", ")}).`); setTts([]); setTtNote(""); await load(); await loadLines();
   };
   const chuyen = async (action) => {
     let ly = "";
@@ -236,17 +244,44 @@ export default function ChiTietLSC() {
           </div>
         </div>
         {r.status === "PHAT_HANH" && conPhaiThu > 0 && (
-          <div className="mt-3 pt-3 border-t border-[#E3E8EF]">
-            <div className="font-bold text-[13px] mb-2">Thu tiền khách hàng</div>
-            <div className="flex gap-2 flex-wrap items-center">
-              <select className="inp !w-auto" value={pf.method} onChange={(e) => setPf((p) => ({ ...p, method: e.target.value, account_id: "" }))}>
-                {(paymentMethods.length ? paymentMethods.filter((m) => m.code !== "Trả góp").map((m) => m.code) : ["Tiền mặt", "Chuyển khoản"]).map((m) => <option key={m}>{m}</option>)}</select>
-              {paymentMethods.find((m) => m.code === pf.method)?.quy_type === "Ngân hàng" && (
-                <select className="inp !w-auto max-w-full" value={pf.account_id} onChange={(e) => setPf((p) => ({ ...p, account_id: e.target.value }))}><option value="">— Tài khoản nhận tiền —</option><BankOptions accounts={banks} companies={[]} /></select>)}
-              <input type="number" className="inp !w-40" placeholder={`Số tiền (${fmtVND(conPhaiThu)})`} value={pf.amount} onChange={(e) => setPf((p) => ({ ...p, amount: e.target.value }))} />
-              <input className="inp !w-48" placeholder="Ghi chú" value={pf.note} onChange={(e) => setPf((p) => ({ ...p, note: e.target.value }))} />
-              <button className="btn-ok !text-xs" disabled={busy} onClick={thuTien}>Ghi nhận thu</button>
+          <div className="mt-3 pt-3 border-t border-[#E3E8EF] max-w-2xl">
+            <div className="font-extrabold mb-2">Thanh toán</div>
+            <div className="flex flex-col gap-2 mb-2">
+              {tts.map((p, i) => (
+                <div key={i} className="rounded-lg border border-[#E3E8EF] p-2 flex flex-col gap-1.5">
+                  <div className="flex gap-1.5 items-center">
+                    <span className="text-[11px] font-bold text-[#8A93A0] w-4 shrink-0">{i + 1}.</span>
+                    <select className="inp !py-1.5 !text-xs !w-auto" value={p.method} onChange={(e) => upTt(i, "method", e.target.value)}>{DS_PTTT.map((m) => <option key={m}>{m}</option>)}</select>
+                    <div className="flex-1"><MoneyInput className="!py-1.5 !text-xs" value={p.amount} onChange={(v) => upTt(i, "amount", v)} /></div>
+                    <button className="text-danger font-bold px-1" onClick={() => setTts((x) => x.filter((_, j) => j !== i))}>✕</button>
+                  </div>
+                  {quyTypeOf(p.method) === "Ngân hàng" && (
+                    <div className="flex items-center gap-2 flex-wrap bg-[#EAF2FF] rounded-md px-2 py-1.5 ml-5">
+                      <span className="text-[11px] font-bold text-brand">Tài khoản nhận tiền:</span>
+                      <select className="inp !w-auto !py-1 !text-xs max-w-full" value={p.account_id || ""} onChange={(e) => upTt(i, "account_id", e.target.value)}>
+                        <option value="">— Chọn đúng tài khoản khách đã chuyển vào —</option><BankOptions accounts={banks} companies={[]} giu={p.account_id} /></select>
+                      {banks.length === 0 && <span className="text-[10.5px] text-danger">Chưa có tài khoản Ngân hàng nào — vào Cài đặt → Tài khoản nhận tiền để tạo.</span>}
+                    </div>)}
+                </div>))}
             </div>
+            <div className="flex gap-1.5 flex-wrap mb-3">
+              <button className="btn-ghost !text-xs" onClick={() => setTts((p) => [...p, { method: "Tiền mặt", account_id: "", amount: "" }])}>⊕ Thêm phương thức</button>
+              {tts.length === 0 && <button className="btn-ghost !text-xs" onClick={() => setTts([{ method: "Tiền mặt", account_id: "", amount: conPhaiThu }])}>{Number(r.da_thu) > 0 ? `Trả nốt ${fmtVND(conPhaiThu)} tiền mặt` : "Trả đủ tiền mặt"}</button>}
+              {tts.length > 0 && conLaiTt > 0 && <button className="btn-ghost !text-xs" onClick={() => setTts((p) => p.map((x, j) => (j === p.length - 1 ? { ...x, amount: (Number(x.amount) || 0) + conLaiTt } : x)))}>Điền nốt {fmtVND(conLaiTt)}</button>}
+            </div>
+            <div className="rounded-xl border border-[#E3E8EF] overflow-hidden mb-3">
+              <div className="flex items-center justify-between px-3 py-2 border-b border-dashed border-[#E3E8EF] text-[13.5px]">
+                <span className="text-[#5A6572]">Khách đã trả{Number(r.da_thu) > 0 ? ` (đã thu trước đó ${fmtVND(r.da_thu)})` : ""}</span><span className="font-bold text-[#0E7A4A]">{fmtVND(Number(r.da_thu || 0) + tongTt)}</span>
+              </div>
+              <div className={`flex items-center justify-between px-3 py-2.5 ${conLaiTt > 0 ? "bg-[#FFF6E5]" : "bg-[#E7F6EE]"}`}>
+                <span className="font-bold text-[13.5px]">Còn phải trả</span>
+                <span className={`text-[18px] font-extrabold ${conLaiTt > 0 ? "text-[#A25F00]" : "text-[#0E7A4A]"}`}>{fmtVND(conLaiTt)}</span>
+              </div>
+            </div>
+            {tts.length > 0 && <div className="flex gap-2 flex-wrap items-center">
+              <input className="inp !w-64" placeholder="Ghi chú (không bắt buộc)" value={ttNote} onChange={(e) => setTtNote(e.target.value)} />
+              <button className="btn-ok" disabled={busy || tongTt <= 0} onClick={thuTien}>{busy ? "Đang ghi…" : `Ghi nhận thu ${fmtVND(tongTt)}`}</button>
+            </div>}
           </div>)}
         {pays.length > 0 && (
           <div className="mt-3"><div className="font-bold text-[13px] mb-1">Phiếu thu ({pays.length})</div>

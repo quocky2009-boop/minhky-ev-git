@@ -1,0 +1,22 @@
+-- 170: Thanh toán LSC nhiều phương thức · Quản lý nhóm hàng hóa/phụ tùng · Giá bán buôn nhập tay · đổi tên "lô" → "đơn bán buôn"
+-- (đã áp dụng trực tiếp qua Supabase MCP ngày 05/11/2026; file này là ghi chú mô tả)
+--
+-- 1) fn_lsc_thu_tien_nhieu(p {id, note, pays:[{method, account_id, amount}]})
+--    Kiểm tra tổng ≤ còn phải trả rồi gọi fn_lsc_thu_tien cho từng khoản trong cùng một giao dịch
+--    (một phiếu PTDV cho mỗi phương thức; khoản cuối đủ tiền thì lệnh chuyển HOAN_THANH_TT).
+--
+-- 2) Nhóm hàng: danh sách lưu ở app_settings
+--      dv_nhom_phu_tung (phụ tùng), hh_nhom_hang_hoa (hàng hóa — mới, khởi tạo Phụ kiện/Phụ tùng/Quà tặng/Vật tư/Khác)
+--    fn_nhom_hang(p {loai: 'PT'|'HH', action: 'them'|'sua'|'xoa'|'sap_xep', ten, ten_moi, chuyen_sang, ds})
+--      quyền: PT → pt_danh_muc, HH → sua_danh_muc
+--      sửa: đổi tên trong danh sách + cập nhật parts/products.group_name
+--      xóa: nhóm đang có mã thì bắt buộc chuyen_sang (chuyển mã sang nhóm khác)
+--
+-- 3) Đơn bán buôn: giá bán buôn nhập tay theo từng dòng xe
+alter table public.don_buon_dong add column if not exists gia_ban bigint check (gia_ban is null or gia_ban >= 0);
+--    - đơn giá dòng = coalesce(gia_ban, gia_niem_yet − round(gia_niem_yet × ck_pct / 100))  (_lo_tong)
+--    - fn_lo_luu nhận lines[].gia_ban (chỉ người có quyền bb_sua_ck; dòng đã giao xe giữ nguyên)
+--    - fn_lo_giao_xe: dòng có gia_ban → đơn xe giá = max(niêm yết, gia_ban), giảm theo số tiền = niêm yết − gia_ban
+--
+-- 4) Thông báo lỗi / diễn giải trong fn_lo_* , _lo_phan_bo: "lô" → "đơn bán buôn"
+--    (giữ nguyên tên phương thức 'Tiền trả trước lô bán buôn' và trạng thái 'Trả trước (lô)' vì có ràng buộc dữ liệu)

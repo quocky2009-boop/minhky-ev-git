@@ -565,7 +565,7 @@ function TaoDonInner() {
               <Field label="Địa chỉ"><input className="inp" value={kh.customer_address} onChange={(e) => setKh((p) => ({ ...p, customer_address: e.target.value }))} /></Field>
               {kh.customer_type === "Khách buôn" && (
                 <div className="md:col-span-2 p-2 rounded-lg bg-[#FFF6E5] border border-[#F5D9A8] text-[12.5px] text-[#A25F00]">
-                  Bán buôn nên lên ở <Link className="underline font-semibold" href="/ban-buon">Đơn bán buôn (theo lô)</Link>: thu tiền ở lô và tự chia cho từng xe. Nếu vẫn lên ở đây, tiền thanh toán sẽ ghi vào <b>đơn đầu tiên</b> — <b>không “thu thêm” lại ở các đơn còn lại</b> (gây ghi thu trùng).
+                  Bán buôn nên lên ở <Link className="underline font-semibold" href="/ban-buon">Đơn bán buôn</Link>: thu tiền ở đơn bán buôn và tự chia cho từng xe. Nếu vẫn lên ở đây, tiền thanh toán sẽ ghi vào <b>đơn đầu tiên</b> — <b>không “thu thêm” lại ở các đơn còn lại</b> (gây ghi thu trùng).
                 </div>
               )}
               {kbSoDu && kbSoDu.tong !== 0 && (

@@ -4,13 +4,14 @@ import { useCatalog, useToast } from "@/lib/useData";
 import { Badge, Toast, KPI, Field, Pager, pageSlice, useSortable, Th, MoneyInput } from "@/components/ui";
 import { fmtVND, fmtDate, fmtTime, errMsg, downloadXLSX } from "@/lib/format";
 import ImportDanhMuc from "@/components/ImportDanhMuc";
+import NhomHang, { dsNhom } from "@/components/NhomHang";
 
-const GROUPS = ["Phụ kiện", "Phụ tùng", "Quà tặng", "Vật tư", "Khác"];
 const UNITS = ["Cái", "Bộ", "Hộp", "Chiếc", "Kg", "Lít", "Cuộn", "Đôi"];
 const emptyF = { name: "", group_name: "Phụ kiện", unit: "Cái", cost_price: "", sale_price: "", min_qty: "0", barcode: "", note: "", location_code: "", status: "Hoạt động" };
 
 export default function HangHoa() {
-  const { supabase, locations, profile, loading, refresh } = useCatalog();
+  const { supabase, locations, profile, loading, refresh, settings } = useCatalog();
+  const GROUPS = dsNhom(settings, "HH");
   const { toast, notify } = useToast();
   const [products, setProducts] = useState([]);
   const [stockMap, setStockMap] = useState({}); // { productId: { locCode: qty } }
@@ -42,6 +43,7 @@ export default function HangHoa() {
   const [kkLoc, setKkLoc] = useState("");
   const [kkRows, setKkRows] = useState([]); // [{product_id, name, unit, ton, dem}]
   const [imp, setImp] = useState(false);
+  const [qlNhom, setQlNhom] = useState(false);
 
   const load = async () => {
     setBusy(true);
@@ -217,11 +219,13 @@ export default function HangHoa() {
   return (
     <div className="flex flex-col gap-4 pb-8">
       <Toast toast={toast} />
+      {qlNhom && <NhomHang loai="HH" supabase={supabase} settings={settings} items={products} notify={notify} onDone={() => { refresh && refresh(); load(); }} onClose={() => setQlNhom(false)} />}
       {imp && <ImportDanhMuc mode="hh" supabase={supabase} locations={locations} notify={notify} onDone={load} onClose={() => setImp(false)} />}
 
       <div className="flex items-center gap-2 flex-wrap">
         <div className="font-extrabold text-lg mr-auto">Quản lý Hàng hóa</div>
         {tab === "ton" && <button className="btn-ghost !text-xs" onClick={xuatExcel}>⬇ Xuất Excel</button>}
+        {isManager && tab === "ton" && <button className="btn-ghost !text-xs" onClick={() => setQlNhom(true)}>⚙ Nhóm hàng</button>}
         {isManager && tab === "ton" && <button className="btn-ghost !text-xs" onClick={() => setImp(true)}>⬆ Nhập Excel</button>}
         {isManager && tab === "ton" && <button className="btn-primary !text-xs" onClick={() => { setEditId(null); setF(emptyF); setShowForm(true); }}>+ Thêm sản phẩm</button>}
       </div>
@@ -251,7 +255,7 @@ export default function HangHoa() {
                 <div className="md:col-span-2"><Field label="Tên sản phẩm *"><input className="inp" value={f.name} onChange={e => setF(p => ({...p, name: e.target.value}))} placeholder="VD: Mũ bảo hiểm VinFast" /></Field></div>
                 <Field label="Nhóm">
                   <select className="inp" value={f.group_name} onChange={e => setF(p => ({...p, group_name: e.target.value}))}>
-                    {GROUPS.map(g => <option key={g}>{g}</option>)}
+                    {[...GROUPS, ...(f.group_name && !GROUPS.includes(f.group_name) ? [f.group_name] : [])].map(g => <option key={g}>{g}</option>)}
                   </select>
                 </Field>
                 <Field label="Đơn vị tính">

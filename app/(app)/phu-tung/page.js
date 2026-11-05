@@ -6,6 +6,7 @@ import { fmtVND, fmtTime, errMsg, downloadXLSX } from "@/lib/format";
 import ImportDanhMuc from "@/components/ImportDanhMuc";
 import DieuChinhTon from "@/components/pt/DieuChinhTon";
 import BaoCaoXNT from "@/components/pt/BaoCaoXNT";
+import NhomHang, { dsNhom } from "@/components/NhomHang";
 
 const TXN_LABEL = {
   NHAP: "Nhập kho", XUAT_DV: "Xuất cho phiếu DV", XUAT_NOI_BO: "Xuất nội bộ",
@@ -14,7 +15,7 @@ const TXN_LABEL = {
 const emptyPart = { id: null, code: "", name: "", group_name: "Phụ tùng", unit: "cái", cost_price: 0, sell_price: 0, vat_pct: "", min_stock: 0, track_serial: false, note: "" };
 
 export default function KhoPhuTung() {
-  const { supabase, locations, settings, profile, loading } = useCatalog();
+  const { supabase, locations, settings, profile, loading, refresh } = useCatalog();
   const { toast, notify } = useToast();
   const [tab, setTab] = useState("ton");
   const [perms, setPerms] = useState({});
@@ -42,7 +43,8 @@ export default function KhoPhuTung() {
   const [nf, setNf] = useState({ part_id: "", location_code: "", qty: 1, unit_cost: "", supplier_id: "", note: "", serials: "" });
 
   const can = (p) => profile?.role === "CEO" || !!perms[p];
-  const groups = (settings?.dv_nhom_phu_tung || "Pin & Ắc quy\nSăm lốp\nPhanh\nĐiện & Sạc\nNhựa & Dàn áo\nKhác").split(/\n+/).map((x) => x.trim()).filter(Boolean);
+  const groups = dsNhom(settings, "PT");
+  const [qlNhom, setQlNhom] = useState(false);
 
   const load = async () => {
     if (!profile) return;
@@ -132,9 +134,11 @@ export default function KhoPhuTung() {
       <div className="flex items-center gap-2 flex-wrap">
         <div className="font-extrabold text-lg mr-auto">Kho phụ tùng</div>
         {can("pt_danh_muc") && <button className="btn-ghost !text-xs" onClick={() => { setPf(emptyPart); setShowPf(!showPf); }}>{showPf ? "Đóng" : "+ Thêm phụ tùng"}</button>}
+        {can("pt_danh_muc") && <button className="btn-ghost !text-xs" onClick={() => setQlNhom(true)}>⚙ Nhóm phụ tùng</button>}
         {can("pt_danh_muc") && <button className="btn-ghost !text-xs" onClick={() => setShowImp(true)}>⬆ Import Excel (danh mục + tồn đầu kỳ)</button>}
         <button className="btn-ghost !text-xs" onClick={exportCSV}>⬇ Xuất Excel tồn kho</button>
       </div>
+      {qlNhom && <NhomHang loai="PT" supabase={supabase} settings={settings} items={parts} notify={notify} onDone={() => { refresh && refresh(); load(); }} onClose={() => setQlNhom(false)} />}
       {showImp && <ImportDanhMuc mode="pt" supabase={supabase} locations={locations} notify={notify} onDone={load} onClose={() => setShowImp(false)} />}
 
       <div className="flex gap-3 flex-wrap">
@@ -150,7 +154,7 @@ export default function KhoPhuTung() {
           <div className="grid gap-3 md:grid-cols-3">
             <Field label="Mã" required><input className="inp" value={pf.code} onChange={(e) => setPf((p) => ({ ...p, code: e.target.value.toUpperCase() }))} placeholder="VD: PT-LOP-001" /></Field>
             <Field label="Tên phụ tùng" required><input className="inp" value={pf.name} onChange={(e) => setPf((p) => ({ ...p, name: e.target.value }))} /></Field>
-            <Field label="Nhóm"><select className="inp" value={pf.group_name} onChange={(e) => setPf((p) => ({ ...p, group_name: e.target.value }))}>{groups.map((g) => <option key={g}>{g}</option>)}</select></Field>
+            <Field label="Nhóm"><select className="inp" value={pf.group_name} onChange={(e) => setPf((p) => ({ ...p, group_name: e.target.value }))}>{[...groups, ...(pf.group_name && !groups.includes(pf.group_name) ? [pf.group_name] : [])].map((g) => <option key={g}>{g}</option>)}</select></Field>
             <Field label="Đơn vị"><input className="inp" value={pf.unit} onChange={(e) => setPf((p) => ({ ...p, unit: e.target.value }))} /></Field>
             <Field label="Giá nhập"><MoneyInput value={pf.cost_price} onChange={(v) => setPf((p) => ({ ...p, cost_price: v || 0 }))} /></Field>
             <Field label="Giá bán (chưa VAT)"><MoneyInput value={pf.sell_price} onChange={(v) => setPf((p) => ({ ...p, sell_price: v || 0 }))} /></Field>
