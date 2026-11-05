@@ -40,6 +40,9 @@ function BanBuonInner() {
   const sort = useSortable();
   const [form, setForm] = useState(null); // tao / sua lo
   const [lo, setLo] = useState(null);     // chi tiet lo
+  const [quet, setQuet] = useState("");   // o quet/go so khung khi giao
+  const [quetMsg, setQuetMsg] = useState(null);
+  const [timDong, setTimDong] = useState({}); // loc so khung theo tung dong
   const [banks, setBanks] = useState([]);
   const can = usePerms(supabase, profile);
   const admin = can("bb_sua_ck"); // duoc sua % CK si tren lo
@@ -160,6 +163,23 @@ function BanBuonInner() {
     const { error } = await supabase.rpc("fn_lo_huy", { p_id: lo.h.id, p_ly_do: ly });
     if (error) return notify(errMsg(error), "err");
     notify("Đã hủy đơn bán buôn."); reload();
+  };
+  // Quet / go so khung: tu gan vao dong dung model con thieu
+  const quetSoKhung = (raw, daGiaoFn) => {
+    const fn = String(raw || "").trim().toUpperCase().replace(/\s+/g, "");
+    if (!fn) return;
+    let u = lo.ton.find((x) => x.frame_number.toUpperCase() === fn);
+    if (!u) { const m = lo.ton.filter((x) => x.frame_number.toUpperCase().endsWith(fn)); if (m.length === 1) u = m[0]; else if (m.length > 1) return setQuetMsg({ err: true, t: `“${fn}” khớp ${m.length} số khung — gõ thêm ký tự.` }); }
+    if (!u) return setQuetMsg({ err: true, t: `Không thấy số khung “${fn}” trong kho (chưa nhập kho, đã bán hoặc đang chuyển).` });
+    if (Object.values(lo.chon).some((a) => a.includes(u.frame_number))) return setQuetMsg({ err: true, t: `${u.frame_number} đã được chọn rồi.` });
+    const dong = lo.dong.find((d) => d.vehicle_id === u.vehicle_id && d.qty - daGiaoFn(d.id) - (lo.chon[d.id] || []).length > 0);
+    if (!dong) {
+      const coModel = lo.dong.some((d) => d.vehicle_id === u.vehicle_id);
+      return setQuetMsg({ err: true, t: coModel ? `${u.frame_number} (${vName(u.vehicle_id)}) — dòng xe này đã chọn đủ số lượng.` : `${u.frame_number} là ${vName(u.vehicle_id)} — không có trong đơn bán buôn này.` });
+    }
+    setLo((L) => ({ ...L, chon: { ...L.chon, [dong.id]: [...(L.chon[dong.id] || []), u.frame_number] } }));
+    setQuetMsg({ err: false, t: `✓ ${u.frame_number} → ${vName(u.vehicle_id)} · ${locName(u.location_code)}` });
+    setQuet("");
   };
   const toggleXe = (dongId, frame, max) => setLo((L) => {
     const cur = L.chon[dongId] || [];
@@ -325,7 +345,7 @@ function BanBuonInner() {
                 {!huy && lo.orders.length === 0 && <button className="btn-ghost !text-xs !text-danger" onClick={huyLo}>Hủy đơn</button>}
               </div>
             </div>
-            {huy && <div className="rounded-lg bg-[#F3F5F8] px-3 py-2 text-[13px]">Lô đã hủy: {h.huy_ly_do}</div>}
+            {huy && <div className="rounded-lg bg-[#F3F5F8] px-3 py-2 text-[13px]">Đơn bán buôn đã hủy: {h.huy_ly_do}</div>}
             <div className="flex gap-3 flex-wrap">
               <KPI label="Khách buôn cần trả" value={fmtVND(h.phai_tra)} sub={`${h.sl_dat} xe · đã giao ${h.sl_giao}`} />
               <KPI label="Đã trả (tiền + cấn trừ)" value={fmtVND(h.da_tra)} tone="green" />
@@ -337,10 +357,19 @@ function BanBuonInner() {
               <div className="lg:col-span-2 flex flex-col gap-4">
                 <div className="card">
                   <div className="font-extrabold mb-2">Xe đặt & giao xe</div>
+                  {!huy && h.sl_giao < h.sl_dat && (
+                    <div className="mb-2.5 rounded-xl bg-[#EAF2FF] p-2.5">
+                      <label className="lbl">Quét hoặc gõ số khung (đủ số khung, hoặc vài số cuối) rồi Enter — tự xếp vào đúng dòng xe</label>
+                      <input className="inp font-mono" autoComplete="off" placeholder="VD: RPXT5LHLVTE711526 hoặc 711526" value={quet}
+                        onChange={(e) => { setQuet(e.target.value); setQuetMsg(null); }} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); quetSoKhung(quet, daGiao); } }} />
+                      {quetMsg && <div className={`text-[12px] mt-1 font-semibold ${quetMsg.err ? "text-danger" : "text-[#0E7A4A]"}`}>{quetMsg.t}</div>}
+                    </div>)}
                   {lo.dong.map((d) => {
                     const g = daGiao(d.id); const con = d.qty - g;
                     const ton = lo.ton.filter((u) => u.vehicle_id === d.vehicle_id);
                     const chon = lo.chon[d.id] || [];
+                    const tk = (timDong[d.id] || "").trim().toUpperCase();
+                    const tonLoc = ton.filter((u) => !chon.includes(u.frame_number) && (!tk || u.frame_number.toUpperCase().includes(tk) || locName(u.location_code).toUpperCase().includes(tk)));
                     return (
                       <div key={d.id} className="border border-[#E3E8EF] rounded-xl p-2.5 mb-2">
                         <div className="flex items-center gap-2 flex-wrap text-[13px]">
@@ -350,15 +379,22 @@ function BanBuonInner() {
                         </div>
                         {!huy && con > 0 && (
                           <div className="mt-1.5">
-                            <div className="text-[11.5px] text-[#5A6572] mb-1">Chọn số khung trong kho (còn {con} xe cần giao) — {ton.length} xe tồn:</div>
+                            {chon.length > 0 && <div className="flex gap-1 flex-wrap mb-1.5 items-center"><span className="text-[11.5px] font-semibold text-brand">Đã chọn {chon.length}/{con}:</span>
+                              {chon.map((f) => { const u = ton.find((x) => x.frame_number === f); return (
+                                <span key={f} className="text-[11px] font-mono rounded px-1.5 py-0.5 bg-brand text-white">{f}{u && <span className="font-sans opacity-80"> · {locName(u.location_code)}</span>} <button className="ml-1 font-bold" onClick={() => toggleXe(d.id, f, con)}>✕</button></span>); })}</div>}
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              <span className="text-[11.5px] text-[#5A6572]">Chọn số khung trong kho (còn {con - chon.length} xe cần chọn) — {ton.length} xe tồn{tk ? `, ${tonLoc.length} khớp` : ""}:</span>
+                              {ton.length > 6 && <input className="inp !py-1 !text-xs !w-56 font-mono" placeholder="Lọc số khung / tên kho…" value={timDong[d.id] || ""} onChange={(e) => setTimDong((m) => ({ ...m, [d.id]: e.target.value }))} />}
+                            </div>
                             <div className="flex gap-1 flex-wrap max-h-40 overflow-y-auto">
-                              {ton.map((u) => (
+                              {tonLoc.map((u) => (
                                 <button key={u.frame_number} type="button" onClick={() => toggleXe(d.id, u.frame_number, con)}
                                   className={`text-[11px] font-mono rounded px-1.5 py-0.5 border ${chon.includes(u.frame_number) ? "bg-brand text-white border-brand" : "bg-[#F3F5F8] border-transparent"}`}>
                                   {u.frame_number} <span className="font-sans opacity-75">· {locName(u.location_code)}</span>
                                 </button>
                               ))}
                               {ton.length === 0 && <span className="text-[12px] text-danger">Hết tồn model này.</span>}
+                              {ton.length > 0 && tonLoc.length === 0 && tk && <span className="text-[12px] text-[#8A93A0]">Không có số khung khớp “{timDong[d.id]}”.</span>}
                             </div>
                           </div>
                         )}
