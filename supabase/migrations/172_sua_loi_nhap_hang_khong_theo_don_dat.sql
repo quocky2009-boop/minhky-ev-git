@@ -1,0 +1,5 @@
+-- 172: Sửa lỗi "record v_po is not assigned yet" khi lập phiếu nhập xe KHÔNG chọn đơn đặt hàng (06/11/2026)
+-- (đã áp dụng trực tiếp qua Supabase MCP; file này là ghi chú)
+-- fn_nhap_hang_v2: phần diễn giải cuối hàm dùng `case when v_po_id is not null then concat(' · từ đơn đặt ', v_po.code) ...`
+-- — PL/pgSQL vẫn đọc v_po.code khi biến record v_po chưa được gán → lỗi. Thay bằng:
+--   coalesce((select concat(' · từ đơn đặt ', po.code) from public.purchase_orders po where po.id = v_po_id), '')
