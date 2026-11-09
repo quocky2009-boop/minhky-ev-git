@@ -14,6 +14,8 @@ const homNay = () => new Date().toLocaleDateString("sv-SE");
 const coGiaFix = (l) => l.gia_ban !== "" && l.gia_ban !== null && l.gia_ban !== undefined;
 const donGia = (l) => (coGiaFix(l) ? Number(l.gia_ban) || 0 : (Number(l.gia_niem_yet) || 0) - Math.round((Number(l.gia_niem_yet) || 0) * (Number(l.ck_pct) || 0) / 100));
 const tienDong = (l) => (Number(l.qty) || 0) * donGia(l);
+// tong tien 1 don xe (giong _tong_don tren server, khong tinh hang kem)
+const tongDonXe = (o) => { const g = (Number(o.sale_price) || 0) * (Number(o.quantity) || 1); const ck = o.vehicle_discount_type === "percent" ? Math.round(g * (Number(o.vehicle_discount_value) || 0) / 100) : Number(o.vehicle_discount_value) || 0; return Math.max(g - ck - (Number(o.discount_amount) || 0) - (Number(o.kb_dieu_chinh) || 0), 0); };
 
 function BanBuonInner() {
   const { supabase, vehicles, locations, profile, loading } = useCatalog();
@@ -77,7 +79,9 @@ function BanBuonInner() {
     let ton = [];
     if (vids.length) { const r = await supabase.from("vehicle_units").select("frame_number,vehicle_id,location_code,imported_at").in("vehicle_id", vids).eq("status", "TON_KHO").order("imported_at").limit(2000); ton = r.data || []; }
     const { data: sd } = await supabase.rpc("fn_kb_so_du", { p_customer: h.customer_id });
-    setLo({ h, dong: dg || [], tt: tt || [], orders: os || [], ton, kb: sd || null, chon: {}, giaoLoc: h.location_code || "", giaoNgay: homNay(), pay: thu && h.status !== "Đã hủy" ? { method: "Chuyển khoản", account_id: "", amount: h.con_phai_tra > 0 ? h.con_phai_tra : "", note: "" } : null, ct: null });
+    let kbDon = [];
+    if ((os || []).length) { const r = await supabase.from("kb_so_cai").select("id,loai,so_tien,sale_code,note,huy").in("sale_code", os.map((o) => o.code)).eq("huy", false); kbDon = r.data || []; }
+    setLo({ h, dong: dg || [], tt: tt || [], orders: os || [], ton, kb: sd || null, kbDon, chon: {}, giaoLoc: h.location_code || "", giaoNgay: homNay(), pay: thu && h.status !== "Đã hủy" ? { method: "Chuyển khoản", account_id: "", amount: h.con_phai_tra > 0 ? h.con_phai_tra : "", note: "" } : null, ct: null });
     if (thu) setTimeout(() => document.getElementById("bb-thanh-toan")?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
   };
 
@@ -352,11 +356,32 @@ function BanBuonInner() {
             {huy && <div className="rounded-lg bg-[#F3F5F8] px-3 py-2 text-[13px]">Đơn bán buôn đã hủy: {h.huy_ly_do}</div>}
             <div className="flex gap-3 flex-wrap">
               <KPI label="Khách buôn cần trả" value={fmtVND(h.phai_tra)} sub={`${h.sl_dat} xe · đã giao ${h.sl_giao}`} />
-              <KPI label="Đã trả (tiền + cấn trừ)" value={fmtVND(h.da_tra)} tone="green" />
+              <KPI label="Đã trả (tiền + cấn trừ)" value={fmtVND(h.da_tra)} tone="green" sub={Number(h.da_tra) > Number(h.phai_tra) ? `trả dư ${fmtVND(h.da_tra - h.phai_tra)} — xem giải thích bên dưới` : undefined} />
               <KPI label="Còn phải trả" value={fmtVND(h.con_phai_tra)} tone={h.con_phai_tra > 0 ? "red" : "green"} />
               <KPI label="Tiền chưa phân bổ cho xe" value={fmtVND(h.so_du_chua_phan_bo)} tone="blue" sub="Tự phân bổ khi giao xe" />
             </div>
 
+            {(() => {
+              const du = Number(h.da_tra) - Number(h.phai_tra);
+              const chuaPb = Number(h.so_du_chua_phan_bo) || 0;
+              if (du <= 0 && chuaPb <= 0) return null;
+              const active = lo.orders.filter((o) => !["Đã hủy", "Đã trả hàng"].includes(o.status));
+              const duDon = active.map((o) => ({ o, tong: tongDonXe(o), paid: Number(o.paid_amount) || 0 })).filter((x) => x.paid > x.tong);
+              return (
+                <div className="rounded-xl border border-[#F2D7A6] bg-[#FFF8EB] px-3 py-2.5 text-[13px]">
+                  <div className="font-bold text-[#A25F00] mb-1">ⓘ Vì sao “Đã trả” khác “Khách buôn cần trả”?</div>
+                  <ul className="list-disc ml-5 flex flex-col gap-0.5">
+                    {chuaPb > 0 && <li><b>{fmtVND(chuaPb)}</b> đã thu ở đơn bán buôn nhưng <b>chưa chia xuống đơn xe</b> (xe chưa giao) — sẽ tự chia khi bấm giao xe.</li>}
+                    {du > 0 && duDon.map(({ o, tong, paid }) => {
+                      const ghi = (lo.kbDon || []).filter((k) => k.sale_code === o.code && k.loai === "DIEU_CHINH_TAY" && Number(k.so_tien) > 0);
+                      return (<li key={o.id}>Đơn xe <Link className="text-brand underline" href={`/don-ban/${o.id}`}>{o.code}</Link> cần trả <b>{fmtVND(tong)}</b> nhưng đã nhận <b>{fmtVND(paid)}</b> → khách <b>trả dư {fmtVND(paid - tong)}</b>.{" "}
+                        {ghi.length ? <span className="text-[#0E7A4A]">Khoản dư đã ghi vào <Link className="underline" href={`/khach-buon?kh=${h.customer_id}`}>Sổ khách buôn</Link> (số dư bù) để cấn trừ đơn sau{ghi[0].note ? ` — ${ghi[0].note}` : ""}.</span>
+                          : <span className="text-danger">Khoản dư chưa ghi vào Sổ khách buôn — cần hoàn lại khách hoặc nhờ Ban giám đốc ghi điều chỉnh để cấn trừ đơn sau.</span>}</li>);
+                    })}
+                    {du > 0 && duDon.length === 0 && chuaPb <= 0 && <li>Khách đã trả nhiều hơn số cần trả <b>{fmtVND(du)}</b> (có thể do giảm giá/bù pin ghi sau khi thu tiền). Kiểm tra Sổ khách buôn hoặc hoàn lại khách.</li>}
+                  </ul>
+                </div>);
+            })()}
             <div className="grid gap-4 lg:grid-cols-3">
               <div className="lg:col-span-2 flex flex-col gap-4">
                 <div className="card">
@@ -368,19 +393,43 @@ function BanBuonInner() {
                         onChange={(e) => { setQuet(e.target.value); setQuetMsg(null); }} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); quetSoKhung(quet, daGiao); } }} />
                       {quetMsg && <div className={`text-[12px] mt-1 font-semibold ${quetMsg.err ? "text-danger" : "text-[#0E7A4A]"}`}>{quetMsg.t}</div>}
                     </div>)}
+                  {(() => {
+                    const rows = lo.dong.map((d) => { const gn = Number(d.gia_niem_yet) || 0; const dgx = donGia(d); return { d, gn, dgx, ckx: gn - dgx, g: daGiao(d.id) }; });
+                    const T = rows.reduce((t, r) => ({ sl: t.sl + r.d.qty, giao: t.giao + r.g, ny: t.ny + r.gn * r.d.qty, ck: t.ck + r.ckx * r.d.qty, tt: t.tt + r.dgx * r.d.qty }), { sl: 0, giao: 0, ny: 0, ck: 0, tt: 0 });
+                    const lech = Number(h.phai_tra) - T.tt;
+                    return (
+                      <div className="overflow-x-auto mb-2"><table className="w-full text-[12.5px] border-collapse">
+                        <thead><tr className="text-[11px] text-[#5A6572] uppercase bg-[#F8FAFB] border-y border-[#E3E8EF]">
+                          <th className="py-2 px-1.5 text-left">#</th><th className="px-1.5 text-left">Model + màu</th><th className="px-1.5 text-right">SL</th><th className="px-1.5 text-center">Đã giao</th>
+                          <th className="px-1.5 text-right">Giá niêm yết/xe</th><th className="px-1.5 text-right">CK %</th><th className="px-1.5 text-right">Tiền CK/xe</th><th className="px-1.5 text-right">Giá bán/xe</th>
+                          <th className="px-1.5 text-right">Tiền niêm yết</th><th className="px-1.5 text-right">Tổng tiền CK</th><th className="px-1.5 text-right">Thành tiền</th></tr></thead>
+                        <tbody>{rows.map(({ d, gn, dgx, ckx, g }, i) => (
+                          <tr key={d.id} className="border-b border-dashed border-[#F0F2F5]">
+                            <td className="py-2 px-1.5 text-[#8A93A0]">{i + 1}</td><td className="px-1.5 font-semibold">{vName(d.vehicle_id)}{coGiaFix(d) && <div className="text-[10.5px] font-normal text-brand">giá bán buôn cố định</div>}</td>
+                            <td className="px-1.5 text-right">{d.qty}</td><td className="px-1.5 text-center"><Badge tone={g >= d.qty ? "green" : "amber"}>{g}/{d.qty}</Badge></td>
+                            <td className="px-1.5 text-right">{fmtVND(gn)}</td><td className="px-1.5 text-right">{coGiaFix(d) ? (gn > 0 ? `${Math.round(ckx / gn * 1000) / 10}%` : "—") : `${Number(d.ck_pct)}%`}</td>
+                            <td className="px-1.5 text-right text-[#A25F00]">{fmtVND(ckx)}</td><td className="px-1.5 text-right font-semibold">{fmtVND(dgx)}</td>
+                            <td className="px-1.5 text-right">{fmtVND(gn * d.qty)}</td><td className="px-1.5 text-right text-[#A25F00]">{fmtVND(ckx * d.qty)}</td><td className="px-1.5 text-right font-bold">{fmtVND(dgx * d.qty)}</td>
+                          </tr>))}</tbody>
+                        <tfoot>
+                          <tr className="bg-[#F8FAFB] font-bold border-t border-[#E3E8EF]"><td className="py-2 px-1.5" colSpan={2}>Tổng cộng</td><td className="px-1.5 text-right">{T.sl}</td><td className="px-1.5 text-center">{T.giao}/{T.sl}</td><td colSpan={4}></td>
+                            <td className="px-1.5 text-right">{fmtVND(T.ny)}</td><td className="px-1.5 text-right text-[#A25F00]">{fmtVND(T.ck)}</td><td className="px-1.5 text-right">{fmtVND(T.tt)}</td></tr>
+                          {lech !== 0 && <tr className="text-[12px]"><td className="py-1.5 px-1.5 text-[#5A6572]" colSpan={10}>Điều chỉnh trên đơn xe đã giao (giảm giá thêm, bù thuê pin… — xem từng đơn xe bên dưới)</td><td className={`px-1.5 text-right font-semibold ${lech < 0 ? "text-[#A25F00]" : ""}`}>{lech > 0 ? "+" : ""}{fmtVND(lech)}</td></tr>}
+                          <tr className="font-extrabold text-brand"><td className="py-2 px-1.5" colSpan={10}>Khách buôn cần trả</td><td className="px-1.5 text-right text-[14px]">{fmtVND(h.phai_tra)}</td></tr>
+                        </tfoot>
+                      </table></div>);
+                  })()}
+                  {!huy && lo.dong.some((d) => d.qty - daGiao(d.id) > 0) && <div className="font-bold text-[13px] mt-3 mb-1">Chọn số khung để giao</div>}
                   {lo.dong.map((d) => {
                     const g = daGiao(d.id); const con = d.qty - g;
+                    if (huy || con <= 0) return null;
                     const ton = lo.ton.filter((u) => u.vehicle_id === d.vehicle_id);
                     const chon = lo.chon[d.id] || [];
                     const tk = (timDong[d.id] || "").trim().toUpperCase();
                     const tonLoc = ton.filter((u) => !chon.includes(u.frame_number) && (!tk || u.frame_number.toUpperCase().includes(tk) || locName(u.location_code).toUpperCase().includes(tk)));
                     return (
                       <div key={d.id} className="border border-[#E3E8EF] rounded-xl p-2.5 mb-2">
-                        <div className="flex items-center gap-2 flex-wrap text-[13px]">
-                          <b className="mr-auto">{vName(d.vehicle_id)}</b>
-                          <span>{coGiaFix(d) ? <>Giá niêm yết {fmtVND(d.gia_niem_yet)} · <b>Giá bán buôn cố định {fmtVND(d.gia_ban)}</b>/xe</> : <>{fmtVND(d.gia_niem_yet)} · CK {Number(d.ck_pct)}% → <b>{fmtVND(donGia(d))}</b>/xe</>}</span>
-                          <Badge tone={con === 0 ? "green" : "amber"}>Giao {g}/{d.qty}</Badge>
-                        </div>
+                        <div className="flex items-center gap-2 flex-wrap text-[13px]"><b className="mr-auto">{vName(d.vehicle_id)}</b><Badge tone="amber">Giao {g}/{d.qty}</Badge></div>
                         {!huy && con > 0 && (
                           <div className="mt-1.5">
                             {chon.length > 0 && <div className="flex gap-1 flex-wrap mb-1.5 items-center"><span className="text-[11.5px] font-semibold text-brand">Đã chọn {chon.length}/{con}:</span>
@@ -417,15 +466,15 @@ function BanBuonInner() {
                 <div className="card">
                   <div className="font-extrabold mb-2">Đơn bán từng xe ({lo.orders.length})</div>
                   <div className="overflow-x-auto"><table className="w-full text-[12.5px]">
-                    <thead><tr className="text-left text-[11px] text-[#8A93A0] uppercase border-b border-[#E3E8EF]"><th className="py-2">Đơn</th><th>Ngày</th><th>Xe · số khung</th><th>Kho</th><th className="text-right">Đã trả</th><th>Khách lẻ cuối</th></tr></thead>
+                    <thead><tr className="text-left text-[11px] text-[#8A93A0] uppercase border-b border-[#E3E8EF]"><th className="py-2">Đơn</th><th>Ngày</th><th>Xe · số khung</th><th>Kho</th><th className="text-right">Cần trả</th><th className="text-right">Đã trả</th><th>Khách lẻ cuối</th></tr></thead>
                     <tbody>{lo.orders.map((o) => (
                       <tr key={o.id} className={`border-b border-dashed border-[#F0F2F5] ${["Đã hủy", "Đã trả hàng"].includes(o.status) ? "opacity-50" : ""}`}>
                         <td className="py-2"><Link className="text-brand underline" href={`/don-ban/${o.id}`}>{o.code}</Link></td><td>{fmtDate(o.sale_date)}</td>
                         <td>{vName(o.vehicle_id)}<div className="font-mono text-[11px]">{o.frame_number}</div></td><td>{locName(o.location_code)}</td>
-                        <td className="text-right">{fmtVND(o.paid_amount || 0)}</td><td>{o.end_customer_name || <span className="text-[#8A93A0]">chưa bán</span>}</td>
+                        <td className="text-right">{fmtVND(tongDonXe(o))}</td><td className={`text-right ${Number(o.paid_amount || 0) > tongDonXe(o) ? "text-[#A25F00] font-semibold" : Number(o.paid_amount || 0) < tongDonXe(o) ? "text-danger" : ""}`}>{fmtVND(o.paid_amount || 0)}{Number(o.paid_amount || 0) > tongDonXe(o) && <div className="text-[10.5px]">dư {fmtVND(Number(o.paid_amount) - tongDonXe(o))}</div>}</td><td>{o.end_customer_name || <span className="text-[#8A93A0]">chưa bán</span>}</td>
                       </tr>
                     ))}
-                    {lo.orders.length === 0 && <tr><td colSpan={6} className="py-3 text-[#8A93A0]">Chưa giao xe nào.</td></tr>}</tbody>
+                    {lo.orders.length === 0 && <tr><td colSpan={7} className="py-3 text-[#8A93A0]">Chưa giao xe nào.</td></tr>}</tbody>
                   </table></div>
                 </div>
               </div>
