@@ -15,7 +15,7 @@ const PRESETS = [["today","Hôm nay"],["week","Tuần này"],["month","Tháng n�
 import { useCatalog } from "@/lib/useData";
 import { Badge, Pager, pageSlice, useSelection, ThCheck, TdCheck, SelectionBar } from "@/components/ui";
 import { InfoRows, MoneyRows } from "@/components/detail";
-import { fmtTime, downloadCSV } from "@/lib/format";
+import { fmtTime, fmtVND, downloadCSV } from "@/lib/format";
 
 export default function LichSu() {
   const { supabase, vehicles, locations, loading } = useCatalog();

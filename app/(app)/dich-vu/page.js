@@ -107,7 +107,7 @@ export default function DichVu() {
   useEffect(() => { if (!loading) load(); }, [loading, profile]);
 
   const openDetail = async (t) => {
-    setDetail(t); setDiscount(t.discount || 0); setPayF({ method: "Chuyển khoản", amount: "" }); setPayFotos([]); setSerialPick({}); setLichSuXe(null);
+    setDetail(t); setDiscount(t.discount || 0); setPayF({ method: "Chuyển khoản", amount: "" }); setLichSuXe(null);
     const [{ data: l }, { data: p }, { data: v }, { data: lg }] = await Promise.all([
       supabase.from("dv_ticket_lines").select("*").eq("ticket_id", t.id).order("id"),
       supabase.from("dv_payments").select("*").eq("ticket_id", t.id).order("id"),
