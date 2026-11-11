@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Field, Toast, stockBadge, Badge, Pager, pageSlice, pageClamp, useSortable, Th, LocSearch, VehicleSearch, MoneyInput, ComboFree, useSelection, ThCheck, TdCheck, SelectionBar } from "@/components/ui";
-import { fmtVND, fmtDate, errMsg, parseCSV, downloadCSV } from "@/lib/format";
+import { fmtVND, fmtDate, errMsg, readTableFile, downloadXLSX } from "@/lib/format";
 
 export default function DMXe() {
   const { supabase, vehicles, brands, loading, totalQty, refresh } = useCatalog();
@@ -194,19 +194,17 @@ export default function DMXe() {
   const exportCSV = () => {
     const rows = [["brand","name","color","mfr_code","list_price","min_stock","id","tong_ton"],
       ...vehicles.map((v) => [v.brand, v.name, v.color, v.mfr_code || "", v.list_price, v.min_stock, v.id, totalQty(v.id)])];
-    const csv = "\uFEFF" + rows.map((r) => r.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-    const a = document.createElement("a"); a.href = url; a.download = "danh_muc_xe.csv"; a.click(); URL.revokeObjectURL(url);
+    downloadXLSX("danh_muc_xe.xlsx", rows, "Danh_muc_xe");
   };
 
   const importCSV = async (file) => {
-    const text = await file.text();
-    const rows = parseCSV(text);
+    let rows;
+    try { rows = await readTableFile(file); } catch (ex) { return notify("Không đọc được file: " + (ex.message || ex), "err"); }
     if (rows.length < 2) return notify("File trống hoặc sai định dạng.", "err");
     const header = rows[0].map((h) => h.trim().toLowerCase());
     const idx = (k) => header.indexOf(k);
     if (idx("brand") < 0 || idx("name") < 0 || idx("color") < 0)
-      return notify("File cần tối thiểu 3 cột: brand, name, color (thêm mfr_code, list_price, min_stock nếu có). Xuất CSV mẫu để xem định dạng.", "err");
+      return notify("File cần tối thiểu 3 cột: brand, name, color (thêm mfr_code, list_price, min_stock nếu có). Bấm Xuất Excel để lấy file mẫu.", "err");
     const items = rows.slice(1).map((r) => ({
       brand: r[idx("brand")]?.trim(), name: r[idx("name")]?.trim(), color: r[idx("color")]?.trim(),
       mfr_code: idx("mfr_code") >= 0 ? r[idx("mfr_code")]?.trim() : "",
@@ -245,10 +243,10 @@ export default function DMXe() {
         <button className="btn-primary" onClick={() => { setEditId(null); setF(empty); setShow(!show); }}>+ Thêm xe mới</button>
         <button className="btn-ghost" onClick={() => setShowBulk(!showBulk)}>💲 Sửa giá hàng loạt</button>
         <button className="btn-ghost" onClick={() => setShowBulkSpecs(!showBulkSpecs)}>⚙ Sửa thông số kỹ thuật hàng loạt</button>
-        <button className="btn-ghost" onClick={exportCSV}>⬇ Xuất CSV</button>
-        <button className="btn-ghost" onClick={() => fileRef.current?.click()}>⬆ Import CSV</button>
-        <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={(e) => { if (e.target.files[0]) importCSV(e.target.files[0]); e.target.value = ""; }} />
-        <span className="text-xs text-[#8A93A0]">Import: file CSV có cột brand, name, color (+ mfr_code, list_price, min_stock). Excel: Save As → CSV UTF-8.</span>
+        <button className="btn-ghost" onClick={exportCSV}>⬇ Xuất Excel</button>
+        <button className="btn-ghost" onClick={() => fileRef.current?.click()}>⬆ Nhập Excel</button>
+        <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" className="hidden" onChange={(e) => { if (e.target.files[0]) importCSV(e.target.files[0]); e.target.value = ""; }} />
+        <span className="text-xs text-[#8A93A0]">Nhập Excel: file có cột brand, name, color (+ mfr_code, list_price, min_stock). Xuất Excel để lấy mẫu, sửa rồi nhập lại. Vẫn nhận file CSV.</span>
       </div>
 
       {showBulk && (
@@ -491,7 +489,7 @@ export default function DMXe() {
                   <span className="text-[12px] font-bold text-brand px-1.5 self-center">Đã chọn {uSel.count} xe</span>
                   <button className="btn-ghost !text-xs !py-1" onClick={() => {
                     const rs = list2.filter((u) => uSel.has(u.frame_number));
-                    downloadCSV(`xe_ton_chon.csv`, [["Hãng", "Tên xe", "Màu", "Số khung", "Kho", "Giá vốn", "Ngày nhập", "Trạng thái"],
+                    downloadXLSX(`xe_ton_chon.xlsx`, [["Hãng", "Tên xe", "Màu", "Số khung", "Kho", "Giá vốn", "Ngày nhập", "Trạng thái"],
                       ...rs.map((u) => { const v = vehicles.find((x) => x.id === u.vehicle_id); const l = locations.find((x) => x.code === u.location_code); return [v?.brand || "", v?.name || u.vehicle_id, v?.color || "", u.frame_number, l?.name || u.location_code, u.cost_price || "", fmtDate(u.imported_at), u.status]; })]);
                     notify(`Đã xuất ${rs.length} xe đã chọn.`);
                   }}>⬇ Xuất Excel</button>

@@ -3,7 +3,7 @@ import { useEffect, useState, useRef } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Field, Badge, Toast, VehicleSearch, LocSearch, FramePicker, Pager, pageSlice } from "@/components/ui";
 import Scanner from "@/components/Scanner";
-import { fmtTime, errMsg, parseCSV, downloadXLSX } from "@/lib/format";
+import { fmtTime, errMsg, readTableFile, downloadXLSX } from "@/lib/format";
 import { ADJUST_REASONS } from "@/lib/const";
 
 export default function DieuChinh() {
@@ -28,7 +28,8 @@ export default function DieuChinh() {
 
   // Import CSV: tao hang loat de xuat dieu chinh
   const importCSV = async (file) => {
-    const rows = parseCSV(await file.text());
+    let rows;
+    try { rows = await readTableFile(file); } catch (ex) { return notify("Không đọc được file: " + (ex.message || ex), "err"); }
     if (rows.length < 2) return notify("File trống hoặc sai định dạng.", "err");
     const header = rows[0].map((h) => h.trim().toLowerCase());
     const idx = (k) => header.indexOf(k);
@@ -125,8 +126,8 @@ export default function DieuChinh() {
         <div className="flex items-center gap-2 flex-wrap mb-2.5">
           <div className="font-extrabold mr-auto">Danh sách đề xuất điều chỉnh ({list.length})</div>
           <button className="btn-ghost !text-xs" onClick={exportCSV}>⬇ Xuất Excel</button>
-          {canRequest && <button className="btn-ghost !text-xs" onClick={() => fileRef.current?.click()}>⬆ Nhập CSV</button>}
-          <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={(e) => { if (e.target.files[0]) importCSV(e.target.files[0]); e.target.value = ""; }} />
+          {canRequest && <button className="btn-ghost !text-xs" onClick={() => fileRef.current?.click()}>⬆ Nhập Excel</button>}
+          <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" className="hidden" onChange={(e) => { if (e.target.files[0]) importCSV(e.target.files[0]); e.target.value = ""; }} />
         </div>
         <div className="overflow-x-auto"><table className="w-full border-collapse">
           <thead><tr><th className="th">Phiếu</th><th className="th">Xe · Kho</th><th className="th">Số khung bớt / thêm</th><th className="th">Chênh</th><th className="th">Lý do</th><th className="th">Đề xuất</th><th className="th">Trạng thái</th><th className="th">Duyệt</th></tr></thead>

@@ -4,7 +4,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Badge, Toast, KPI } from "@/components/ui";
-import { fmtDate, errMsg, parseCSV, downloadCSV } from "@/lib/format";
+import { fmtDate, errMsg, readTableFile, downloadXLSX } from "@/lib/format";
 
 const daysIn = (iso) => Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86400000));
 
@@ -30,19 +30,20 @@ export default function KhoChiTiet() {
   const vOf = (id) => vehicles.find((x) => x.id === id);
 
   const exportCSV = () => {
-    downloadCSV(`ton_${decodeURIComponent(code)}.csv`,
+    downloadXLSX(`ton_${decodeURIComponent(code)}.xlsx`,
       [["frame_number","vehicle_id","ten_xe","mau","engine_number","imported_at","so_ngay_ton","trang_thai"],
        ...units.map((u) => { const v = vOf(u.vehicle_id);
          return [u.frame_number, u.vehicle_id, v?.name || "", v?.color || "", u.engine_number || "", u.imported_at?.slice(0,10), daysIn(u.imported_at), u.status]; })]);
   };
 
   const importCSV = async (file) => {
-    const rows = parseCSV(await file.text());
+    let rows;
+    try { rows = await readTableFile(file); } catch (ex) { return notify("Không đọc được file: " + (ex.message || ex), "err"); }
     if (rows.length < 2) return notify("File trống hoặc sai định dạng.", "err");
     const header = rows[0].map((h) => h.trim().toLowerCase());
     const idx = (k) => header.indexOf(k);
     if (idx("frame_number") < 0 || idx("vehicle_id") < 0)
-      return notify("File cần tối thiểu 2 cột: frame_number, vehicle_id (thêm imported_at dạng 2026-07-01, engine_number, note nếu có). Bấm Xuất CSV để xem mẫu.", "err");
+      return notify("File cần tối thiểu 2 cột: frame_number, vehicle_id (thêm imported_at dạng 2026-07-01, engine_number, note nếu có). Bấm Xuất Excel để xem mẫu.", "err");
     const items = rows.slice(1).map((r) => ({
       frame_number: r[idx("frame_number")]?.trim(),
       vehicle_id: r[idx("vehicle_id")]?.trim(),
@@ -94,9 +95,9 @@ export default function KhoChiTiet() {
         <div className="flex gap-2 flex-wrap items-center mb-3">
           <div className="font-extrabold mr-auto">Chi tiết từng xe ({list.length})</div>
           <input className="inp !w-56" placeholder="Tìm số khung, tên xe…" value={q} onChange={(e) => setQ(e.target.value)} />
-          <button className="btn-ghost !text-xs" onClick={exportCSV}>⬇ Xuất CSV</button>
-          {canEdit && <button className="btn-ghost !text-xs" onClick={() => fileRef.current?.click()}>⬆ Import CSV</button>}
-          <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={(e) => { if (e.target.files[0]) importCSV(e.target.files[0]); e.target.value = ""; }} />
+          <button className="btn-ghost !text-xs" onClick={exportCSV}>⬇ Xuất Excel</button>
+          {canEdit && <button className="btn-ghost !text-xs" onClick={() => fileRef.current?.click()}>⬆ Nhập Excel</button>}
+          <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" className="hidden" onChange={(e) => { if (e.target.files[0]) importCSV(e.target.files[0]); e.target.value = ""; }} />
           <select className="inp !w-auto" value={sort} onChange={(e) => setSort(e.target.value)}>
             <option value="days">Sắp xếp: tồn lâu nhất trước</option>
             <option value="model">Sắp xếp: theo mẫu xe</option>

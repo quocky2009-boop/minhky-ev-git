@@ -3,7 +3,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useCatalog } from "@/lib/useData";
 import { Badge, Pager, pageSlice, pageClamp } from "@/components/ui";
-import { fmtNum, fmtDate } from "@/lib/format";
+import { fmtNum, fmtDate, downloadXLSX } from "@/lib/format";
 
 const daysIn = (t) => Math.max(0, Math.floor((Date.now() - new Date(t).getTime()) / 86400000));
 
@@ -64,9 +64,7 @@ export default function TonTongHop() {
     const tot30 = withSales ? list.reduce((a, v) => a + (sales[v.id] || 0), 0) : 0;
     const rows = [head, ...body,
       ["", "TONG", "", "", grand, ...regions.map((r) => regTotal(r)), ...locs.map((l) => colTotal(l.code)), ...(withSales ? [tot30, avg(tot30)] : [])]];
-    const csv = "\uFEFF" + rows.map((r) => r.map((c) => `"${String(c ?? "")}"`).join(",")).join("\n");
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-    const a = document.createElement("a"); a.href = url; a.download = withSales ? "ton_tong_hop_kem_doanh_so.csv" : "ton_tong_hop.csv"; a.click(); URL.revokeObjectURL(url);
+    downloadXLSX(withSales ? "ton_tong_hop_kem_doanh_so.xlsx" : "ton_tong_hop.xlsx", rows, "Ton_tong_hop");
   };
 
   return (
@@ -79,11 +77,11 @@ export default function TonTongHop() {
         </select>
         <label className="flex items-center gap-1.5 text-xs"><input type="checkbox" checked={hideZero} onChange={(e) => setHideZero(e.target.checked)} /> Ẩn xe hết tồn</label>
         <div className="relative">
-          <button className="btn-ghost" disabled={expBusy} onClick={() => setShowExp((x) => !x)}>{expBusy ? "Đang xuất…" : "⬇ Xuất CSV ▾"}</button>
+          <button className="btn-ghost" disabled={expBusy} onClick={() => setShowExp((x) => !x)}>{expBusy ? "Đang xuất…" : "⬇ Xuất Excel ▾"}</button>
           {showExp && (
             <div className="absolute right-0 top-full mt-1 z-30 bg-white border border-[#E3E8EF] rounded-xl shadow-lg p-1.5 min-w-[230px] flex flex-col">
-              <button className="text-left text-[13px] px-3 py-2 rounded-lg hover:bg-[#F3F5F8]" onClick={() => exportCSV(false)}>Xuất CSV kho<div className="text-[11px] text-[#8A93A0]">Mã hàng + tồn từng điểm</div></button>
-              <button className="text-left text-[13px] px-3 py-2 rounded-lg hover:bg-[#F3F5F8]" onClick={() => exportCSV(true)}>Xuất CSV kèm doanh số<div className="text-[11px] text-[#8A93A0]">Thêm 30_days và Sales_avg</div></button>
+              <button className="text-left text-[13px] px-3 py-2 rounded-lg hover:bg-[#F3F5F8]" onClick={() => exportCSV(false)}>Xuất Excel kho<div className="text-[11px] text-[#8A93A0]">Mã hàng + tồn từng điểm</div></button>
+              <button className="text-left text-[13px] px-3 py-2 rounded-lg hover:bg-[#F3F5F8]" onClick={() => exportCSV(true)}>Xuất Excel kèm doanh số<div className="text-[11px] text-[#8A93A0]">Thêm 30_days và Sales_avg</div></button>
             </div>
           )}
         </div>
