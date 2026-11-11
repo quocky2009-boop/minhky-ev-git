@@ -1,0 +1,6 @@
+-- 178: Tối ưu phòng xa cho RLS và chỉ mục (13/11/2026) — đã áp dụng qua Supabase MCP; file này là ghi chú
+-- 1) 31 policy RLS gọi auth.uid() trực tiếp → đổi thành (select auth.uid()) để chỉ tính một lần mỗi câu lệnh
+--    (cảnh báo auth_rls_initplan của Supabase). Lệnh tự so số dòng từng vai trò đọc được trước/sau — không lệch.
+-- 2) Xóa chỉ mục trùng sale_payments_sale_code_idx (trùng sale_pay_idx).
+-- 3) Thêm chỉ mục: sales_orders(customer_id), sale_payments(cash_txn_code), cash_txns(ref_doc),
+--    vehicle_units(import_doc), vehicle_units(sale_code), customers(assigned_to), customers(created_by).
