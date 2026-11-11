@@ -40,6 +40,7 @@ export default function DonBan() {
   const [fLoc, setFLoc] = useState(() => (_params.get("kho") || "").split(",").filter(Boolean));
   const [fInv, setFInv] = useState(() => _params.get("hd") || "");
   const [fType, setFType] = useState(() => _params.get("loai") || "");
+  const [fKl, setFKl] = useState(() => _params.get("kl") || ""); // khach le cua dai ly: "" | co | chua
   const [showHuy, setShowHuy] = useState(() => _params.get("huy") === "1");
   const [q, setQ] = useState(() => _params.get("q") || "");
   const [page, setPage] = useState(() => Number(_params.get("trang")) || 1);
@@ -64,11 +65,12 @@ export default function DonBan() {
     if (fLoc.length) sp.set("kho", fLoc.join(","));
     if (fInv) sp.set("hd", fInv);
     if (fType) sp.set("loai", fType);
+    if (fKl) sp.set("kl", fKl);
     if (showHuy) sp.set("huy", "1");
     if (page > 1) sp.set("trang", String(page));
     const qs = sp.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-  }, [q, from, to, fLoc.join(","), fInv, fType, showHuy, page]);
+  }, [q, from, to, fLoc.join(","), fInv, fType, fKl, showHuy, page]);
   // Tu mo chi tiet khi den tu o tim kiem toan cuc (khop dung 1 don)
   const [_autoOpened, _setAutoOpened] = useState(false);
   useEffect(() => {
@@ -152,15 +154,21 @@ export default function DonBan() {
   const canConfirm = ["SALES", "MANAGER", "ADMIN", "CEO"].includes(profile.role);
   const canCancel = ["ADMIN", "CEO"].includes(profile.role);
 
+  const isVF = (o) => (vOf(o.vehicle_id)?.brand || "").toUpperCase().includes("VINFAST");
+  const canKhachLe = (o) => o.customer_type === "Khách buôn";
+  const thieuKhachLe = (o) => canKhachLe(o) && isVF(o) && !o.end_customer_id;
   const daDong = (o) => o.status === "Đã hủy" || o.status === "Đã trả hàng";
   const filtered = rows.filter((o) => {
     if (daDong(o) && !showHuy) return false;
     if (fInv && (o.invoice_status || "Chờ xuất HĐ") !== fInv) return false;
     if (fType && (o.customer_type || "") !== fType) return false;
+    if (fKl === "co" && !o.end_customer_id) return false;
+    if (fKl === "chua" && !thieuKhachLe(o)) return false;
     if (!q) return true;
-    const kw = q.toLowerCase();
+    const kd = (x) => String(x || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d");
+    const kw = kd(q.trim());
     const v = vOf(o.vehicle_id);
-    return `${o.code} ${o.customer_name} ${o.customer_phone} ${o.frame_number} ${o.invoice_no || ""} ${v ? v.name : ""} ${o.seller_name}`.toLowerCase().includes(kw);
+    return kd(`${o.code} ${o.customer_name} ${o.customer_phone} ${o.frame_number} ${o.invoice_no || ""} ${v ? v.name : ""} ${o.seller_name} ${o.end_customer_name || ""} ${o.end_customer_phone || ""}`).includes(kw);
   });
   const sorted = sort.sortFn(filtered, {
     code: (o) => o.code, date: (o) => o.sale_date, xe: (o) => vOf(o.vehicle_id)?.name || o.vehicle_id, sk: (o) => o.frame_number || "", sdt: (o) => o.customer_phone || "",
@@ -173,7 +181,6 @@ export default function DonBan() {
   const doanhSo = rowsActive.reduce((s, o) => s + total(o), 0);
   const nHuy = rows.filter((o) => o.status === "Đã hủy" || o.status === "Đã trả hàng").length;
 
-  const isVF = (o) => (vOf(o.vehicle_id)?.brand || "").toUpperCase().includes("VINFAST");
   const confirmInv = async (o) => {
     if (!invF.no.trim()) return notify("Bắt buộc nhập số hóa đơn.", "err");
     if (!invF.dms?.trim()) return notify("Bắt buộc nhập Mã đơn DMS.", "err");
@@ -227,8 +234,6 @@ export default function DonBan() {
 
   const canSuaTT = ["CEO", "MANAGER", "ADMIN"].includes(profile?.role);
 
-  const canKhachLe = (o) => o.customer_type === "Khách buôn";
-  const thieuKhachLe = (o) => canKhachLe(o) && isVF(o) && !o.end_customer_id;
 
   const luuPromo = async () => {
     setBusy(true);
@@ -445,7 +450,7 @@ export default function DonBan() {
       <div className="flex gap-3 flex-wrap">
         <KPI label="Chờ hoàn thiện (HĐ/BH/App)" value={nCho} tone={nCho ? "amber" : "dark"} />
         {rows.filter((o) => thieuKhachLe(o)).length > 0 && (
-          <KPI label="Chờ thông tin khách lẻ" value={rows.filter((o) => thieuKhachLe(o)).length} tone="red" />
+          <div className="cursor-pointer" title="Bấm để lọc các đơn chưa có khách lẻ" onClick={() => { setFKl(fKl === "chua" ? "" : "chua"); setPage(1); }}><KPI label={fKl === "chua" ? "Chờ thông tin khách lẻ ✓ đang lọc" : "Chờ thông tin khách lẻ"} value={rows.filter((o) => !daDong(o) && thieuKhachLe(o)).length} tone="red" /></div>
         )}
         <KPI label="Đã hoàn thành" value={nXong} tone="green" />
         <KPI label="Tổng đơn" value={rowsActive.length} tone="dark" />
@@ -468,10 +473,13 @@ export default function DonBan() {
             <option value="">Loại khách: tất cả</option>
             {Array.from(new Set(rows.map((o) => o.customer_type).filter(Boolean))).sort().map((t) => <option key={t}>{t}</option>)}
           </select>
+          <select className="inp !w-auto" value={fKl} onChange={(e) => { setFKl(e.target.value); setPage(1); }} title="Khách lẻ cuối của đơn bán cho đại lý / khách buôn">
+            <option value="">Khách lẻ của đại lý: tất cả</option><option value="co">Đã có khách lẻ</option><option value="chua">Chưa có khách lẻ (chờ nhập)</option>
+          </select>
           <button className={`btn-ghost !text-xs ${showHuy ? "!bg-[#FDEDED] !text-danger" : ""}`} onClick={() => { setShowHuy(!showHuy); setPage(1); }}>
             {showHuy ? "Đang hiện đơn hủy/trả" : `Đơn hủy/trả${nHuy ? ` (${nHuy})` : ""}`}
           </button>
-          <input className="inp !w-56" placeholder="Tìm mã đơn, khách, số khung, số HĐ…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
+          <input className="inp !w-64" placeholder="Tìm mã đơn, khách, khách lẻ của đại lý, số khung…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
           <button className="btn-ghost !text-xs" onClick={exportCSV}>⬇ Excel</button>
           <button className="btn-ghost !text-xs" onClick={() => setShowThuong(!showThuong)}>🏆 Tính thưởng tháng</button>
         </div>
@@ -520,6 +528,12 @@ export default function DonBan() {
                       <div className="text-[13px] truncate" title={o.customer_name}>{o.customer_name}</div>
                       <div className="text-[11px] text-[#5A6572]">{o.customer_phone}</div>
                       <Badge tone={o.customer_type === "Khách buôn" ? "amber" : o.customer_type === "Khách lẻ của Đại lý" ? "blue" : o.customer_type === "Khách lẻ" || !o.customer_type ? "green" : "purple"}>{o.customer_type || "Khách lẻ"}</Badge>
+                      {o.end_customer_id
+                        ? <div className="mt-1 text-[12px] leading-tight rounded-md bg-[#F4FBF7] border border-[#BBE3CC] px-1.5 py-1" title="Khách lẻ cuối (người mua từ đại lý / khách buôn)">
+                            <span className="text-[10.5px] text-[#0E7A4A] font-semibold">👤 Khách lẻ:</span> <b>{o.end_customer_name}</b>
+                            {o.end_customer_phone && <div className="text-[11px] text-[#5A6572]">{o.end_customer_phone}</div>}
+                          </div>
+                        : thieuKhachLe(o) && <div className="mt-1 text-[11px] font-semibold text-[#A25F00]">👤 Chưa có khách lẻ</div>}
                     </td>
                     <td data-label="Tổng đơn" className="td font-bold">{fmtVND(total(o))}</td>
                     <td data-label="Hóa đơn" className="td">
