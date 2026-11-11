@@ -6,5 +6,6 @@
 --   - ghi phiếu thu đúng hình thức (Tiền mặt / Chuyển khoản), chuyển khoản bắt buộc chọn tài khoản nhận;
 --   - tự insert sale_payments gắn với phiếu thu; trigger tự tính paid_amount; không nhận "Trả góp".
 -- Dữ liệu: bổ sung dòng thanh toán cho PT-2609-82443 (đơn BH-2609-63142, 14.500.000) — đơn duy nhất bị lệch.
--- Còn 2 phiếu thu thêm 23/07 (PT-2607-41044: 19.990.000; PT-2607-07078: 13.622.000, quỹ SHB) thuộc 2 đơn đã bị xóa — chưa xử lý, chờ CEO xác nhận.
+-- 2 phiếu thu thêm 23/07 (PT-2607-41044: 19.990.000; PT-2607-07078: 13.622.000, quỹ SHB) thuộc 2 đơn thử đã xóa (CEO xác nhận 11/11):
+--   đã đảo ngược bằng 2 phiếu chi "Đảo ngược thu sai" cùng ngày, bù opening_balance quỹ SHB +33.612.000 (log so_du_dau_ky_log) — số dư thực tế không đổi.
 -- Đã gỡ extension plpgsql_check (cài tạm để quét lỗi hàm).
