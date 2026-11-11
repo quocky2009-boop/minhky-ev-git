@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { NAV, NAV_GROUPS, ROLES } from "@/lib/const";
+import { NAV, NAV_GROUPS, ROLES, TAB_GROUPS } from "@/lib/const";
 import GlobalSearch from "@/components/GlobalSearch";
 import GridEnhancer from "@/components/GridEnhancer";
 
@@ -82,16 +82,53 @@ export default function AppShell({ profile, children }) {
     return n.roles.includes(profile.role);
   };
 
-  const ItemLink = ({ n, sub }) => (
-    <Link href={n.href} onClick={() => setOpen(false)}
-      className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[13.5px] font-semibold mb-0.5 ${sub ? "ml-3" : ""} ${isActive(n) ? "bg-brand text-white" : "hover:bg-navy-800"}`}>
-      <span className="flex-1">{n.label}</span>
-      {badges[base(n.href)] > 0 && (
-        <span className={`min-w-[20px] h-5 px-1.5 rounded-full text-[10.5px] font-extrabold flex items-center justify-center ${isActive(n) ? "bg-white text-brand" : "bg-danger text-white"}`}>
-          {badges[base(n.href)] > 99 ? "99+" : badges[base(n.href)]}
-        </span>
+  // Gop cac trang cung tabGroup thanh 1 muc menu (tro toi tab dau tien user duoc xem)
+  const gopTab = (items) => {
+    const out = []; const seen = {};
+    items.forEach((n) => {
+      if (!n.tabGroup) return out.push(n);
+      if (seen[n.tabGroup]) return seen[n.tabGroup].tabs.push(n);
+      const e = { ...n, label: TAB_GROUPS[n.tabGroup] || n.label, tabs: [n] };
+      seen[n.tabGroup] = e; out.push(e);
+    });
+    return out;
+  };
+  const badgeOf = (n) => (n.tabs || [n]).reduce((a, x) => a + (badges[base(x.href)] || 0), 0);
+  const activeOf = (n) => (n.tabs ? n.tabs.some(isActive) : isActive(n));
+  // Tab cua trang dang mo (neu trang thuoc 1 nhom tab)
+  const curNav = NAV.find((n) => n.tabGroup && pathname.startsWith(base(n.href)));
+  const curTabs = curNav ? NAV.filter((n) => n.tabGroup === curNav.tabGroup && canSee(n)) : [];
+
+  // Tim nhanh chuc nang + ghim "Hay dung" (luu theo tung nguoi tren may nay)
+  const [mq, setMq] = useState("");
+  const pinKey = `mk_menu_pins_${profile.id}`;
+  const [pins, setPins] = useState([]);
+  useEffect(() => { try { setPins(JSON.parse(localStorage.getItem(pinKey) || "[]")); } catch { setPins([]); } }, [pinKey]);
+  const togglePin = (href) => setPins((prev) => {
+    const next = prev.includes(href) ? prev.filter((x) => x !== href) : [...prev, href].slice(-8);
+    try { localStorage.setItem(pinKey, JSON.stringify(next)); } catch {}
+    return next;
+  });
+  const khongDau = (x) => String(x || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d");
+  const visibleNav = NAV.filter(canSee);
+  const kq = mq.trim() ? visibleNav.filter((n) => khongDau(`${n.label} ${TAB_GROUPS[n.tabGroup] || ""} ${NAV_GROUPS.find((g) => g.items.includes(n))?.label || ""}`).includes(khongDau(mq.trim()))) : [];
+  const pinned = pins.map((h) => visibleNav.find((n) => n.href === h)).filter(Boolean);
+
+  const ItemLink = ({ n, sub, pinable = true }) => (
+    <div className={`group flex items-center rounded-lg mb-0.5 ${sub ? "ml-3" : ""} ${activeOf(n) ? "bg-brand text-white" : "hover:bg-navy-800"}`}>
+      <Link href={n.href} onClick={() => { setOpen(false); setMq(""); }} className="flex-1 min-w-0 flex items-center gap-2.5 px-3 py-2.5 text-[13.5px] font-semibold">
+        <span className="flex-1">{n.label}</span>
+        {badgeOf(n) > 0 && (
+          <span className={`min-w-[20px] h-5 px-1.5 rounded-full text-[10.5px] font-extrabold flex items-center justify-center ${activeOf(n) ? "bg-white text-brand" : "bg-danger text-white"}`}>
+            {badgeOf(n) > 99 ? "99+" : badgeOf(n)}
+          </span>
+        )}
+      </Link>
+      {pinable && (
+        <button type="button" onClick={() => togglePin(n.href)} title={pins.includes(n.href) ? "Bỏ ghim khỏi Hay dùng" : "Ghim vào Hay dùng"}
+          className={`px-2 py-2.5 text-[13px] ${pins.includes(n.href) ? "text-[#FACC15]" : "opacity-0 group-hover:opacity-60 focus:opacity-100 md:opacity-0 max-md:opacity-40"}`}>{pins.includes(n.href) ? "★" : "☆"}</button>
       )}
-    </Link>
+    </div>
   );
 
   return (
@@ -103,21 +140,40 @@ export default function AppShell({ profile, children }) {
           <div className="text-lg font-extrabold text-white tracking-wide">MINH KỲ <span className="text-[#4ADE80]">EV</span></div>
           <div className="text-[11px] text-[#7E8FA3] mt-0.5">Quản lý hệ thống xe điện</div>
         </div>
+        <div className="px-2 pt-2">
+          <div className="relative">
+            <input value={mq} onChange={(e) => setMq(e.target.value)} placeholder="Tìm chức năng…" autoComplete="off"
+              className="w-full rounded-lg bg-navy-800 border border-navy-700 text-[13px] text-white placeholder-[#7E8FA3] pl-3 pr-7 py-2 outline-none focus:border-brand" />
+            {mq && <button className="absolute right-2 top-1/2 -translate-y-1/2 text-[#7E8FA3] hover:text-white" onClick={() => setMq("")}>✕</button>}
+          </div>
+        </div>
         <nav className="flex-1 p-2 overflow-y-auto">
+          {mq.trim() ? (
+            <div>
+              <div className="px-3 py-1.5 text-[11px] font-extrabold tracking-wide text-[#8FA0B5]">KẾT QUẢ ({kq.length})</div>
+              {kq.map((n) => <ItemLink key={n.href} n={n} />)}
+              {kq.length === 0 && <div className="px-3 py-2 text-[12.5px] text-[#7E8FA3]">Không thấy chức năng nào khớp “{mq}”.</div>}
+            </div>
+          ) : (<>
+          {pinned.length > 0 && (
+            <div className="mb-1.5 pb-1.5 border-b border-navy-700">
+              <div className="px-3 py-1.5 text-[11px] font-extrabold tracking-wide text-[#FACC15]">★ HAY DÙNG</div>
+              {pinned.map((n) => <ItemLink key={"pin" + n.href} n={n} />)}
+            </div>)}
           {NAV_GROUPS.map((g, gi) => {
-            const items = g.items.filter(canSee);
+            const items = gopTab(g.items.filter(canSee));
             if (items.length === 0) return null;
             if (!g.label) return items.map((n) => <ItemLink key={n.href} n={n} />);
             const opened = openGroups.has(g.label);
-            const hasActive = items.some((n) => pathname.startsWith(base(n.href)));
+            const hasActive = items.some(activeOf);
             return (
               <div key={g.label} className="mb-0.5">
                 <button onClick={() => toggle(g.label)}
                   className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[12px] font-extrabold tracking-wide ${hasActive && !opened ? "text-white bg-navy-800" : "text-[#8FA0B5]"} hover:bg-navy-800 hover:text-white`}>
                   <span className="flex-1 text-left">{g.label}</span>
-                  {!opened && items.reduce((a, n) => a + (badges[base(n.href)] || 0), 0) > 0 && (
+                  {!opened && items.reduce((a, n) => a + badgeOf(n), 0) > 0 && (
                     <span className="min-w-[20px] h-5 px-1.5 rounded-full text-[10.5px] font-extrabold flex items-center justify-center bg-danger text-white">
-                      {items.reduce((a, n) => a + (badges[base(n.href)] || 0), 0)}
+                      {items.reduce((a, n) => a + badgeOf(n), 0)}
                     </span>
                   )}
                   <span className="text-[10px]">{opened ? "▾" : "▸"}</span>
@@ -126,6 +182,7 @@ export default function AppShell({ profile, children }) {
               </div>
             );
           })}
+          </>)}
         </nav>
         <div className="p-3.5 border-t border-navy-700 flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-full bg-brand text-white flex items-center justify-center font-extrabold">{(profile.name || "?")[0].toUpperCase()}</div>
@@ -144,7 +201,17 @@ export default function AppShell({ profile, children }) {
           <GlobalSearch />
           <div className="text-xs text-[#8A93A0] whitespace-nowrap hidden md:block">{new Date().toLocaleDateString("vi-VN")}</div>
         </header>
-        <div className="p-5 pb-16">{children}</div>
+        <div className="p-5 pb-16">
+          {curTabs.length > 1 && (
+            <div className="flex gap-1 border-b border-[#E3E8EF] mb-4 overflow-x-auto">
+              {curTabs.map((n) => (
+                <Link key={n.href} href={n.href} className={`px-3.5 py-2 text-[13.5px] font-semibold border-b-2 -mb-px whitespace-nowrap flex items-center gap-1.5 ${isActive(n) ? "border-brand text-brand" : "border-transparent text-[#5A6572] hover:text-brand"}`}>
+                  {n.label}
+                  {badges[base(n.href)] > 0 && <span className="min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-extrabold flex items-center justify-center bg-danger text-white">{badges[base(n.href)]}</span>}
+                </Link>))}
+            </div>)}
+          {children}
+        </div>
       </main>
     </div>
   );
