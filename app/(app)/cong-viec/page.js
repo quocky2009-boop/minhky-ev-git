@@ -20,6 +20,7 @@ export default function VievCuaToi() {
   const [busy, setBusy] = useState(true);
   const [fSt, setFSt] = useState("");
   const [page, setPage] = useState(1);
+  const [soDong, setSoDong] = useState(20);
   // chi tiet
   const [d, setD] = useState(null);
   const [cl, setCl] = useState([]);
@@ -341,7 +342,7 @@ export default function VievCuaToi() {
         {busy && rows.length === 0 ? <div className="text-sm text-[#8A93A0]">Đang tải…</div> : (
           <>
             <div className="flex flex-col gap-2">
-              {pageSlice(filtered, page, 15).map((t) => {
+              {pageSlice(filtered, page, soDong).map((t) => {
                 const st = TASK_STATUS[t.status] || { label: t.status, tone: "dark" };
                 const h = hanLabel(t.due_at, t.status);
                 const pct = t.cl_tong > 0 ? Math.round(t.cl_xong / t.cl_tong * 100) : (t.status === "completed" ? 100 : 0);
@@ -383,7 +384,7 @@ export default function VievCuaToi() {
               })}
               {filtered.length === 0 && <div className="text-sm text-[#8A93A0] text-center py-8">Không có việc nào. 🎉</div>}
             </div>
-            <Pager total={filtered.length} page={page} setPage={setPage} pageSize={15} setPageSize={() => {}} />
+            <Pager total={filtered.length} page={page} setPage={setPage} pageSize={soDong} setPageSize={setSoDong} />
           </>
         )}
         </div>

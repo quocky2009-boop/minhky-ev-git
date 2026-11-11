@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Field, Badge, Toast, KPI, Pager, pageSlice, pageClamp } from "@/components/ui";
-import { fmtVND, fmtNum, fmtTime, fmtDate, downloadCSV } from "@/lib/format";
+import { fmtVND, fmtNum, fmtTime, fmtDate, downloadXLSX } from "@/lib/format";
 
 const iso = (d) => d.toISOString().slice(0, 10);
 const PRESETS = [
@@ -112,7 +112,7 @@ export default function BaoCao() {
     const suffix = type === "ton" ? iso(new Date()) : `${from}_den_${to}`;
     if (type === "ban") {
       const cfs = customFields.filter((c) => c.entity === "sales_order");
-      downloadCSV(`ban_hang_${suffix}.csv`,
+      downloadXLSX(`ban_hang_${suffix}.xlsx`,
         [["Ma_Don","Ngay_Ban","Kho_Ban","Hang","Ma_Xe","Ten_Xe","Mau","So_Khung","SL",
           "Khach_Hang","SDT","CCCD","Dia_Chi","Loai_Khach","Nguon_Khach",
           "Gia_Niem_Yet","Gia_Ban","Thanh_Tien_Xe","Tong_Ban_Kem","Tong_Don",
@@ -137,15 +137,15 @@ export default function BaoCao() {
              ...cfs.map((c) => { const val = s.extra?.[c.field_key]; return val === undefined || val === null || val === "" ? "" : (c.field_type === "checkbox" ? (val ? "Có" : "Không") : String(val)); })];
          })]);
     }
-    else if (type === "dieuchuyen") downloadCSV(`dieu_chuyen_${suffix}.csv`,
+    else if (type === "dieuchuyen") downloadXLSX(`dieu_chuyen_${suffix}.xlsx`,
       [["Phieu","Ngay_Tao","Xe","Kho_Di","Kho_Den","SL","Nguoi_Tao","Nguoi_Nhan","Trang_Thai","Ghi_Chu"],
        ...rows.map((t) => { const v = vOf(t.vehicle_id);
          return [t.code, fmtTime(t.requested_at), v ? `${v.name} ${v.color}` : t.vehicle_id, locName(t.from_location), locName(t.to_location), t.quantity, t.requested_by_name, t.confirmed_by_name, t.status, t.note]; })]);
-    else if (type === "lichsu") downloadCSV(`lich_su_${suffix}.csv`,
+    else if (type === "lichsu") downloadXLSX(`lich_su_${suffix}.xlsx`,
       [["Thoi_Gian","Loai","Xe","Kho_Di","Kho_Den","SL","Ton_Truoc","Ton_Sau","Nguoi","Phieu","Ghi_Chu"],
        ...rows.map((t) => { const v = vOf(t.vehicle_id);
          return [fmtTime(t.created_at), t.txn_type, v ? `${v.name} ${v.color}` : t.vehicle_id, locName(t.from_location), locName(t.to_location), t.qty, t.stock_before, t.stock_after, t.created_by_name, t.doc_code, t.note]; })]);
-    else downloadCSV(`ton_kho_${suffix}.csv`,
+    else downloadXLSX(`ton_kho_${suffix}.xlsx`,
       [["Ma_Xe","Hang","Ten_Xe","Mau", ...(fLoc ? [locName(fLoc)] : [...regions, "Tong"]), "Ton_Toi_Thieu"],
        ...rows.map((v) => [v.id, v.brand, v.name, v.color,
          ...(fLoc ? [getQty(v.id, fLoc)] : [...regions.map((r) => regionQty(v.id, r)), totalQty(v.id)]), v.min_stock])]);
@@ -162,7 +162,7 @@ export default function BaoCao() {
     let units = (data || []).filter((u) => !fBrand || vOf(u.vehicle_id)?.brand === fBrand);
     if (units.length === 0) return notify("Không có xe tồn nào khớp bộ lọc.", "err");
     const today = new Date();
-    downloadCSV(`ton_kho_chi_tiet_${iso(today)}.csv`,
+    downloadXLSX(`ton_kho_chi_tiet_${iso(today)}.xlsx`,
       [["Khu_Vuc", "Kho", "Hang", "Ma_Xe", "Ten_Xe", "Mau", "So_Khung", "So_Khung_Tam", "Ngay_Nhap_Kho", "So_Ngay_Ton", "Trang_Thai", "Phieu_Nhap", "Gia_Niem_Yet", "Ghi_Chu"],
        ...units.map((u) => {
          const v = vOf(u.vehicle_id);
@@ -205,8 +205,8 @@ export default function BaoCao() {
               <option value="">Hãng: tất cả</option>{brands.map((b) => <option key={b.name}>{b.name}</option>)}
             </select>
           )}
-          <button className="btn-primary ml-auto" onClick={doExport} disabled={busy || rows.length === 0}>⬇ Xuất CSV ({fmtNum(rows.length)} dòng)</button>
-          {(type === "ton" || type === "tonsk") && <button className="btn-ghost !text-xs" onClick={exportTonChiTiet}>⬇ CSV chi tiết theo số khung</button>}
+          <button className="btn-primary ml-auto" onClick={doExport} disabled={busy || rows.length === 0}>⬇ Xuất Excel ({fmtNum(rows.length)} dòng)</button>
+          {(type === "ton" || type === "tonsk") && <button className="btn-ghost !text-xs" onClick={exportTonChiTiet}>⬇ Excel chi tiết theo số khung</button>}
         </div>
       </div>
 
@@ -218,28 +218,28 @@ export default function BaoCao() {
         <div className="font-extrabold mb-2.5">Xem trước {busy ? "· đang tải…" : `· ${fmtNum(rows.length)} dòng`}<span className="text-xs font-normal text-[#8A93A0]"> (file CSV xuất luôn có đủ toàn bộ)</span></div>
         <div className="overflow-x-auto">
           {type === "ban" && (
-            <table className="w-full border-collapse">
+            <div className="tbl-scroll"><table className="w-full border-collapse">
               <thead><tr><th className="th">Mã đơn</th><th className="th">Ngày</th><th className="th">Xe</th><th className="th">Kho</th><th className="th">Khách</th><th className="th">Giá bán</th><th className="th">NV</th></tr></thead>
               <tbody>{preview.map((s) => { const v = vOf(s.vehicle_id);
                 return <tr key={s.id}><td className="td font-bold">{s.code}</td><td className="td">{fmtDate(s.sale_date)}</td><td className="td">{v ? `${v.name} ${v.color}` : s.vehicle_id} ×{s.quantity}</td><td className="td">{locName(s.location_code)}</td><td className="td">{s.customer_name}</td><td className="td font-bold">{fmtVND(s.sale_price)}</td><td className="td">{s.seller_name}</td></tr>; })}</tbody>
-            </table>
+            </table></div>
           )}
           {type === "dieuchuyen" && (
-            <table className="w-full border-collapse">
+            <div className="tbl-scroll"><table className="w-full border-collapse">
               <thead><tr><th className="th">Phiếu</th><th className="th">Ngày</th><th className="th">Xe</th><th className="th">Đi → Đến</th><th className="th">SL</th><th className="th">Trạng thái</th></tr></thead>
               <tbody>{preview.map((t) => { const v = vOf(t.vehicle_id);
                 return <tr key={t.id}><td className="td font-bold">{t.code}</td><td className="td">{fmtTime(t.requested_at)}</td><td className="td">{v ? `${v.name} ${v.color}` : t.vehicle_id}</td><td className="td">{locName(t.from_location)} → {locName(t.to_location)}</td><td className="td font-bold">{t.quantity}</td><td className="td"><Badge tone={t.status === "Đã nhận" ? "green" : t.status === "Đang chuyển" ? "blue" : "gray"}>{t.status}</Badge></td></tr>; })}</tbody>
-            </table>
+            </table></div>
           )}
           {type === "lichsu" && (
-            <table className="w-full border-collapse">
+            <div className="tbl-scroll"><table className="w-full border-collapse">
               <thead><tr><th className="th">Thời gian</th><th className="th">Loại</th><th className="th">Xe</th><th className="th">Kho</th><th className="th">SL</th><th className="th">Tồn trước → sau</th><th className="th">Người</th></tr></thead>
               <tbody>{preview.map((t) => { const v = vOf(t.vehicle_id);
                 return <tr key={t.id}><td className="td whitespace-nowrap">{fmtTime(t.created_at)}</td><td className="td">{t.txn_type}</td><td className="td">{v ? `${v.name} ${v.color}` : t.vehicle_id}</td><td className="td">{t.from_location && t.to_location ? `${locName(t.from_location)} → ${locName(t.to_location)}` : locName(t.from_location || t.to_location)}</td><td className="td"><b className={t.qty < 0 ? "text-danger" : "text-[#0E7A4A]"}>{t.qty > 0 ? "+" : ""}{t.qty}</b></td><td className="td">{t.stock_before} → <b>{t.stock_after}</b></td><td className="td">{t.created_by_name}</td></tr>; })}</tbody>
-            </table>
+            </table></div>
           )}
           {type === "ton" && (
-            <table className="w-full border-collapse">
+            <div className="tbl-scroll"><table className="w-full border-collapse">
               <thead><tr><th className="th">Xe</th><th className="th">Hãng</th><th className="th">Màu</th>{fLoc ? <th className="th">{locName(fLoc)}</th> : <>{regions.map((r) => <th key={r} className="th">{r}</th>)}<th className="th">Tổng</th></>}</tr></thead>
               <tbody>{preview.map((v) => (
                 <tr key={v.id}><td className="td font-bold">{v.name}</td><td className="td">{v.brand}</td><td className="td">{v.color}</td>
@@ -247,7 +247,7 @@ export default function BaoCao() {
                     : <>{regions.map((r) => <td key={r} className="td">{regionQty(v.id, r)}</td>)}<td className="td font-bold">{totalQty(v.id)}</td></>}
                 </tr>
               ))}</tbody>
-            </table>
+            </table></div>
           )}
           {type === "tonsk" && (() => {
             const kw = skq.trim().toLowerCase();

@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Field, Badge, Toast, VehicleSearch, LocSearch, Pager, pageSlice } from "@/components/ui";
-import { errMsg, downloadCSV, fmtTime } from "@/lib/format";
+import { errMsg, fmtTime, downloadXLSX } from "@/lib/format";
 import Scanner from "@/components/Scanner";
 
 export default function QuetGom() {
@@ -147,7 +147,7 @@ export default function QuetGom() {
     const { data, error } = await supabase.rpc("fn_pool_con_lai");
     if (error) return notify(errMsg(error), "err");
     if (!data?.length) return notify("Không còn số khung nào chờ gán — toàn bộ danh sách hãng đã vào kho/phiếu. 🎉");
-    downloadCSV(`doi_chieu_chua_gan_${new Date().toISOString().slice(0, 10)}.csv`,
+    downloadXLSX(`doi_chieu_chua_gan_${new Date().toISOString().slice(0, 10)}.xlsx`,
       [["frame_number", "vehicle_id"], ...data.map((r) => [r.frame_number, r.vehicle_id])]);
     notify(`Đã xuất ${data.length} số khung hãng có nhưng chưa thấy thực tế — dùng làm bảng đối chiếu thiếu.`);
   };
@@ -176,7 +176,7 @@ export default function QuetGom() {
   };
 
   const exportRows = (rws, tag) => {
-    downloadCSV(`${tag}_${new Date().toISOString().slice(0, 10)}.csv`,
+    downloadXLSX(`${tag}_${new Date().toISOString().slice(0, 10)}.xlsx`,
       [["frame_number", "vehicle_id"], ...rws.map((r) => [r.frame_number || r.frame, r.vehicle_id])]);
   };
 
@@ -305,7 +305,7 @@ export default function QuetGom() {
               <label className="btn-ghost !text-xs cursor-pointer">⬆ Import file hãng (CSV)
                 <input type="file" accept=".csv,text/csv" className="hidden" onChange={(e) => { if (e.target.files[0]) importPoolCSV(e.target.files[0]); e.target.value = ""; }} />
               </label>
-              <button className="btn-ghost !text-xs" onClick={exportPoolConLai}>⬇ CSV chưa gán (đối chiếu)</button>
+              <button className="btn-ghost !text-xs" onClick={exportPoolConLai}>⬇ Excel chưa gán (đối chiếu)</button>
               <button className="btn-ghost !text-xs hover:text-danger" onClick={async () => { if (confirm("Xóa TOÀN BỘ danh sách chờ từ hãng? (không ảnh hưởng tồn kho/phiếu nháp)")) { const { error } = await supabase.rpc("fn_xoa_pool"); if (error) return notify(errMsg(error), "err"); loadPoolCount(); notify("Đã xóa danh sách chờ."); } }}>🗑</button>
             </>
           )}
@@ -416,7 +416,7 @@ export default function QuetGom() {
         <div className="flex items-center gap-2 flex-wrap mb-2.5">
           <div className="font-extrabold mr-auto">Đã gom: {rows.length} xe {locLabel && `· ${locLabel}`}</div>
           <button className="btn-primary !text-xs" disabled={busy} onClick={saveDraft}>💾 Lưu phiếu nháp</button>
-          <button className="btn-ok !text-xs" onClick={() => rows.length ? (exportRows(rows, `quet_${loc || "kho"}`), notify(`Đã xuất ${rows.length} số khung — gửi Zalo cho Admin/BGĐ kèm tên kho.`)) : notify("Chưa có số khung nào.", "err")}>⬇ Xuất CSV</button>
+          <button className="btn-ok !text-xs" onClick={() => rows.length ? (exportRows(rows, `quet_${loc || "kho"}`), notify(`Đã xuất ${rows.length} số khung — gửi Zalo cho Admin/BGĐ kèm tên kho.`)) : notify("Chưa có số khung nào.", "err")}>⬇ Xuất Excel</button>
           {canImport && <button className="btn-primary !text-xs" disabled={busy} onClick={importCurrent}>{busy ? "Đang xử lý…" : "⚡ Nhập thẳng vào kho"}</button>}
           {rows.length > 0 && <button className="btn-danger !text-xs" onClick={() => confirm("Xóa toàn bộ danh sách đang gom?") && newDraft()}>Làm lại</button>}
         </div>
@@ -462,7 +462,7 @@ export default function QuetGom() {
                 <td className="td">{d.status === "Nháp" ? <Badge tone="amber">Nháp</Badge> : <Badge tone="green">Đã nhập{d.imported_by_name ? ` · ${d.imported_by_name}` : ""}</Badge>}</td>
                 <td className="td"><div className="flex gap-1.5 flex-wrap">
                   {d.status === "Nháp" && <button className={`!px-2.5 !py-1 !text-xs ${editId === d.id ? "btn-primary" : "btn-ghost"}`} onClick={() => toggleEdit(d)}>{editId === d.id ? "Đóng sửa" : "✏ Sửa"}</button>}
-                  <button className="btn-ghost !px-2.5 !py-1 !text-xs" onClick={() => exportRows(d.rows || [], d.code)}>CSV</button>
+                  <button className="btn-ghost !px-2.5 !py-1 !text-xs" onClick={() => exportRows(d.rows || [], d.code)}>Excel</button>
                   {canImport && d.status === "Nháp" && <button className="btn-primary !px-2.5 !py-1 !text-xs" disabled={busy} onClick={() => importDraft(d)}>⚡ Nhập</button>}
                   {d.status === "Nháp" && <button className="btn-ghost !px-2 !py-1 !text-xs hover:text-danger" onClick={() => delDraft(d)}>🗑</button>}
                 </div></td>

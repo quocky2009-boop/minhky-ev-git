@@ -37,6 +37,7 @@ export default function KiemSoatTon() {
   const [busy, setBusy] = useState(false);
   const [sk, setSk] = useState(null);       // danh sach so khung
   const [skPage, setSkPage] = useState(1);
+  const [skSoDong, setSkSoDong] = useState(20);
 
   const allowed = ["CEO", "MANAGER", "ADMIN"].includes(profile?.role);
   const [dangVe, setDangVe] = useState(null); // hang dang ve: don dat chua nhap du
@@ -361,7 +362,7 @@ export default function KiemSoatTon() {
               <>
                 <div className="tbl-scroll"><table className="w-full border-collapse">
                   <thead><tr><th className="th">Số khung</th><th className="th">Model · màu</th><th className="th">Điểm</th><th className="th">Trạng thái</th><th className="th">Ngày nhập</th><th className="th text-right">Tuổi tồn</th></tr></thead>
-                  <tbody>{pageSlice(sk, skPage, 20).map((u) => (
+                  <tbody>{pageSlice(sk, skPage, skSoDong).map((u) => (
                     <tr key={u.frame_number} className="hover:bg-[#F8FAFC]">
                       <td className="td font-mono text-[12px] font-bold">{u.frame_number}</td>
                       <td className="td text-[13px]">{u.v.name} <span className="text-[#8A93A0]">· {u.v.color}</span></td>
@@ -373,7 +374,7 @@ export default function KiemSoatTon() {
                   ))}
                   {sk.length === 0 && <tr><td className="td" colSpan={6}>Không có xe nào khớp bộ lọc.</td></tr>}</tbody>
                 </table></div>
-                <Pager total={sk.length} page={skPage} setPage={setSkPage} pageSize={20} setPageSize={() => {}} />
+                <Pager total={sk.length} page={skPage} setPage={setSkPage} pageSize={skSoDong} setPageSize={setSkSoDong} />
               </>
             )}
           </div>

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCatalog, useToast } from "@/lib/useData";
 import { SavedFilters, AmountFilter, trongKhoang } from "@/components/FinFilters";
 import { Badge, Toast, KPI, Field, MultiCheck, Pager, pageSlice, useSortable, Th, useSelection, ThCheck, TdCheck, SelectionBar } from "@/components/ui";
-import { fmtVND, fmtDate, fmtTime, errMsg, downloadCSV } from "@/lib/format";
+import { fmtVND, fmtDate, fmtTime, errMsg, downloadXLSX } from "@/lib/format";
 
 const iso = (d) => d.toLocaleDateString("sv-SE");
 const NHOM_TONE = { "Chưa đến hạn": "green", "Quá hạn 1–7 ngày": "amber", "Quá hạn 8–30 ngày": "red", "Quá hạn trên 30 ngày": "red" };
@@ -102,7 +102,7 @@ export default function CongNoPhai() {
 
   const chon = () => sorted.filter((r) => sel.has(r.id));
   const xuatExcel = (rs) => {
-    downloadCSV("cong_no_phai_thu.csv", [
+    downloadXLSX("cong_no_phai_thu.xlsx", [
       ["Mã đơn","Khách","SĐT","Loại KH","Điểm bán","Xe","Ngày bán","Hạn TT","Tổng đơn","Đã trả","Còn nợ","Nhóm","Số ngày QH","Cam kết","Số lần nhắc"],
       ...rs.map((r) => [r.code, r.customer_name, r.customer_phone, r.customer_type,
         locName(r.location_code), vName(r.vehicle_id), fmtDate(r.sale_date),

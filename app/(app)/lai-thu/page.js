@@ -21,6 +21,7 @@ export default function LaiThu() {
   const [fotos, setFotos] = useState([]);
   const [busy, setBusy] = useState(false);
   const [page, setPage] = useState(1);
+  const [soDong, setSoDong] = useState(10);
   const [newC, setNewC] = useState(null);
   const [tab, setTab] = useState("cua_toi");
   const [choDuyet, setChoDuyet] = useState([]);
@@ -216,7 +217,7 @@ export default function LaiThu() {
         {rows.length === 0 ? <div className="text-sm text-[#8A93A0]">Chưa có lượt lái thử nào.</div> : (
           <>
             <div className="flex flex-col gap-2">
-              {pageSlice(rows, page, 10).map((o) => {
+              {pageSlice(rows, page, soDong).map((o) => {
                 const st = SUB_STATUS[o.status] || { label: o.status, tone: "dark" };
                 const canEdit = ["draft", "needs_revision"].includes(o.status);
                 return (
@@ -234,7 +235,7 @@ export default function LaiThu() {
                 );
               })}
             </div>
-            <Pager total={rows.length} page={page} setPage={setPage} pageSize={10} setPageSize={() => {}} />
+            <Pager total={rows.length} page={page} setPage={setPage} pageSize={soDong} setPageSize={setSoDong} />
           </>
         )}
       </div>

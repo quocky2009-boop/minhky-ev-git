@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Field, Badge, Toast, KPI, Pager, pageSlice, useSortable, Th, LocSearch, MoneyInput } from "@/components/ui";
 import { InfoRows, MoneyRows } from "@/components/detail";
-import { fmtVND, fmtDate, fmtTime, errMsg, downloadCSV } from "@/lib/format";
+import { fmtVND, fmtDate, fmtTime, errMsg, downloadXLSX } from "@/lib/format";
 import { CUSTOMER_TYPES, CUSTOMER_SOURCES } from "@/lib/const";
 
 const iso = (d) => d.toLocaleDateString("sv-SE");
@@ -41,6 +41,7 @@ function KhachHangInner() {
   const [stageEdit, setStageEdit] = useState(null); // {id, pipeline_stage, heat, next_call_date, lost_reason, note}
   const [fPotential, setFPotential] = useState("");
   const [page, setPage] = useState(1);
+  const [soDong, setSoDong] = useState(20);
   const sort = useSortable();
 
   // Form + chi tiết
@@ -174,7 +175,7 @@ function KhachHangInner() {
   const tongNo = Object.values(tq).reduce((a, b) => a + Number(b.con_no || 0), 0);
 
   const exportCSV = () => {
-    downloadCSV(`khach_hang_${iso(new Date())}.csv`,
+    downloadXLSX(`khach_hang_${iso(new Date())}.xlsx`,
       [["Mã", "Họ tên", "SĐT", "SĐT phụ", "Email", "CCCD", "Ngày sinh", "Giới tính", "Địa chỉ", "Loại khách",
         "Nguồn", "NV phụ trách", "Cửa hàng", "Quan tâm", "Ngân sách", "Dự kiến mua", "Tiềm năng", "Trạng thái",
         "Số đơn", "Tổng mua", "Còn nợ", "Lần CS gần nhất"],
@@ -523,7 +524,7 @@ function KhachHangInner() {
       <Toast toast={toast} />
       <div className="flex items-center gap-2 flex-wrap">
         <div className="font-extrabold text-lg mr-auto">Khách hàng ({sorted.length})</div>
-        <button className="btn-ghost !text-xs" onClick={exportCSV}>⬇ CSV</button>
+        <button className="btn-ghost !text-xs" onClick={exportCSV}>⬇ Excel</button>
         <button className="btn-primary !text-sm" onClick={openNew}>+ Thêm khách hàng</button>
       </div>
 
@@ -592,7 +593,7 @@ function KhachHangInner() {
             <Th label="Đã mua" k="mua" sort={sort} /><Th label="Còn nợ" k="no" sort={sort} />
             <Th label="Chăm sóc" k="cs" sort={sort} /><th className="th"></th>
           </tr></thead>
-          <tbody>{pageSlice(sorted, page, 20).map((c, i) => {
+          <tbody>{pageSlice(sorted, page, soDong).map((c, i) => {
             const t = tq[c.id] || {};
             const quaHan = t.hen_ke_tiep && new Date(t.hen_ke_tiep) <= new Date();
             return (
@@ -632,7 +633,7 @@ function KhachHangInner() {
           {sorted.length === 0 && <tr><td className="td" colSpan={9}>Không có khách hàng nào khớp bộ lọc.</td></tr>}
           </tbody>
         </table></div>
-        <Pager total={sorted.length} page={page} setPage={setPage} pageSize={20} setPageSize={() => {}} />
+        <Pager total={sorted.length} page={page} setPage={setPage} pageSize={soDong} setPageSize={setSoDong} />
       </div>
 
       {/* MODAL ĐỔI PIPELINE STAGE */}

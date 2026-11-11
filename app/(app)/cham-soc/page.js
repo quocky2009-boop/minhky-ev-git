@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Badge, Toast, Pager, pageSlice } from "@/components/ui";
-import { fmtDate, fmtTime, downloadCSV } from "@/lib/format";
+import { fmtDate, fmtTime, downloadXLSX } from "@/lib/format";
 
 const today = () => new Date().toLocaleDateString("sv-SE");
 const tempTone = (t) => t === "Hot" ? "red" : t === "Warm" ? "amber" : t === "Cold" ? "blue" : "gray";
@@ -37,7 +37,7 @@ export default function LichSuChamSoc() {
   });
 
   const exportCSV = () => {
-    downloadCSV(`lich_su_cham_soc_${from}_den_${to}.csv`,
+    downloadXLSX(`lich_su_cham_soc_${from}_den_${to}.xlsx`,
       [["Ngay_Cham_Soc","Ma_KH","Khach_Hang","SDT","Lead","Noi_Dung","Ket_Qua","Nguoi_Ghi","Ngay_Nhap_He_Thong"],
        ...list.map((l) => [l.care_date, l.customers?.code || "", l.customers?.name || "", l.customers?.phone || "",
          l.customers?.temperature || "", l.content, l.result, l.created_by_name, l.created_at])]);
@@ -54,7 +54,7 @@ export default function LichSuChamSoc() {
         <select className="inp !w-auto" value={fTemp} onChange={(e) => setFTemp(e.target.value)}>
           <option value="">Lead: tất cả</option><option>Hot</option><option>Warm</option><option>Cold</option>
         </select>
-        <button className="btn-ghost !text-xs" onClick={exportCSV}>⬇ Xuất CSV</button>
+        <button className="btn-ghost !text-xs" onClick={exportCSV}>⬇ Xuất Excel</button>
       </div>
       <div className="overflow-x-auto"><table className="w-full border-collapse">
         <thead><tr><th className="th">Ngày chăm sóc</th><th className="th">Khách hàng</th><th className="th">Lead</th><th className="th">Nội dung</th><th className="th">Kết quả</th><th className="th">Người ghi</th><th className="th">Ngày nhập hệ thống</th></tr></thead>

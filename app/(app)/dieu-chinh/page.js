@@ -3,7 +3,7 @@ import { useEffect, useState, useRef } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Field, Badge, Toast, VehicleSearch, LocSearch, FramePicker, Pager, pageSlice } from "@/components/ui";
 import Scanner from "@/components/Scanner";
-import { fmtTime, errMsg, parseCSV, downloadCSV } from "@/lib/format";
+import { fmtTime, errMsg, parseCSV, downloadXLSX } from "@/lib/format";
 import { ADJUST_REASONS } from "@/lib/const";
 
 export default function DieuChinh() {
@@ -20,7 +20,7 @@ export default function DieuChinh() {
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
 
   const exportCSV = () => {
-    downloadCSV(`de_xuat_dieu_chinh.csv`,
+    downloadXLSX(`de_xuat_dieu_chinh.xlsx`,
       [["Phieu","Thoi_Gian","Ma_Xe","Kho","Ton_HT","Thuc_Te","Chenh","SK_Bot","SK_Them","Ly_Do","Ghi_Chu","Nguoi_De_Xuat","Nguoi_Duyet","Trang_Thai"],
        ...list.map((ad) => [ad.code, ad.created_at, ad.vehicle_id, ad.location_code, ad.system_qty, ad.actual_qty, ad.diff_qty,
          (ad.frames_remove || []).join("; "), (ad.frames_add || []).join("; "), ad.reason, ad.note, ad.requested_by_name, ad.approved_by_name, ad.status])]);
@@ -124,7 +124,7 @@ export default function DieuChinh() {
       <div className="card">
         <div className="flex items-center gap-2 flex-wrap mb-2.5">
           <div className="font-extrabold mr-auto">Danh sách đề xuất điều chỉnh ({list.length})</div>
-          <button className="btn-ghost !text-xs" onClick={exportCSV}>⬇ Xuất CSV</button>
+          <button className="btn-ghost !text-xs" onClick={exportCSV}>⬇ Xuất Excel</button>
           {canRequest && <button className="btn-ghost !text-xs" onClick={() => fileRef.current?.click()}>⬆ Nhập CSV</button>}
           <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={(e) => { if (e.target.files[0]) importCSV(e.target.files[0]); e.target.value = ""; }} />
         </div>

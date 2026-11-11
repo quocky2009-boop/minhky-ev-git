@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
 import { QuickDates, AmountFilter, SavedFilters, RefLink, TongLoc, trongKhoang } from "@/components/FinFilters";
 import { Badge, Toast, KPI, Field, LocSearch, MultiCheck, MoneyInput, Pager, pageSlice, pageClamp, useSortable, Th, useSelection, ThCheck, TdCheck, SelectionBar } from "@/components/ui";
-import { fmtVND, fmtTime, fmtDate, errMsg, downloadCSV } from "@/lib/format";
+import { fmtVND, fmtTime, fmtDate, errMsg, downloadXLSX } from "@/lib/format";
 
 const iso = (d) => d.toLocaleDateString("sv-SE");
 const firstOfMonth = () => { const d = new Date(); return iso(new Date(d.getFullYear(), d.getMonth(), 1)); };
@@ -106,7 +106,7 @@ export default function PhieuThuChi({ dir }) {
   };
 
   const exportCSV = () => {
-    downloadCSV(`phieu_${isThu ? "thu" : "chi"}_${from}_den_${to}.csv`,
+    downloadXLSX(`phieu_${isThu ? "thu" : "chi"}_${from}_den_${to}.xlsx`,
       [["Mã phiếu", "Ngày", "Quỹ", "Danh mục", "Số tiền", "Đối tượng", "Diễn giải", "Chứng từ gốc", "Người tạo"],
        ...sorted.map((t) => [t.code, fmtTime(t.created_at), accName(t.account_id), t.category, t.amount, t.counterparty, t.description, t.ref_doc, t.created_by_name])]);
     notify(`Đã xuất ${sorted.length} phiếu.`);
@@ -117,7 +117,7 @@ export default function PhieuThuChi({ dir }) {
   const tongChon = chon().reduce((a, b) => a + b.amount, 0);
   const exportChon = () => {
     const rs = chon();
-    downloadCSV(`phieu_${isThu ? "thu" : "chi"}_chon_${sorted.length ? iso(new Date()) : ""}.csv`,
+    downloadXLSX(`phieu_${isThu ? "thu" : "chi"}_chon_${sorted.length ? iso(new Date()) : ""}.xlsx`,
       [["Mã phiếu", "Ngày", "Quỹ", "Danh mục", "Số tiền", "Đối tượng", "Diễn giải", "Chứng từ gốc", "Người tạo"],
        ...rs.map((t) => [t.code, fmtTime(t.created_at), accName(t.account_id), t.category, t.amount, t.counterparty, t.description, t.ref_doc, t.created_by_name])]);
     notify(`Đã xuất ${rs.length} phiếu đã chọn.`);

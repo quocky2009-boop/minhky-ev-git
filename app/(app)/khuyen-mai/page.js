@@ -34,6 +34,7 @@ export default function KhuyenMai() {
   const [fPin, setFPin] = useState("");
   const [fTT, setFTT] = useState("");
   const [page, setPage] = useState(1);
+  const [soDong, setSoDong] = useState(20);
   const sort = useSortable();
 
   const load = async () => {
@@ -222,7 +223,7 @@ export default function KhuyenMai() {
             <Th label="Trạng thái" k="tt" sort={sort} />
             {canQuan && <th className="th"></th>}
           </tr></thead>
-          <tbody>{pageSlice(sorted, page, 20).map((r) => (
+          <tbody>{pageSlice(sorted, page, soDong).map((r) => (
             <tr key={r.id} className="hover:bg-[#F8FAFC]">
               <td className="td font-bold text-brand">{r.code}</td>
               <td className="td">{r.name}</td>
@@ -239,7 +240,7 @@ export default function KhuyenMai() {
           {sorted.length === 0 && <tr><td className="td" colSpan={10}>Chưa có chương trình khuyến mại nào.</td></tr>}
           </tbody>
         </table></div>
-        <Pager total={sorted.length} page={page} setPage={setPage} pageSize={20} setPageSize={() => {}} />
+        <Pager total={sorted.length} page={page} setPage={setPage} pageSize={soDong} setPageSize={setSoDong} />
       </div>
     </div>
   );

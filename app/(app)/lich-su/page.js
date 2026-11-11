@@ -15,7 +15,7 @@ const PRESETS = [["today","Hôm nay"],["week","Tuần này"],["month","Tháng n�
 import { useCatalog } from "@/lib/useData";
 import { Badge, Pager, pageSlice, useSelection, ThCheck, TdCheck, SelectionBar } from "@/components/ui";
 import { InfoRows, MoneyRows } from "@/components/detail";
-import { fmtTime, fmtVND, downloadCSV } from "@/lib/format";
+import { fmtTime, fmtVND, downloadXLSX } from "@/lib/format";
 
 export default function LichSu() {
   const { supabase, vehicles, locations, loading } = useCatalog();
@@ -122,7 +122,7 @@ export default function LichSu() {
       <SelectionBar sel={sel}>
         <button className="btn-ghost !text-xs !py-1" onClick={() => {
           const rs = list.filter((t) => sel.has(t.id));
-          downloadCSV(`lich_su_chon.csv`, [["Thời gian", "Loại", "Xe", "Kho", "SL", "Tồn trước", "Tồn sau", "Người", "Phiếu", "Ghi chú"],
+          downloadXLSX(`lich_su_chon.xlsx`, [["Thời gian", "Loại", "Xe", "Kho", "SL", "Tồn trước", "Tồn sau", "Người", "Phiếu", "Ghi chú"],
             ...rs.map((t) => { const v = vehicles.find((x) => x.id === t.vehicle_id); return [fmtTime(t.created_at), t.txn_type, v ? `${v.name} ${v.color}` : t.vehicle_id, t.from_location && t.to_location ? `${locName(t.from_location)} → ${locName(t.to_location)}` : locName(t.from_location || t.to_location), t.qty, t.stock_before, t.stock_after, t.created_by_name, t.doc_code, t.note]; })]);
         }}>⬇ Xuất Excel</button>
       </SelectionBar>

@@ -24,7 +24,7 @@ export default function CoHoi() {
   const [fAss, setFAss] = useState("");
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(25);
+  const [pageSize, setPageSize] = useState(20);
   const sort = useSortable();
   // Form tao/sua
   const [show, setShow] = useState(false);
@@ -344,7 +344,7 @@ export default function CoHoi() {
             {sorted.length === 0 && <tr><td colSpan={9} className="td">Không có cơ hội nào.</td></tr>}
             </tbody>
           </table></div>
-          <Pager total={sorted.length} page={page} setPage={setPage} pageSize={pageSize} setPageSize={() => {}} />
+          <Pager total={sorted.length} page={page} setPage={setPage} pageSize={pageSize} setPageSize={setPageSize} />
         </div>
       )}
 

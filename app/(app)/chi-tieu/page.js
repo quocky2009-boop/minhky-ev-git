@@ -103,7 +103,7 @@ export default function ChiTieu() {
 
       <div className="card">
         <div className="font-extrabold mb-2.5">Chỉ tiêu đã đặt trong tháng này</div>
-        <table className="w-full border-collapse tbl-card">
+        <div className="tbl-scroll"><table className="w-full border-collapse tbl-card">
           <thead><tr><th className="th">Phạm vi</th><th className="th">Hãng xe</th><th className="th">Chỉ tiêu doanh thu</th><th className="th">Chỉ tiêu số xe</th><th className="th">Ghi chú</th><th className="th"></th></tr></thead>
           <tbody>
             {rows.map((r) => (
@@ -118,7 +118,7 @@ export default function ChiTieu() {
             ))}
             {rows.length === 0 && <tr><td className="td" colSpan={6}>Chưa đặt chỉ tiêu tháng này.</td></tr>}
           </tbody>
-        </table>
+        </table></div>
       </div>
     </div>
   );

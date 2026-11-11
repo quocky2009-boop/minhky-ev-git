@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
 import { QuickDates, AmountFilter, SavedFilters, RefLink, TongLoc, trongKhoang } from "@/components/FinFilters";
 import { Badge, Toast, Field, LocSearch, MultiCheck, Pager, pageSlice, pageClamp, useSortable, Th, useSelection, ThCheck, TdCheck, SelectionBar } from "@/components/ui";
-import { fmtVND, fmtTime, fmtDate, errMsg, downloadCSV } from "@/lib/format";
+import { fmtVND, fmtTime, fmtDate, errMsg, downloadXLSX } from "@/lib/format";
 
 const iso = (d) => d.toLocaleDateString("sv-SE");
 const firstOfMonth = () => { const d = new Date(); return iso(new Date(d.getFullYear(), d.getMonth(), 1)); };
@@ -138,7 +138,7 @@ export default function SoQuy() {
   const tongQuy = accs.filter((a) => a.status === "Hoạt động").reduce((a, b) => a + Number(b.so_du), 0);
 
   const exportCSV = () => {
-    downloadCSV(`so_quy_${from}_den_${to}.csv`,
+    downloadXLSX(`so_quy_${from}_den_${to}.xlsx`,
       [["Mã phiếu", "Ngày", "Loại phiếu", "Tiền thu", "Tiền chi", "Ngày tạo", "Chứng từ gốc", "Quỹ", "Người tạo"],
        ...sorted.map((t) => [t.code, fmtDate(t.txn_date), t.category, t.direction === "Thu" ? t.amount : "", t.direction === "Chi" ? t.amount : "", fmtTime(t.created_at), t.ref_doc, accName(t.account_id), t.created_by_name])]);
     notify(`Đã xuất ${sorted.length} phiếu.`);
@@ -235,7 +235,7 @@ export default function SoQuy() {
                 <span className="text-[12px] font-bold text-danger px-1.5 self-center">Chi: {fmtVND(sorted.filter((t) => sel.has(t.id) && t.direction === "Chi").reduce((a, b) => a + b.amount, 0))}</span>
                 <button className="btn-ghost !text-xs !py-1" onClick={() => {
                   const rs = sorted.filter((t) => sel.has(t.id));
-                  downloadCSV(`so_quy_chon.csv`, [["Mã phiếu", "Ngày", "Loại", "Tiền thu", "Tiền chi", "Chứng từ gốc", "Quỹ"],
+                  downloadXLSX(`so_quy_chon.xlsx`, [["Mã phiếu", "Ngày", "Loại", "Tiền thu", "Tiền chi", "Chứng từ gốc", "Quỹ"],
                     ...rs.map((t) => [t.code, fmtDate(t.txn_date), t.category, t.direction === "Thu" ? t.amount : "", t.direction === "Chi" ? t.amount : "", t.ref_doc, accName(t.account_id)])]);
                   notify(`Đã xuất ${rs.length} phiếu đã chọn.`);
                 }}>⬇ Xuất Excel</button>

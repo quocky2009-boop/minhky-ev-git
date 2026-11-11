@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Badge, Toast, KPI, LocSearch, Pager, pageSlice, useSortable, Th } from "@/components/ui";
-import { fmtVND, fmtDate, errMsg, downloadCSV } from "@/lib/format";
+import { fmtVND, fmtDate, errMsg, downloadXLSX } from "@/lib/format";
 
 const iso = (d) => d.toLocaleDateString("sv-SE");
 const firstOfMonth = () => { const d = new Date(); return iso(new Date(d.getFullYear(), d.getMonth(), 1)); };
@@ -19,6 +19,7 @@ export default function LaiGopCongNo() {
   const [fLoc, setFLoc] = useState("");
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
+  const [soDong, setSoDong] = useState(20);
   const [busy, setBusy] = useState(false);
   const sort = useSortable();
   const sortN = useSortable();
@@ -69,14 +70,14 @@ export default function LaiGopCongNo() {
   const noQua30 = noDon.filter((d) => d.tuoi_no > 30);
 
   const exportLai = () => {
-    downloadCSV(`lai_gop_${from}_den_${to}.csv`,
+    downloadXLSX(`lai_gop_${from}_den_${to}.xlsx`,
       [["Mã đơn", "Ngày", "Kho", "Xe", "Số khung", "Khách", "NV bán", "Doanh thu", "Giá vốn", "Lãi gộp", "Tỷ lệ %"],
        ...laiRows.map((r) => [r.code, r.sale_date, locName(r.location_code), vName(r.vehicle_id), r.frame_number,
          r.customer_name, r.seller_name, r.doanh_thu, r.gia_von, r.lai_gop, r.doanh_thu ? Math.round(r.lai_gop / r.doanh_thu * 1000) / 10 : 0])]);
     notify(`Đã xuất ${laiRows.length} đơn.`);
   };
   const exportNo = () => {
-    downloadCSV(`cong_no_${iso(new Date())}.csv`,
+    downloadXLSX(`cong_no_${iso(new Date())}.xlsx`,
       [["Mã đơn", "Ngày bán", "Khách", "SĐT", "Loại khách", "Tổng đơn", "Đã trả", "Còn nợ", "Tuổi nợ (ngày)", "NV bán"],
        ...noDon.map((d) => [d.code, d.sale_date, d.customer_name, d.customer_phone, d.customer_type, d.tong_don, d.da_tra, d.con_no, d.tuoi_no, d.seller_name])]);
     notify(`Đã xuất ${noDon.length} đơn còn nợ.`);
@@ -135,14 +136,14 @@ export default function LaiGopCongNo() {
             <div className="flex gap-2 items-center mb-2 flex-wrap">
               <div className="font-extrabold mr-auto">Chi tiết từng đơn ({laiRows.length})</div>
               <input className="inp !w-56" placeholder="Tìm mã đơn, khách, số khung…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
-              <button className="btn-ghost !text-xs" onClick={exportLai}>⬇ CSV</button>
+              <button className="btn-ghost !text-xs" onClick={exportLai}>⬇ Excel</button>
             </div>
             <div className="tbl-scroll"><table className="w-full border-collapse tbl-card">
               <thead><tr>
                 <Th label="Mã đơn" k="code" sort={sort} /><Th label="Ngày" k="ngay" sort={sort} /><Th label="Xe" k="xe" sort={sort} />
                 <Th label="Khách" k="kh" sort={sort} /><Th label="Doanh thu" k="dt" sort={sort} /><Th label="Giá vốn" k="gv" sort={sort} /><Th label="Lãi gộp" k="lg" sort={sort} />
               </tr></thead>
-              <tbody>{pageSlice(laiRows, page, 20).map((r) => (
+              <tbody>{pageSlice(laiRows, page, soDong).map((r) => (
                 <tr key={r.id} className={r.gia_von === 0 ? "bg-[#FFFCF5]" : "hover:bg-[#F8FAFC]"}>
                   <td className="td font-bold text-xs">{r.code}</td>
                   <td className="td text-xs whitespace-nowrap">{fmtDate(r.sale_date)}</td>
@@ -154,7 +155,7 @@ export default function LaiGopCongNo() {
                 </tr>
               ))}</tbody>
             </table></div>
-            <Pager total={laiRows.length} page={page} setPage={setPage} pageSize={20} setPageSize={() => {}} />
+            <Pager total={laiRows.length} page={page} setPage={setPage} pageSize={soDong} setPageSize={setSoDong} />
           </div>
         </>
       )}
@@ -172,12 +173,12 @@ export default function LaiGopCongNo() {
             <div className="flex gap-2 items-center mb-2 flex-wrap">
               <div className="font-extrabold mr-auto">Công nợ theo khách ({khachRows.length})</div>
               <input className="inp !w-56" placeholder="Tìm tên / SĐT khách…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
-              <button className="btn-ghost !text-xs" onClick={exportNo}>⬇ CSV</button>
+              <button className="btn-ghost !text-xs" onClick={exportNo}>⬇ Excel</button>
             </div>
             <div className="tbl-scroll"><table className="w-full border-collapse tbl-card">
               <thead><tr><Th label="Khách hàng" k="ten" sort={sortN} /><th className="th">SĐT</th><th className="th">Loại</th>
                 <Th label="Số đơn" k="don" sort={sortN} /><Th label="Tổng nợ" k="no" sort={sortN} /><Th label="Nợ lâu nhất" k="tuoi" sort={sortN} /></tr></thead>
-              <tbody>{pageSlice(khachRows, page, 20).map((k, i) => (
+              <tbody>{pageSlice(khachRows, page, soDong).map((k, i) => (
                 <tr key={i} className={k.tuoi_no_max > 30 ? "bg-[#FFF6F6]" : "hover:bg-[#F8FAFC]"}>
                   <td className="td font-semibold text-[13px]">{k.customer_name}</td>
                   <td className="td text-xs">{k.customer_phone}</td>
@@ -190,7 +191,7 @@ export default function LaiGopCongNo() {
               {khachRows.length === 0 && <tr><td className="td" colSpan={6}>Không có công nợ nào. 👍</td></tr>}
               </tbody>
             </table></div>
-            <Pager total={khachRows.length} page={page} setPage={setPage} pageSize={20} setPageSize={() => {}} />
+            <Pager total={khachRows.length} page={page} setPage={setPage} pageSize={soDong} setPageSize={setSoDong} />
           </div>
 
           <div className="card">
@@ -207,7 +208,7 @@ export default function LaiGopCongNo() {
                   <a className="btn-ghost !px-2 !py-1 !text-xs" href={`/don-ban?q=${encodeURIComponent(d.code)}`} title="Mở đơn ở trang Đơn bán rồi bấm 💵 để thu — chọn đúng hình thức và tài khoản nhận">Thu thêm →</a>
                 </div>
               ))}
-              {noDon.length > 50 && <div className="text-xs text-[#8A93A0]">Hiển thị 50 đơn nợ lâu nhất — xuất CSV để xem đầy đủ.</div>}
+              {noDon.length > 50 && <div className="text-xs text-[#8A93A0]">Hiển thị 50 đơn nợ lâu nhất — xuất Excel để xem đầy đủ.</div>}
             </div>
           </div>
         </>

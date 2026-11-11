@@ -20,6 +20,7 @@ export default function DatCoc() {
   const [fSt, setFSt] = useState("DANG_GIU");
   const [detail, setDetail] = useState(null);
   const [page, setPage] = useState(1);
+  const [soDong, setSoDong] = useState(20);
   const [f, setF] = useState({ frame_number: "", customer_id: "", customer_name: "", customer_phone: "", amount: "", hold_until: iso(new Date(Date.now() + 3 * 86400000)), note: "" });
   const [newC, setNewC] = useState(null);
   const [frameInfo, setFrameInfo] = useState(null);
@@ -159,7 +160,7 @@ export default function DatCoc() {
           </select>
         </div>
         <div className="flex flex-col gap-2">
-          {pageSlice(filtered, page, 15).map((d) => {
+          {pageSlice(filtered, page, soDong).map((d) => {
             const st = ST[d.status] || { label: d.status, tone: "dark" };
             const qh = d.status === "DANG_GIU" && new Date(d.hold_until) < new Date(iso(new Date()));
             return (
@@ -183,7 +184,7 @@ export default function DatCoc() {
           })}
           {filtered.length === 0 && <div className="text-sm text-[#8A93A0]">Không có phiếu cọc nào.</div>}
         </div>
-        <Pager total={filtered.length} page={page} setPage={setPage} pageSize={15} setPageSize={() => {}} />
+        <Pager total={filtered.length} page={page} setPage={setPage} pageSize={soDong} setPageSize={setSoDong} />
       </div>
 
       {detail && (() => {

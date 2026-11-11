@@ -68,6 +68,7 @@ export default function DichVu() {
     if (hit.length === 1) { _setAutoOpened(true); openDetail(hit[0]); }
   }, [_params, rows]);
   const [page, setPage] = useState(1);
+  const [soDong, setSoDong] = useState(20);
   const [busy, setBusy] = useState(false);
   // tiep nhan
   const [show, setShow] = useState(false);
@@ -664,7 +665,7 @@ export default function DichVu() {
           <input className="inp !w-64" placeholder="Tìm mã phiếu, khách, SĐT, số khung…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
         </div>
         <div className="flex flex-col gap-2">
-          {pageSlice(filtered, page, 15).map((t) => {
+          {pageSlice(filtered, page, soDong).map((t) => {
             const st = ST[t.status] || { label: t.status, tone: "dark" };
             return (
               <button key={t.id} className="flex items-center gap-2 p-2.5 rounded-xl border border-[#E3E8EF] hover:bg-[#F8FAFC] text-left" onClick={() => openDetail(t)}>
@@ -678,7 +679,7 @@ export default function DichVu() {
           })}
           {filtered.length === 0 && <div className="text-sm text-[#8A93A0]">Không có phiếu nào khớp bộ lọc.</div>}
         </div>
-        <Pager total={filtered.length} page={page} setPage={setPage} pageSize={15} setPageSize={() => {}} />
+        <Pager total={filtered.length} page={page} setPage={setPage} pageSize={soDong} setPageSize={setSoDong} />
       </div>
     </div>
   );

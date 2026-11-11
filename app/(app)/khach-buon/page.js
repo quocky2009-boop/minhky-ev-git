@@ -180,9 +180,9 @@ function KhachBuonInner() {
   return (
     <div className="flex flex-col gap-4 pb-8">
       <Toast toast={toast} />
-      <div className="flex gap-1 border-b border-[#E3E8EF]">
+      <div className="flex gap-1.5 flex-wrap">
         {[["so", "Sổ công nợ khách buôn"], ["ck", "Bảng chiết khấu sỉ"]].map(([k, l]) => (
-          <button key={k} onClick={() => setTab(k)} className={`px-3.5 py-2 text-[13px] font-semibold border-b-2 -mb-px ${tab === k ? "border-brand text-brand" : "border-transparent text-[#5A6572]"}`}>{l}</button>
+          <button key={k} onClick={() => setTab(k)} className={`btn !px-3 !py-2 !text-xs ${tab === k ? "bg-brand text-white" : "bg-[#EEF1F4]"}`}>{l}</button>
         ))}
       </div>
 

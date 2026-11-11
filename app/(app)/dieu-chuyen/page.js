@@ -3,7 +3,7 @@ import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Field, Badge, Toast, LocSearch, FrameSearch, Pager, pageSlice, useSortable, Th, useSelection, ThCheck, TdCheck, SelectionBar } from "@/components/ui";
-import { fmtTime, fmtDate, errMsg, downloadCSV } from "@/lib/format";
+import { fmtTime, fmtDate, errMsg, downloadXLSX } from "@/lib/format";
 import Link from "next/link";
 
 function DieuChuyenInner() {
@@ -287,7 +287,7 @@ function DieuChuyenInner() {
           <button className="btn-ghost !text-xs ml-auto" onClick={() => {
             const rs = sorted.filter((t) => sel.has(t.id));
             const exp = rs.length ? rs : sorted;
-            downloadCSV(`dieu_chuyen.csv`, [["Mã phiếu","Xe","SL","Kho xuất","Kho nhận","Trạng thái","Ngày lập","Người lập","Ngày nhận","Người nhận","Ghi chú"],
+            downloadXLSX(`dieu_chuyen.xlsx`, [["Mã phiếu","Xe","SL","Kho xuất","Kho nhận","Trạng thái","Ngày lập","Người lập","Ngày nhận","Người nhận","Ghi chú"],
               ...exp.map((t) => [t.code, vName(t.vehicle_id), t.quantity, locName(t.from_location), locName(t.to_location), t.status, fmtTime(t.requested_at), t.requested_by_name, t.confirmed_at ? fmtTime(t.confirmed_at) : "", t.confirmed_by_name || "", t.note || ""])]);
             notify(`Đã xuất ${exp.length} phiếu.`);
           }}>⬇ Xuất Excel</button>
@@ -296,7 +296,7 @@ function DieuChuyenInner() {
           <span className="text-[12px] font-bold text-brand px-1 self-center">{sel.count} phiếu</span>
           <button className="btn-ghost !text-xs !py-1" onClick={() => {
             const rs = sorted.filter((t) => sel.has(t.id));
-            downloadCSV(`dieu_chuyen_chon.csv`, [["Mã phiếu","Xe","SL","Kho xuất","Kho nhận","Trạng thái","Ngày lập","Người lập","Ngày nhận","Người nhận"],
+            downloadXLSX(`dieu_chuyen_chon.xlsx`, [["Mã phiếu","Xe","SL","Kho xuất","Kho nhận","Trạng thái","Ngày lập","Người lập","Ngày nhận","Người nhận"],
               ...rs.map((t) => [t.code, vName(t.vehicle_id), t.quantity, locName(t.from_location), locName(t.to_location), t.status, fmtTime(t.requested_at), t.requested_by_name, t.confirmed_at ? fmtTime(t.confirmed_at) : "", t.confirmed_by_name || ""])]);
             notify(`Đã xuất ${rs.length} phiếu.`);
           }}>⬇ Xuất Excel</button>

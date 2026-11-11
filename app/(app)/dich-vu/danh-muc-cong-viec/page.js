@@ -17,6 +17,7 @@ export default function DanhMucCongViec() {
   const [fLoai, setFLoai] = useState([]);
   const [showNgung, setShowNgung] = useState(false);
   const [page, setPage] = useState(1);
+  const [soDong, setSoDong] = useState(20);
   const [f, setF] = useState(null);
   const [imp, setImp] = useState(false);
   const [perm, setPerm] = useState(false);
@@ -79,7 +80,7 @@ export default function DanhMucCongViec() {
         </div>
         <div className="tbl-scroll"><table className="w-full border-collapse tbl-card">
           <thead><tr><th className="th">Mã</th><th className="th">Công việc</th><th className="th">Loại CV</th><th className="th">Nhóm</th><th className="th text-right">Giá chưa VAT</th><th className="th text-right">VAT</th><th className="th text-right">Giá gồm VAT</th><th className="th">Trạng thái</th>{perm && <th className="th"></th>}</tr></thead>
-          <tbody>{pageSlice(list, page, 30).map((r) => (
+          <tbody>{pageSlice(list, page, soDong).map((r) => (
             <tr key={r.id} className={r.status !== "Hoạt động" ? "text-[#8A93A0]" : "hover:bg-[#F8FAFC]"}>
               <td data-label="Mã" className="td font-bold font-mono text-[12px]">{r.code}</td><td data-label="Công việc" className="td">{r.name}</td>
               <td data-label="Loại CV" className="td text-[13px]">{r.loai_cv}</td><td data-label="Nhóm" className="td text-[13px]">{r.group_name}</td>
@@ -92,7 +93,7 @@ export default function DanhMucCongViec() {
             {list.length === 0 && <tr><td className="td" colSpan={9}>Chưa có công việc nào khớp.</td></tr>}
           </tbody>
         </table></div>
-        <Pager total={list.length} page={page} setPage={setPage} pageSize={30} setPageSize={() => {}} />
+        <Pager total={list.length} page={page} setPage={setPage} pageSize={soDong} setPageSize={setSoDong} />
       </div>
       {imp && <ImportDanhMuc mode="cv" supabase={supabase} locations={locations} notify={notify} onDone={load} onClose={() => setImp(false)} />}
     </div>

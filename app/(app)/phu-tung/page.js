@@ -27,6 +27,7 @@ export default function KhoPhuTung() {
   const [q, setQ] = useState("");
   const [fLoc, setFLoc] = useState("");
   const [page, setPage] = useState(1);
+  const [soDong, setSoDong] = useState(20);
   const [busy, setBusy] = useState(false);
   const sort = useSortable();
   // form danh muc
@@ -197,7 +198,7 @@ export default function KhoPhuTung() {
               <Th label="Giá gốc" k="goc" sort={sort} className="text-right" /><Th label="Đơn giá bán" k="gia" sort={sort} className="text-right" />
               <th className="th"></th>
             </tr></thead>
-            <tbody>{pageSlice(partRows, page, 20).map((p) => {
+            <tbody>{pageSlice(partRows, page, soDong).map((p) => {
               const tt = tonKd(p.id);
               const thieu = p.min_stock > 0 && totalOf(p.id) < p.min_stock;
               const ks = khoCua(p.id);
@@ -226,7 +227,7 @@ export default function KhoPhuTung() {
             {partRows.length === 0 && <tr><td className="td" colSpan={9}>{parts.length ? "Không có phụ tùng nào khớp bộ lọc." : "Chưa có phụ tùng nào. Bấm \"+ Thêm phụ tùng\" để bắt đầu."}</td></tr>}
             </tbody>
           </table></div>
-          <Pager total={partRows.length} page={page} setPage={setPage} pageSize={20} setPageSize={() => {}} />
+          <Pager total={partRows.length} page={page} setPage={setPage} pageSize={soDong} setPageSize={setSoDong} />
         </div>
       )}
 
@@ -277,7 +278,7 @@ export default function KhoPhuTung() {
           </div>
           <div className="tbl-scroll"><table className="w-full border-collapse tbl-card">
             <thead><tr><th className="th w-8">#</th><th className="th">Serial</th><th className="th">Loại</th><th className="th">Điểm</th><th className="th">Ngày nhập</th></tr></thead>
-            <tbody>{pageSlice(units.filter((u) => !fLoc || u.location_code === fLoc), page, 20).map((u, i) => (
+            <tbody>{pageSlice(units.filter((u) => !fLoc || u.location_code === fLoc), page, soDong).map((u, i) => (
               <tr key={u.serial} className="hover:bg-[#F8FAFC]">
                 <td className="td text-center text-xs text-[#8A93A0]">{i + 1}</td>
                 <td className="td font-mono font-bold text-[12px]">{u.serial}</td>
@@ -289,7 +290,7 @@ export default function KhoPhuTung() {
             {units.length === 0 && <tr><td className="td" colSpan={5}>Chưa có pin/ắc quy nào theo serial. Tạo phụ tùng có bật "Theo dõi serial" rồi nhập kho.</td></tr>}
             </tbody>
           </table></div>
-          <Pager total={units.filter((u) => !fLoc || u.location_code === fLoc).length} page={page} setPage={setPage} pageSize={20} setPageSize={() => {}} />
+          <Pager total={units.filter((u) => !fLoc || u.location_code === fLoc).length} page={page} setPage={setPage} pageSize={soDong} setPageSize={setSoDong} />
         </div>
       )}
 
@@ -297,7 +298,7 @@ export default function KhoPhuTung() {
         <div className="card">
           <div className="font-extrabold mb-3">Lịch sử nhập xuất ({txns.length})</div>
           <div className="flex flex-col gap-1.5">
-            {pageSlice(txns, page, 20).map((t) => (
+            {pageSlice(txns, page, soDong).map((t) => (
               <div key={t.id} className="flex items-center gap-2 p-2 rounded-lg border border-[#E3E8EF] text-[13px]">
                 <Badge tone={t.qty_change > 0 ? "green" : "amber"}>{TXN_LABEL[t.txn_type] || t.txn_type}</Badge>
                 <div className="mr-auto min-w-0">
@@ -310,7 +311,7 @@ export default function KhoPhuTung() {
             ))}
             {txns.length === 0 && <div className="text-sm text-[#8A93A0]">Chưa có giao dịch nào.</div>}
           </div>
-          <Pager total={txns.length} page={page} setPage={setPage} pageSize={20} setPageSize={() => {}} />
+          <Pager total={txns.length} page={page} setPage={setPage} pageSize={soDong} setPageSize={setSoDong} />
         </div>
       )}
     </div>

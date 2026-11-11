@@ -230,10 +230,10 @@ export default function HangHoa() {
         {isManager && tab === "ton" && <button className="btn-primary !text-xs" onClick={() => { setEditId(null); setF(emptyF); setShowForm(true); }}>+ Thêm sản phẩm</button>}
       </div>
 
-      <div className="flex gap-1 border-b border-[#E3E8EF]">
+      <div className="flex gap-1.5 flex-wrap">
         {[["ton","Tồn kho"],["dieu_chuyen","Điều chuyển"],["kiem_ke","Kiểm kê"]].map(([k, label]) => (
           <button key={k} onClick={() => setTab(k)}
-            className={`px-3.5 py-2 text-[13px] font-semibold border-b-2 -mb-px ${tab === k ? "border-brand text-brand" : "border-transparent text-[#5A6572] hover:text-brand"}`}>
+            className={`btn !px-3 !py-2 !text-xs ${tab === k ? "bg-brand text-white" : "bg-[#EEF1F4]"}`}>
             {label}
           </button>
         ))}
@@ -459,7 +459,7 @@ export default function HangHoa() {
           </div>
           <div className="card">
             <div className="font-extrabold mb-2.5">Danh sách phiếu điều chuyển</div>
-            <table className="w-full border-collapse tbl-card">
+            <div className="tbl-scroll"><table className="w-full border-collapse tbl-card">
               <thead><tr><th className="th">Mã phiếu</th><th className="th">Sản phẩm</th><th className="th">Từ kho</th><th className="th">Đến kho</th><th className="th">SL</th><th className="th">Trạng thái</th><th className="th"></th></tr></thead>
               <tbody>{transfers.map(t => (
                 <tr key={t.id}>
@@ -481,7 +481,7 @@ export default function HangHoa() {
               ))}
               {transfers.length === 0 && <tr><td className="td" colSpan={7}>Chưa có phiếu điều chuyển nào.</td></tr>}
               </tbody>
-            </table>
+            </table></div>
           </div>
         </>
       )}
@@ -504,7 +504,7 @@ export default function HangHoa() {
                 <div className="font-semibold">Đang kiểm kê: {locName(kkLoc)}</div>
                 <button className="btn-ghost !text-xs ml-auto" onClick={() => { setKkLoc(""); setKkRows([]); }}>✕ Đóng</button>
               </div>
-              <table className="w-full border-collapse tbl-card">
+              <div className="tbl-scroll"><table className="w-full border-collapse tbl-card">
                 <thead><tr><th className="th">Sản phẩm</th><th className="th">ĐVT</th><th className="th">Tồn hệ thống</th><th className="th">Đếm thực tế</th><th className="th">Chênh lệch</th></tr></thead>
                 <tbody>{kkRows.map((r, i) => (
                   <tr key={r.product_id} className={Number(r.dem) !== r.ton ? "bg-[#FFF8E5]" : ""}>
@@ -515,7 +515,7 @@ export default function HangHoa() {
                     <td className={`td text-center font-bold ${Number(r.dem) - r.ton > 0 ? "text-[#0E7A4A]" : Number(r.dem) - r.ton < 0 ? "text-danger" : "text-[#8A93A0]"}`}>{Number(r.dem) - r.ton > 0 ? "+" : ""}{Number(r.dem) - r.ton}</td>
                   </tr>
                 ))}</tbody>
-              </table>
+              </table></div>
               <button className="btn-ok mt-3" disabled={busy} onClick={luuKiemKe}>Lưu kết quả kiểm kê</button>
             </>
           )}

@@ -16,6 +16,7 @@ export default function DieuChinhTon({ supabase, locations, parts, stock, canEdi
   const [to, setTo] = useState(today());
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
+  const [soDong, setSoDong] = useState(20);
   const [mode, setMode] = useState(null); // null | "THU_CONG" | "FILE"
   const [form, setForm] = useState({ location_code: "", note: "", lines: [], file_name: "" });
   const [pick, setPick] = useState("");
@@ -157,7 +158,7 @@ export default function DieuChinhTon({ supabase, locations, parts, stock, canEdi
         {!canEdit && <div className="text-[12px] text-[#8A93A0] mb-2">Bạn chỉ xem được. Quyền tạo điều chỉnh: “Kiểm kê phụ tùng”.</div>}
         <div className="tbl-scroll"><table className="w-full border-collapse tbl-card">
           <thead><tr><th className="th">Mã yêu cầu</th><th className="th">Ngày tạo</th><th className="th">Người tạo</th><th className="th">Kho</th><th className="th">Phương thức</th><th className="th text-right">Tổng bản ghi</th><th className="th text-right">Thành công</th><th className="th text-right">Lỗi</th><th className="th">Trạng thái</th></tr></thead>
-          <tbody>{pageSlice(rows, page, 20).map((r) => (
+          <tbody>{pageSlice(rows, page, soDong).map((r) => (
             <tr key={r.id} className="hover:bg-[#F8FAFC] cursor-pointer" onClick={() => xem(r)}>
               <td data-label="Mã yêu cầu" className="td font-mono font-bold text-[12px] text-brand">{r.code}</td><td data-label="Ngày tạo" className="td text-xs">{fmtTime(r.created_at)}</td>
               <td data-label="Người tạo" className="td text-[13px]">{r.by_name}</td><td data-label="Kho" className="td text-xs">{locName(r.location_code)}</td>
@@ -168,7 +169,7 @@ export default function DieuChinhTon({ supabase, locations, parts, stock, canEdi
             {rows.length === 0 && <tr><td className="td text-[#8A93A0]" colSpan={9}>Chưa có yêu cầu điều chỉnh nào trong khoảng này.</td></tr>}
           </tbody>
         </table></div>
-        <Pager total={rows.length} page={page} setPage={setPage} pageSize={20} setPageSize={() => {}} />
+        <Pager total={rows.length} page={page} setPage={setPage} pageSize={soDong} setPageSize={setSoDong} />
       </div>
     </div>
   );

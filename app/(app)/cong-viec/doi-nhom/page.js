@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Badge, Toast, KPI, Pager, pageSlice } from "@/components/ui";
-import { errMsg, downloadCSV } from "@/lib/format";
+import { errMsg, downloadXLSX } from "@/lib/format";
 import { TASK_STATUS, TASK_CLOSED, PRIORITY, hanLabel, sortTasks, fmtHan, toLocalInput } from "@/lib/task";
 
 const KANBAN = ["not_started", "in_progress", "pending_review", "needs_revision", "completed", "failed"];
@@ -18,6 +18,7 @@ export default function VievDoiNhom() {
   const [fSt, setFSt] = useState("");
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
+  const [soDong, setSoDong] = useState(20);
   const [busy, setBusy] = useState(true);
   const [d, setD] = useState(null);
   const [cl, setCl] = useState([]);
@@ -114,7 +115,7 @@ export default function VievDoiNhom() {
   });
 
   const exportCSV = () => {
-    downloadCSV(`cong_viec_${new Date().toISOString().slice(0, 10)}.csv`,
+    downloadXLSX(`cong_viec_${new Date().toISOString().slice(0, 10)}.xlsx`,
       [["Mã", "Tên việc", "Nhóm", "Người thực hiện", "Người giao", "Mức độ", "Hạn", "Gửi lúc", "Xác nhận lúc", "Trạng thái", "Quá hạn", "Checklist", "Số lần bổ sung"],
        ...sorted.map((t) => [t.code, t.title, t.category_name || "", t.assignee_name, t.assigned_by_name || t.created_by_name,
          t.priority, fmtHan(t.due_at), t.submitted_at ? fmtHan(t.submitted_at) : "", t.completed_at ? fmtHan(t.completed_at) : "",
@@ -210,7 +211,7 @@ export default function VievDoiNhom() {
       <div className="flex items-center gap-2 flex-wrap">
         <div className="font-extrabold text-lg mr-auto">Việc đội nhóm ({rows.length})</div>
         <Link href="/cong-viec/giao-viec" className="btn-primary !text-sm">+ Giao việc</Link>
-        <button className="btn-ghost !text-xs" onClick={exportCSV}>⬇ CSV</button>
+        <button className="btn-ghost !text-xs" onClick={exportCSV}>⬇ Excel</button>
       </div>
 
       <div className="flex gap-3 flex-wrap">
@@ -245,7 +246,7 @@ export default function VievDoiNhom() {
         {view === "list" && (
           <>
             <div className="flex flex-col gap-2">
-              {pageSlice(sorted, page, 15).map((t) => {
+              {pageSlice(sorted, page, soDong).map((t) => {
                 const st = TASK_STATUS[t.status]; const h = hanLabel(t.due_at, t.status);
                 return (
                   <button key={t.id} className={`p-2.5 rounded-xl border text-left hover:bg-[#F8FAFC] ${h?.overdue ? "border-[#F5B5B5] bg-[#FFF6F6]" : t.status === "pending_review" ? "border-[#F0C000] bg-[#FFFCF0]" : "border-[#E3E8EF]"}`} onClick={() => openTask(t)}>
@@ -264,7 +265,7 @@ export default function VievDoiNhom() {
               })}
               {sorted.length === 0 && <div className="text-sm text-[#8A93A0]">Không có việc nào khớp bộ lọc.</div>}
             </div>
-            <Pager total={sorted.length} page={page} setPage={setPage} pageSize={15} setPageSize={() => {}} />
+            <Pager total={sorted.length} page={page} setPage={setPage} pageSize={soDong} setPageSize={setSoDong} />
           </>
         )}
 

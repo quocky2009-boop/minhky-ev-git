@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
 import { QuickDates, AmountFilter, SavedFilters, trongKhoang } from "@/components/FinFilters";
 import { Badge, Toast, KPI, Pager, pageSlice, MultiCheck } from "@/components/ui";
-import { fmtVND, fmtDate, fmtTime, errMsg, downloadCSV } from "@/lib/format";
+import { fmtVND, fmtDate, fmtTime, errMsg, downloadXLSX } from "@/lib/format";
 
 const todayISO = () => new Date().toLocaleDateString("sv-SE");
 
@@ -71,7 +71,7 @@ export default function GiaiNgan() {
   };
 
   const exportCSV = () => {
-    downloadCSV(`cho_giai_ngan.csv`,
+    downloadXLSX(`cho_giai_ngan.xlsx`,
       [["Don","Khach","SDT","Cong_Ty","So_Tien","Du_Kien","Trang_Thai","Ngay_Tao","Phieu_Thu","Nguoi_Xac_Nhan"],
        ...filtered.map((x) => { const o = orders[x.sale_code];
          return [x.sale_code, o?.customer_name || "", o?.customer_phone || "", x.finance_company, x.amount, x.expected_date || "", x.status, fmtTime(x.created_at), x.disbursed_txn_code, x.disbursed_by_name]; })]);
@@ -93,7 +93,7 @@ export default function GiaiNgan() {
           <select className="inp !w-auto" value={fStatus} onChange={(e) => setFStatus(e.target.value)}>
             <option value="">Tất cả trạng thái</option><option>Chờ giải ngân</option><option>Đã giải ngân</option>
           </select>
-          <button className="btn-ghost !text-xs" onClick={exportCSV}>⬇ Xuất CSV</button>
+          <button className="btn-ghost !text-xs" onClick={exportCSV}>⬇ Xuất Excel</button>
         </div>
         <div className="flex gap-2 flex-wrap items-center mb-2">
           <span className="text-[11.5px] text-[#8A93A0] font-semibold">Ngày bán:</span>

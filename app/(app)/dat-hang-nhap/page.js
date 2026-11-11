@@ -186,11 +186,11 @@ export default function DatHangNhap() {
       {showImp && <ImportDatHang supabase={supabase} vehicles={vehicles} locations={locations} notify={notify} onClose={() => setShowImp(false)} onDone={() => { load(); refresh(); }} />}
 
       <div className="card">
-        <div className="flex gap-1 border-b border-[#E3E8EF] mb-3 flex-wrap">
+        <div className="flex gap-1.5 mb-3 flex-wrap">
           {[["tat-ca", "Tất cả đơn đặt hàng"], ["chua-nhap", "Chưa nhập"], ["nhap-mot-phan", "Nhập một phần"], ["hoan-thanh", "Hoàn thành"]].map(([k, label]) => (
             <button key={k} onClick={() => { setTab(k); setPage(1); }}
-              className={`px-3.5 py-2 text-[13px] font-semibold border-b-2 -mb-px ${tab === k ? "border-brand text-brand" : "border-transparent text-[#5A6572] hover:text-brand"}`}>
-              {label} <span className="text-[11px] text-[#8A93A0]">({counts[k]})</span>
+              className={`btn !px-3 !py-2 !text-xs ${tab === k ? "bg-brand text-white" : "bg-[#EEF1F4]"}`}>
+              {label} <span className="text-[11px] opacity-70">({counts[k]})</span>
             </button>
           ))}
         </div>

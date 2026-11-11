@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Badge, Toast, KPI, Field, LocSearch, Pager, pageSlice, useSortable, Th, useSelection, ThCheck, TdCheck, SelectionBar } from "@/components/ui";
-import { fmtDate, errMsg, downloadCSV } from "@/lib/format";
+import { fmtDate, errMsg, downloadXLSX } from "@/lib/format";
 
 const iso = (d) => d.toLocaleDateString("sv-SE");
 const HAN_NGAY = 7; // qua 7 ngay ke tu ngay nhap ma chua co COC -> bao do
@@ -113,7 +113,7 @@ export default function GiayCOC() {
   };
 
   const xuat = (rs, ten) => {
-    downloadCSV(ten, [["Số khung", "Xe", "Kho", "Lô nhập", "Ngày nhập", "Số ngày", "Trạng thái COC", "Ngày nhận COC"],
+    downloadXLSX(ten, [["Số khung", "Xe", "Kho", "Lô nhập", "Ngày nhập", "Số ngày", "Trạng thái COC", "Ngày nhận COC"],
       ...rs.map((u) => { const v = vOf(u.vehicle_id); return [u.frame_number, v ? `${v.brand} ${v.name} ${v.color}` : u.vehicle_id, locName(u.location_code), u.import_doc, fmtDate(u.imported_at), soNgay(u), COC_TT[u.coc_status]?.label || u.coc_status, u.coc_received_at ? fmtDate(u.coc_received_at) : ""]; })]);
     notify(`Đã xuất ${rs.length} dòng.`);
   };
@@ -123,7 +123,7 @@ export default function GiayCOC() {
       <Toast toast={toast} />
       <div className="flex items-center gap-2 flex-wrap">
         <div className="font-extrabold text-lg mr-auto">Giấy COC (chứng nhận xuất xưởng)</div>
-        <button className="btn-ghost !text-xs" onClick={() => xuat(sorted, `giay_coc_${iso(new Date())}.csv`)}>⬇ Xuất file</button>
+        <button className="btn-ghost !text-xs" onClick={() => xuat(sorted, `giay_coc_${iso(new Date())}.xlsx`)}>⬇ Xuất file</button>
       </div>
 
       <div className="flex gap-3 flex-wrap">
@@ -165,7 +165,7 @@ export default function GiayCOC() {
               <button className="btn-ok !text-xs !py-1" disabled={busy} onClick={nhanCOC}>✓ Đã nhận COC</button>
               <button className="btn-ghost !text-xs !py-1 !text-danger" disabled={busy} onClick={() => datTT("THAT_LAC")}>⚠ Báo thất lạc</button>
               <button className="btn-ghost !text-xs !py-1" disabled={busy} onClick={() => datTT("CHUA_VE")}>↩ Đặt lại Chưa về</button>
-              <button className="btn-ghost !text-xs !py-1" onClick={() => xuat(chon(), "giay_coc_chon.csv")}>⬇ Xuất Excel</button>
+              <button className="btn-ghost !text-xs !py-1" onClick={() => xuat(chon(), "giay_coc_chon.xlsx")}>⬇ Xuất Excel</button>
             </SelectionBar>
           )}
 

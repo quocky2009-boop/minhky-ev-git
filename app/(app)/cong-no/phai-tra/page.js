@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
 import { SavedFilters, AmountFilter, trongKhoang } from "@/components/FinFilters";
 import { Badge, Toast, KPI, Field, MultiCheck, Pager, pageSlice, useSortable, Th, useSelection, ThCheck, TdCheck, SelectionBar } from "@/components/ui";
-import { fmtVND, fmtDate, fmtTime, errMsg, downloadCSV } from "@/lib/format";
+import { fmtVND, fmtDate, fmtTime, errMsg, downloadXLSX } from "@/lib/format";
 
 const iso = (d) => d.toLocaleDateString("sv-SE");
 
@@ -151,7 +151,7 @@ export default function CongNoPhaiTra() {
 
       <div className="card">
         <div className="flex gap-2 flex-wrap items-center mb-3">
-          <button className="btn-ghost !text-xs" onClick={() => downloadCSV(`cong_no_phai_tra_${iso(new Date())}.csv`,
+          <button className="btn-ghost !text-xs" onClick={() => downloadXLSX(`cong_no_phai_tra_${iso(new Date())}.xlsx`,
             [["Mã nợ", "NCC", "Phiếu nhập", "Kho", "Tổng tiền", "Đã trả", "Còn nợ", "Hạn TT", "Trạng thái"],
              ...sorted.map((r) => [r.code, r.supplier, r.import_doc, locName(r.location_code), r.tong_tien, r.da_tra, r.con_no, r.due_date || "", r.status])])}>⬇ Xuất Excel (đang lọc)</button>
           <span className="text-[13px] font-bold text-danger">Tổng lọc: {fmtVND(filtered.reduce((a, r) => a + (r.con_no || 0), 0))}</span>

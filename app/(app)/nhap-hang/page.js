@@ -4,7 +4,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Field, Badge, Toast, KPI, LocSearch, VehicleSearch, MoneyInput, Pager, pageSlice, pageClamp, useSortable, Th, useSelection, ThCheck, TdCheck, SelectionBar } from "@/components/ui";
-import { fmtVND, fmtTime, errMsg, downloadCSV } from "@/lib/format";
+import { fmtVND, fmtTime, errMsg, downloadXLSX } from "@/lib/format";
 import Scanner from "@/components/Scanner";
 
 const iso = (d) => d.toLocaleDateString("sv-SE");
@@ -169,7 +169,7 @@ function NhapHangInner() {
   const tongXe = dons.reduce((s, d) => s + d.so_xe, 0);
 
   const exportCSV = () => {
-    downloadCSV(`don_nhap_${iso(new Date())}.csv`,
+    downloadXLSX(`don_nhap_${iso(new Date())}.xlsx`,
       [["Mã phiếu", "Ngày", "Kho", "NCC", "Số mã", "Số xe", "Người nhập"],
         ...sorted.map((d) => [d.doc, fmtTime(d.created_at), locName(d.location_code), d.supplier, d.so_ma, d.so_xe, d.by])]);
     notify(`Đã xuất ${sorted.length} phiếu nhập.`);
@@ -558,7 +558,7 @@ function NhapHangInner() {
             {sups.map((x) => <option key={x}>{x}</option>)}
           </select>
           <input className="inp !w-56" placeholder="Tìm mã phiếu, NCC, xe, người nhập…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
-          <button className="btn-ghost !text-xs" onClick={exportCSV}>⬇ CSV</button>
+          <button className="btn-ghost !text-xs" onClick={exportCSV}>⬇ Excel</button>
         </div>
 
         {busy && txns.length === 0 ? <div className="text-sm text-[#8A93A0] py-4">Đang tải đơn nhập…</div> : (
@@ -567,7 +567,7 @@ function NhapHangInner() {
               <span className="text-[12px] font-bold text-brand px-1.5 self-center">Tổng xe: {sorted.filter((d) => sel.has(d.doc)).reduce((a, b) => a + b.so_xe, 0)}</span>
               <button className="btn-ghost !text-xs !py-1" onClick={() => {
                 const rs = sorted.filter((d) => sel.has(d.doc));
-                downloadCSV(`don_nhap_chon.csv`, [["Mã phiếu", "Ngày", "Kho", "NCC", "Số mã", "Số xe", "Người nhập"],
+                downloadXLSX(`don_nhap_chon.xlsx`, [["Mã phiếu", "Ngày", "Kho", "NCC", "Số mã", "Số xe", "Người nhập"],
                   ...rs.map((d) => [d.doc, fmtTime(d.created_at), locName(d.location_code), d.supplier, d.so_ma, d.so_xe, d.by])]);
                 notify(`Đã xuất ${rs.length} phiếu đã chọn.`);
               }}>⬇ Xuất Excel</button>

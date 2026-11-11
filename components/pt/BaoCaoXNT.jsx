@@ -26,6 +26,7 @@ export default function BaoCaoXNT({ supabase, locations, notify }) {
   const [busy, setBusy] = useState(false);
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
+  const [soDong, setSoDong] = useState(20);
   const sort = useSortable();
   const ky = kyOf(loai, quy, nam) || [from, to];
 
@@ -72,7 +73,7 @@ export default function BaoCaoXNT({ supabase, locations, notify }) {
       <div className="tbl-scroll"><table className="w-full border-collapse tbl-card">
         <thead><tr><Th label="Mã PT" k="ma" sort={sort} /><Th label="Tên phụ tùng" k="ten" sort={sort} /><th className="th">ĐVT</th><Th label="Kho" k="kho" sort={sort} /><th className="th">Vị trí</th>
           <Th label="Tồn đầu" k="dau" sort={sort} className="text-right" /><Th label="Nhập" k="nhap" sort={sort} className="text-right" /><Th label="Xuất" k="xuat" sort={sort} className="text-right" /><Th label="Tồn cuối" k="cuoi" sort={sort} className="text-right" /><Th label="Giá gốc" k="gia" sort={sort} className="text-right" /></tr></thead>
-        <tbody>{pageSlice(list, page, 30).map((r) => (
+        <tbody>{pageSlice(list, page, soDong).map((r) => (
           <tr key={r.part_id + r.location_code} className="hover:bg-[#F8FAFC]">
             <td data-label="Mã PT" className="td font-mono text-xs">{r.ma}</td><td data-label="Tên" className="td text-[13px] font-semibold">{r.ten}</td><td data-label="ĐVT" className="td text-xs">{r.dvt}</td>
             <td data-label="Kho" className="td text-xs">{r.kho}</td><td data-label="Vị trí" className="td text-xs">{r.vi_tri || "—"}</td>
@@ -84,7 +85,7 @@ export default function BaoCaoXNT({ supabase, locations, notify }) {
         </tbody>
         {list.length > 0 && <tfoot><tr className="bg-[#F8FAFB] font-bold"><td className="td" colSpan={5}>Tổng cộng ({list.length} dòng)</td><td className="td text-right">{sum("ton_dau")}</td><td className="td text-right">{sum("nhap")}</td><td className="td text-right">{sum("xuat")}</td><td className="td text-right">{sum("ton_cuoi")}</td><td className="td text-right text-[11px]">GT tồn cuối: {fmtVND(gtCuoi)}</td></tr></tfoot>}
       </table></div>
-      <Pager total={list.length} page={page} setPage={setPage} pageSize={30} setPageSize={() => {}} />
+      <Pager total={list.length} page={page} setPage={setPage} pageSize={soDong} setPageSize={setSoDong} />
     </div>
   );
 }

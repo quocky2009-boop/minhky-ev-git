@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Field, Badge, Toast, LocPicker } from "@/components/ui";
-import { errMsg, downloadCSV } from "@/lib/format";
+import { errMsg, downloadXLSX } from "@/lib/format";
 import Scanner from "@/components/Scanner";
 import { printPhieuKiemKho } from "@/lib/printKiemKho";
 
@@ -67,7 +67,7 @@ export default function KiemKe() {
   const exportBienBan = () => {
     const locLabel = locations.find((l) => l.code === loc)?.name || loc;
     const today = new Date().toLocaleDateString("vi-VN");
-    downloadCSV(`bien_ban_kiem_ke_${loc}_${new Date().toISOString().slice(0,10)}.csv`, [
+    downloadXLSX(`bien_ban_kiem_ke_${loc}_${new Date().toISOString().slice(0,10)}.xlsx`, [
       ["BIÊN BẢN KIỂM KÊ TỒN KHO"],
       ["Kho / cửa hàng:", locLabel],
       ["Ngày kiểm kê:", today],
@@ -84,7 +84,7 @@ export default function KiemKe() {
       [],
       ["Người kiểm kê (ký, họ tên):", "", "", "Quản lý cửa hàng (ký, họ tên):", "", "", ""],
     ]);
-    notify("Đã xuất biên bản kiểm kê CSV — mở bằng Excel, in ra để ký.");
+    notify("Đã xuất biên bản kiểm kê Excel — in ra để ký.");
   };
 
   const submitQty = async () => {
@@ -218,7 +218,7 @@ export default function KiemKe() {
           </table></div>
           <div className="flex gap-2 mt-3 flex-wrap">
             <button className="btn-primary" disabled={busy} onClick={submitQty}>{busy ? "Đang xử lý…" : "Hoàn tất kiểm kê & tạo đề xuất điều chỉnh"}</button>
-            <button className="btn-ghost" onClick={exportBienBan}>🖨 Xuất biên bản kiểm kê (CSV)</button>
+            <button className="btn-ghost" onClick={exportBienBan}>🖨 Xuất biên bản kiểm kê (Excel)</button>
           </div>
         </>
       )}
