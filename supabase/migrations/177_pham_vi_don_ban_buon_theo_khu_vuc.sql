@@ -1,0 +1,11 @@
+-- 177: Phạm vi xem Đơn bán buôn theo khu vực (12/11/2026) — đã áp dụng qua Supabase MCP; file này là ghi chú
+-- Trước: v_don_buon phụ thuộc phạm vi khách hàng → Sales gần như không thấy đơn nào; CHT thấy theo người phụ trách khách.
+-- Nay:  fn_bb_trong_pham_vi(location_code, created_by, seller_id)
+--   CEO / ADMIN: tất cả · MANAGER không gán khu vực: tất cả
+--   MANAGER / SALES có khu vực: đơn có cửa hàng phụ trách thuộc khu vực của mình
+--   Luôn thấy đơn do mình tạo / mình là người bán.
+-- Áp dụng cho: RLS don_buon, don_buon_dong, don_buon_thanh_toan (qua fn_bb_xem_duoc) và view v_don_buon
+--   (view chạy quyền chủ sở hữu + tự lọc theo hàm trên, không còn bị chặn bởi phạm vi khách hàng).
+-- Kèm theo để trang chi tiết dùng được:
+--   policy read_sales_don_buon trên sales_orders: xem được đơn xe thuộc đơn bán buôn trong phạm vi
+--   policy read_customers_khach_buon_khu_vuc trên customers: SALES xem được KHÁCH BUÔN do người cùng khu vực phụ trách/tạo.
