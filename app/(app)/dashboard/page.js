@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useCatalog } from "@/lib/useData";
-import { KPI, Badge, stockBadge } from "@/components/ui";
+import { KPI, Badge } from "@/components/ui";
 import { fmtNum, fmtVND, fmtDate } from "@/lib/format";
 
 const iso = (d) => d.toLocaleDateString("sv-SE");

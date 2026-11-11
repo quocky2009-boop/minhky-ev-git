@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Badge, Toast, KPI, Field, CustomerSearch, LocSearch, Pager, pageSlice, MoneyInput, FrameSearch } from "@/components/ui";
+import { Badge, Toast, KPI, Field, CustomerSearch, Pager, pageSlice, MoneyInput, FrameSearch } from "@/components/ui";
 import Link from "next/link";
 import { InfoRows, MoneyRows } from "@/components/detail";
 import { printBienNhanCoc } from "@/lib/printCoc";

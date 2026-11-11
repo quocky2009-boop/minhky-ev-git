@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
 import { QuickDates, AmountFilter, SavedFilters, RefLink, TongLoc, trongKhoang } from "@/components/FinFilters";
-import { Badge, Toast, KPI, Field, LocSearch, MultiCheck, MoneyInput, Pager, pageSlice, pageClamp, useSortable, Th, useSelection, ThCheck, TdCheck, SelectionBar } from "@/components/ui";
+import { Badge, Toast, KPI, Field, MultiCheck, MoneyInput, Pager, pageSlice, useSortable, Th, useSelection, ThCheck, TdCheck, SelectionBar } from "@/components/ui";
 import { fmtVND, fmtTime, fmtDate, errMsg, downloadXLSX } from "@/lib/format";
 
 const iso = (d) => d.toLocaleDateString("sv-SE");

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Badge, Toast, KPI, Field } from "@/components/ui";
+import { Badge, Toast, KPI } from "@/components/ui";
 import { fmtDate, errMsg } from "@/lib/format";
 
 export default function BaoDuong() {

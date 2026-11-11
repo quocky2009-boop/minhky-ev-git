@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Field, Badge, Toast, LocPicker } from "@/components/ui";
-import { errMsg, downloadXLSX } from "@/lib/format";
+import { downloadXLSX } from "@/lib/format";
 import Scanner from "@/components/Scanner";
 import { printPhieuKiemKho } from "@/lib/printKiemKho";
 

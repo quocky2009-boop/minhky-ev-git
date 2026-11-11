@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Field, Toast, stockBadge, Badge, Pager, pageSlice, pageClamp, useSortable, Th, LocSearch, VehicleSearch, MoneyInput, ComboFree, useSelection, ThCheck, TdCheck, SelectionBar } from "@/components/ui";
+import { Field, Toast, stockBadge, Badge, Pager, pageSlice, useSortable, Th, LocSearch, VehicleSearch, MoneyInput, ComboFree, useSelection, ThCheck, TdCheck, SelectionBar } from "@/components/ui";
 import { fmtVND, fmtDate, errMsg, readTableFile, downloadXLSX } from "@/lib/format";
 
 export default function DMXe() {

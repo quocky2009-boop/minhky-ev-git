@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Badge, Toast, Field } from "@/components/ui";
+import { Badge, Toast } from "@/components/ui";
 import { fmtVND, fmtDate, fmtTime, errMsg } from "@/lib/format";
 import { printOrder, printOrderBill } from "@/lib/print";
 import BangGiaDon from "@/components/BangGiaDon";

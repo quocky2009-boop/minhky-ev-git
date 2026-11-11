@@ -5,7 +5,7 @@ import { Badge, Toast, KPI, Field, Pager, pageSlice } from "@/components/ui";
 import { errMsg } from "@/lib/format";
 import { uploadAnhDon } from "@/lib/img";
 import { TASK_STATUS, TASK_CLOSED, PRIORITY, hanLabel, sortTasks, fmtHan, toLocalInput } from "@/lib/task";
-import { InfoRows, AuditLog } from "@/components/detail";
+import { AuditLog } from "@/components/detail";
 
 const TASK_LOG = {
   create: "Tạo việc", start: "Bắt đầu thực hiện", check: "Tích checklist", uncheck: "Bỏ tích checklist",

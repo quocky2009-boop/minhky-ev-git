@@ -3,7 +3,7 @@ import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Field, Badge, Toast, KPI, LocSearch, VehicleSearch, MoneyInput, Pager, pageSlice, pageClamp, useSortable, Th, useSelection, ThCheck, TdCheck, SelectionBar } from "@/components/ui";
+import { Field, Badge, Toast, KPI, LocSearch, VehicleSearch, MoneyInput, Pager, pageSlice, useSortable, Th, useSelection, ThCheck, TdCheck, SelectionBar } from "@/components/ui";
 import { fmtVND, fmtTime, errMsg, downloadXLSX } from "@/lib/format";
 import Scanner from "@/components/Scanner";
 

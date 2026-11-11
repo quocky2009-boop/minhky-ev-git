@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Badge, Toast, VehicleSearch } from "@/components/ui";
+import { Badge, Toast } from "@/components/ui";
 import Link from "next/link";
 import { fmtTime, fmtDate, errMsg } from "@/lib/format";
 import { usePerms } from "@/lib/usePerms";

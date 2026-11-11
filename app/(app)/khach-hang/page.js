@@ -3,8 +3,7 @@ import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Field, Badge, Toast, KPI, Pager, pageSlice, useSortable, Th, LocSearch, MoneyInput } from "@/components/ui";
-import { InfoRows, MoneyRows } from "@/components/detail";
+import { Field, Badge, Toast, KPI, Pager, pageSlice, useSortable, Th, LocSearch } from "@/components/ui";
 import { fmtVND, fmtDate, fmtTime, errMsg, downloadXLSX } from "@/lib/format";
 import { CUSTOMER_TYPES, CUSTOMER_SOURCES } from "@/lib/const";
 

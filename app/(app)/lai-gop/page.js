@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Badge, Toast, KPI, LocSearch, Pager, pageSlice, useSortable, Th } from "@/components/ui";
-import { fmtVND, fmtDate, errMsg, downloadXLSX } from "@/lib/format";
+import { fmtVND, fmtDate, downloadXLSX } from "@/lib/format";
 
 const iso = (d) => d.toLocaleDateString("sv-SE");
 const firstOfMonth = () => { const d = new Date(); return iso(new Date(d.getFullYear(), d.getMonth(), 1)); };

@@ -1,0 +1,11 @@
+-- 176: Siết quyền xem các view báo cáo theo vai trò (12/11/2026) — đã áp dụng qua Supabase MCP; file này là ghi chú
+-- Trước đây 23 view chạy với quyền chủ sở hữu (bỏ qua RLS) nên mọi tài khoản đã đăng nhập đọc được toàn bộ
+-- (lãi gộp, công nợ, toàn bộ khách hàng…) nếu gọi thẳng API; chỉ có menu chặn.
+-- 1) security_invoker = true (RLS của bảng gốc áp dụng theo người gọi):
+--    v_cong_no_don, v_cong_no_khach, v_cong_no_phai_thu, v_cong_no_phai_tra, v_don_ban_km_audit, v_don_ban_tong,
+--    v_thu_chi_ngay, v_thu_theo_httt, v_co_hoi, v_coc_lo, v_don_cho_khach_le, v_dv_dashboard, v_dv_lich_su_xe, v_dv_ticket_tong
+-- 2) v_lai_gop_don: security_invoker + chỉ CEO / MANAGER / ADMIN (và service_role cho báo cáo tự động).
+-- 3) v_khach_tong_quan: giữ số liệu đầy đủ nhưng chỉ trả về khách trong phạm vi được xem (fn_kh_trong_pham_vi, như RLS bảng customers).
+-- 4) Giữ nguyên: v_lsc, v_lenh_sua_chua (KTV cần xem lệnh kèm tên khách), v_task_* (4 view công việc), v_quy_so_du (đã tự lọc theo _quy_xem_duoc).
+-- 5) Đặt search_path = public cho fn_gen_code, _touch_updated_at, _task_safe, _task_build_msg, _debt_build_msg, _vnd.
+-- Hàm SECURITY DEFINER và pg_cron không bị ảnh hưởng (chạy với quyền chủ sở hữu).

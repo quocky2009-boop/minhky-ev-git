@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { EXCEL_PERMS } from "@/lib/excelPerm";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Toast, Badge } from "@/components/ui";
+import { Toast } from "@/components/ui";
 
 const ROLES_LIST = [
   { key: "SALES", label: "Sales", color: "bg-blue-500" },

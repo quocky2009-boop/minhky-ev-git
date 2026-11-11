@@ -5,7 +5,7 @@ import { useCatalog, useToast } from "@/lib/useData";
 import { Badge, Toast } from "@/components/ui";
 import Link from "next/link";
 import { usePerms } from "@/lib/usePerms";
-import { fmtVND, fmtDate, fmtTime, errMsg } from "@/lib/format";
+import { fmtVND, fmtTime, errMsg } from "@/lib/format";
 
 export default function NhapChiTiet() {
   const { doc } = useParams();

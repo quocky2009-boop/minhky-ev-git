@@ -1,7 +1,6 @@
 "use client";
 // Quet ma vach/QR bang camera + OCR anh chup -> tra ve danh sach so khung
 import { useEffect, useRef, useState } from "react";
-import { Badge } from "@/components/ui";
 
 const beep = () => {
   try {

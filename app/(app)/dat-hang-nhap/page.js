@@ -2,8 +2,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Field, Badge, Toast, LocSearch, VehicleSearch, Pager, pageSlice, useSortable, Th } from "@/components/ui";
-import { fmtDate, fmtTime, errMsg } from "@/lib/format";
+import { Field, Badge, Toast, VehicleSearch, Pager, pageSlice, useSortable, Th } from "@/components/ui";
+import { fmtTime, errMsg } from "@/lib/format";
 import ImportDatHang from "@/components/ImportDatHang";
 
 const iso = (d) => d.toLocaleDateString("sv-SE");

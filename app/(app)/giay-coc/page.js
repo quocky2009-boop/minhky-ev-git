@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Badge, Toast, KPI, Field, LocSearch, Pager, pageSlice, useSortable, Th, useSelection, ThCheck, TdCheck, SelectionBar } from "@/components/ui";
+import { Badge, Toast, KPI, LocSearch, Pager, pageSlice, useSortable, Th, useSelection, ThCheck, TdCheck, SelectionBar } from "@/components/ui";
 import { fmtDate, errMsg, downloadXLSX } from "@/lib/format";
 
 const iso = (d) => d.toLocaleDateString("sv-SE");

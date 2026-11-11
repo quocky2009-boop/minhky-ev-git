@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Badge, Toast } from "@/components/ui";
-import { fmtVND, fmtDate, fmtTime, errMsg } from "@/lib/format";
+import { fmtTime, errMsg } from "@/lib/format";
 
 export default function DieuChuyenChiTiet() {
   const { id } = useParams();
