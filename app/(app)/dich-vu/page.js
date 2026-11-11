@@ -252,6 +252,7 @@ export default function DichVu() {
     return (
       <div className="flex flex-col gap-4">
         <Toast toast={toast} />
+      <div className="rounded-xl bg-[#FDF1DF] text-[#A25F00] text-[13px] px-3 py-2">Đây là màn hình <b>phiếu dịch vụ cũ</b> (chỉ để xem lại dữ liệu trước đây). Tiếp nhận xe mới dùng <a className="underline font-semibold" href="/dich-vu/lenh-sua-chua">DỊCH VỤ › Lệnh sửa chữa</a>.</div>
         <div className="flex items-center gap-2 flex-wrap">
           <button className="btn-ghost !text-xs" onClick={() => { setDetail(null); load(); }}>← Danh sách</button>
           <div className="font-extrabold text-lg mr-auto">{detail.code}</div>
@@ -641,7 +642,7 @@ export default function DichVu() {
           <p className="text-[11px] text-[#8A93A0] mt-2">Thu tiền và hoàn tất (nghiệm thu + giao xe) thực hiện ở màn chi tiết phiếu sau khi tiếp nhận.</p>
         </div>
 
-        <div className="fixed bottom-0 left-0 right-0 lg:left-[248px] bg-white border-t border-[#E6EAEF] px-4 py-3 flex items-center gap-3 z-30">
+        <div className="fixed bottom-[54px] md:bottom-0 left-0 right-0 lg:left-[248px] bg-white border-t border-[#E6EAEF] px-4 py-3 flex items-center gap-3 z-30">
           <div className="text-[13px] hidden sm:block">
             <span className="text-[#8A93A0]">Khách:</span> <b>{f.customer_name || "—"}</b>
             {nLines.filter((l) => l.name?.trim()).length > 0 && <span className="text-[#5A6572] ml-2">· {nLines.filter((l) => l.name?.trim()).length} hạng mục</span>}

@@ -946,7 +946,7 @@ function TaoDonInner() {
       </div>
 
       {/* ===== THANH HÀNH ĐỘNG DÍNH ĐÁY ===== */}
-      <div className="fixed bottom-0 left-0 right-0 lg:left-[248px] bg-white border-t border-[#E6EAEF] px-4 py-3 flex items-center gap-3 z-30">
+      <div className="fixed bottom-[54px] md:bottom-0 left-0 right-0 lg:left-[248px] bg-white border-t border-[#E6EAEF] px-4 py-3 flex items-center gap-3 z-30">
         <div className="text-[13px] hidden sm:block">
           <span className="text-[#8A93A0]">Khách phải trả:</span> <b className="text-brand text-[15px]">{fmtVND(phaiTra)}</b>
           {conLai > 0 && <span className="text-[#A25F00] ml-2">· còn {fmtVND(conLai)}</span>}

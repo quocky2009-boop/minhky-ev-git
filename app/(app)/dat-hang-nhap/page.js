@@ -164,7 +164,7 @@ export default function DatHangNhap() {
           <button className="btn-ghost !text-xs mt-2.5" onClick={() => setLines((p) => [...p, { ...emptyLine }])}>⊕ Thêm sản phẩm</button>
         </div>
 
-        <div className="fixed bottom-0 left-0 right-0 lg:left-[248px] bg-white border-t border-[#E6EAEF] px-4 py-3 flex items-center gap-3 z-30">
+        <div className="fixed bottom-[54px] md:bottom-0 left-0 right-0 lg:left-[248px] bg-white border-t border-[#E6EAEF] px-4 py-3 flex items-center gap-3 z-30">
           <div className="ml-auto flex gap-2">
             <button className="btn-ghost" onClick={() => setShowForm(false)}>Hủy</button>
             <button className="btn-ok !px-6" disabled={busy} onClick={luuDon}>{busy ? "Đang lưu…" : "Tạo đơn đặt hàng"}</button>

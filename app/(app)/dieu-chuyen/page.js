@@ -258,7 +258,7 @@ function DieuChuyenInner() {
             </div>
           )}
 
-          <div className="fixed bottom-0 left-0 right-0 lg:left-[248px] bg-white border-t border-[#E6EAEF] px-4 py-3 flex items-center gap-3 z-30">
+          <div className="fixed bottom-[54px] md:bottom-0 left-0 right-0 lg:left-[248px] bg-white border-t border-[#E6EAEF] px-4 py-3 flex items-center gap-3 z-30">
             <div className="text-[13px] hidden sm:block">
               {meta.from && meta.to
                 ? <><span className="text-[#8A93A0]">Chuyển:</span> <b>{locName(meta.from)} → {locName(meta.to)}</b> <span className="text-brand font-bold ml-2">{rows.length} xe</span></>

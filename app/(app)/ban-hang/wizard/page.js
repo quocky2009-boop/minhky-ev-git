@@ -863,7 +863,7 @@ function TaoDonWizardInner() {
       )}
 
       {/* THANH ĐIỀU HƯỚNG */}
-      <div className="fixed bottom-0 left-0 right-0 lg:left-[248px] bg-white border-t border-[#E6EAEF] px-4 py-3 flex items-center gap-2 z-30">
+      <div className="fixed bottom-[54px] md:bottom-0 left-0 right-0 lg:left-[248px] bg-white border-t border-[#E6EAEF] px-4 py-3 flex items-center gap-2 z-30">
         <div className="text-[12px] text-[#8A93A0]">Bước {step}/4 — {STEPS[step - 1]}</div>
         <div className="ml-auto flex gap-2">
           {step > 1 && <button className="btn-ghost" onClick={() => setStep(step - 1)}>← Quay lại</button>}

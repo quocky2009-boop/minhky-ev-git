@@ -40,7 +40,7 @@ export default function AppShell({ profile, children }) {
       const q = [
         supabase.from("sales_orders").select("id", { count: "exact", head: true }).neq("invoice_status", "Đã xuất HĐ"),
         supabase.from("sale_adjust_requests").select("id", { count: "exact", head: true }).eq("status", "Chờ duyệt"),
-        supabase.from("dv_tickets").select("id", { count: "exact", head: true }).not("status", "in", "(DA_GIAO,HUY)"),
+        supabase.from("repair_orders").select("id", { count: "exact", head: true }).in("status", ["BAO_GIA", "PHAT_HANH"]),
         supabase.from("deposits").select("id", { count: "exact", head: true }).eq("status", "DANG_GIU"),
         supabase.from("v_task_list").select("id", { count: "exact", head: true })
           .eq("assignee_id", profile.id)
@@ -51,7 +51,7 @@ export default function AppShell({ profile, children }) {
           .not("stage", "in", "(Đã bán,Mất khách)"),
       ];
       const [don, dc, dv, coc, task, taskDuyet, coHoi] = await Promise.all(q.map((x) => x.then((r) => r.count || 0).catch(() => 0)));
-      if (!huy) setBadges({ "/don-ban": don, "/dieu-chinh": dc, "/dich-vu": dv, "/dat-coc": coc,
+      if (!huy) setBadges({ "/don-ban": don, "/dieu-chinh": dc, "/dich-vu/lenh-sua-chua": dv, "/dat-coc": coc,
         "/cong-viec": task, "/cong-viec/doi-nhom": taskDuyet, "/co-hoi": coHoi });
     };
     dem();
@@ -201,7 +201,7 @@ export default function AppShell({ profile, children }) {
           <GlobalSearch />
           <div className="text-xs text-[#8A93A0] whitespace-nowrap hidden md:block">{new Date().toLocaleDateString("vi-VN")}</div>
         </header>
-        <div className="p-5 pb-16">
+        <div className="p-5 pb-24 md:pb-16">
           {curTabs.length > 1 && (
             <div className="flex gap-1 border-b border-[#E3E8EF] mb-4 overflow-x-auto">
               {curTabs.map((n) => (
@@ -213,6 +213,24 @@ export default function AppShell({ profile, children }) {
           {children}
         </div>
       </main>
+      {/* Thanh nut nhanh duoi day — chi hien tren dien thoai */}
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-white border-t border-[#E3E8EF] flex justify-around px-1 pt-1 pb-[max(4px,env(safe-area-inset-bottom))] print:hidden">
+        {(profile.role === "TECHNICIAN"
+          ? [["/dashboard", "🏠", "Tổng quan"], ["/dich-vu/lenh-sua-chua", "🛠", "Sửa chữa"], ["/phu-tung", "📦", "Phụ tùng"], ["/cong-viec", "✅", "Việc"]]
+          : [["/dashboard", "🏠", "Tổng quan"], ["/don-ban", "🧾", "Đơn bán"], ["/tra-cuu", "🔎", "Tồn xe"], ["/cong-viec", "✅", "Việc"]]
+        ).filter(([h]) => { const n = NAV.find((x) => x.href === h); return !n || canSee(n); }).map(([h, ic, lb]) => {
+          const on = h === "/cong-viec" ? pathname === h : pathname.startsWith(h);
+          const b = h === "/dich-vu/lenh-sua-chua" || h === "/cong-viec" || h === "/don-ban" ? badges[h] : 0;
+          return (
+            <Link key={h} href={h} className={`relative flex-1 flex flex-col items-center gap-0.5 py-1 rounded-lg text-[10.5px] font-semibold ${on ? "text-brand" : "text-[#5A6572]"}`}>
+              <span className="text-[18px] leading-none">{ic}</span>{lb}
+              {b > 0 && <span className="absolute top-0 right-[22%] min-w-[16px] h-4 px-1 rounded-full text-[9.5px] font-extrabold flex items-center justify-center bg-danger text-white">{b > 99 ? "99+" : b}</span>}
+            </Link>);
+        })}
+        <button className="flex-1 flex flex-col items-center gap-0.5 py-1 rounded-lg text-[10.5px] font-semibold text-[#5A6572]" onClick={() => setOpen(true)}>
+          <span className="text-[18px] leading-none">☰</span>Menu
+        </button>
+      </nav>
     </div>
   );
 }

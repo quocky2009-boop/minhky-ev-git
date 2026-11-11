@@ -516,7 +516,7 @@ function NhapHangInner() {
         </div>
 
         {/* THANH DÍNH ĐÁY */}
-        <div className="fixed bottom-0 left-0 right-0 lg:left-[248px] bg-white border-t border-[#E6EAEF] px-4 py-3 flex items-center gap-3 z-30">
+        <div className="fixed bottom-[54px] md:bottom-0 left-0 right-0 lg:left-[248px] bg-white border-t border-[#E6EAEF] px-4 py-3 flex items-center gap-3 z-30">
           <div className="text-[13px] hidden sm:block">
             <span className="text-[#8A93A0]">Tổng:</span> <b className="text-brand text-[15px]">{tongXeForm} xe</b>
             {tongVon > 0 && <span className="text-[#5A6572] ml-2">· {fmtVND(tongVon)}</span>}
