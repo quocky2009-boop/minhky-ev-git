@@ -1,6 +1,7 @@
 "use client";
 import { useRef, useState } from "react";
 import { fmtDate, errMsg } from "@/lib/format";
+import { coQuyenExcel, baoKhongCoQuyenExcel } from "@/lib/excelPerm";
 
 // Import Excel hang loat "Don dat hang nhap" (ke hoach nhap xe).
 // Mau: sheet Don_dat_hang (Chi_Nhanh, Nha_Cung_Cap, Ngay_Du_Kien, Ma_Hang, Ma_Xe, So_Luong, Ghi_Chu_Dong, Ghi_Chu_Don)
@@ -35,6 +36,7 @@ export default function ImportDatHang({ supabase, vehicles, locations, notify, o
   const vName = (id) => { const v = vehicles.find((x) => x.id === id); return v ? `${v.brand} ${v.name} ${v.color}` : id; };
 
   const taiMau = async () => {
+    if (!coQuyenExcel("nhap")) return baoKhongCoQuyenExcel("nhap");
     const XLSX = await import("xlsx");
     const wb = XLSX.utils.book_new();
     const l0 = locs[0], l1 = locs[1] || locs[0];
@@ -72,6 +74,7 @@ export default function ImportDatHang({ supabase, vehicles, locations, notify, o
   };
 
   const doc = async (file) => {
+    if (!coQuyenExcel("nhap")) return baoKhongCoQuyenExcel("nhap");
     setDone(null); setGroups(null); setFileName(file.name);
     try {
       const XLSX = await import("xlsx");

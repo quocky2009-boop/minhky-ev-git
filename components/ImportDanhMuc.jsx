@@ -1,6 +1,7 @@
 "use client";
 import { useRef, useState } from "react";
 import { errMsg } from "@/lib/format";
+import { coQuyenExcel, baoKhongCoQuyenExcel } from "@/lib/excelPerm";
 
 // Import Excel danh muc: mode "cv" (cong viec dich vu), "pt" (phu tung + ton dau ky theo kho), "hh" (hang hoa + ton dau ky)
 const norm = (s) => String(s ?? "").trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/g, "d").replace(/[^a-z0-9]+/g, " ").trim();
@@ -38,6 +39,7 @@ export default function ImportDanhMuc({ mode, supabase, locations, notify, onDon
   const [done, setDone] = useState(null);
 
   const taiMau = async () => {
+    if (!coQuyenExcel("nhap")) return baoKhongCoQuyenExcel("nhap");
     const XLSX = await import("xlsx");
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([c.cols, ...c.sample]), c.sheet);
@@ -49,6 +51,7 @@ export default function ImportDanhMuc({ mode, supabase, locations, notify, onDon
 
   const docFile = async (e) => {
     const file = e.target.files?.[0]; if (!file) return;
+    if (!coQuyenExcel("nhap")) { e.target.value = ""; return baoKhongCoQuyenExcel("nhap"); }
     setFileName(file.name); setDone(null);
     try {
       const XLSX = await import("xlsx");

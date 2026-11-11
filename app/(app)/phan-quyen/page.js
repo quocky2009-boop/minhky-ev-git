@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { EXCEL_PERMS } from "@/lib/excelPerm";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Toast, Badge } from "@/components/ui";
 
@@ -35,6 +36,7 @@ const PERM_GROUPS = [
     { key: "kb_can_tru", label: "Cấn trừ số dư công nợ khách buôn vào đơn bán buôn / đơn xe", desc: "Dùng số dư bù (KM hãng, bù thuê pin) trừ vào tiền phải trả" },
     { key: "kb_dieu_chinh", label: "Điều chỉnh tay / hủy dòng / chế độ cấn trừ sổ khách buôn", desc: "" },
   ]},
+  { group: "Nhập / xuất Excel", icon: "📊", items: EXCEL_PERMS },
   { group: "Đơn bán", icon: "🛒", items: [
     { key: "xac_nhan_hd", label: "Xác nhận đã xuất hóa đơn", desc: "Hoàn thành đơn bán" },
     { key: "sua_thanh_toan", label: "Cập nhật số tiền đã thanh toán", desc: "Thu tiền thêm hoặc hoàn tiền" },

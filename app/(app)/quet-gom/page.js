@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { coQuyenExcel, baoKhongCoQuyenExcel } from "@/lib/excelPerm";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Field, Badge, Toast, VehicleSearch, LocSearch, Pager, pageSlice } from "@/components/ui";
 import { errMsg, fmtTime, downloadXLSX } from "@/lib/format";
@@ -116,6 +117,7 @@ export default function QuetGom() {
 
   const stripVN = (x) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").toLowerCase().replace(/[^a-z0-9]/g, "");
   const importPoolCSV = async (file) => {
+    if (!coQuyenExcel("nhap")) return baoKhongCoQuyenExcel("nhap");
     const text = (await file.text()).replace(/^\uFEFF/, "");
     const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
     if (lines.length < 2) return notify("File rỗng hoặc thiếu dòng dữ liệu.", "err");

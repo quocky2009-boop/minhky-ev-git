@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Badge, Field, LocSearch, Pager, pageSlice } from "@/components/ui";
 import { fmtTime, errMsg, downloadXLSX } from "@/lib/format";
+import { coQuyenExcel, baoKhongCoQuyenExcel } from "@/lib/excelPerm";
 
 // Dieu chinh ton kho phu tung: danh sach yeu cau ADJ-..., tao thu cong hoac tai file Excel
 const TT = { HOAN_THANH: ["Hoàn thành", "green"], MOT_PHAN: ["Hoàn thành một phần", "amber"], LOI: ["Lỗi", "red"] };
@@ -46,10 +47,11 @@ export default function DieuChinhTon({ supabase, locations, parts, stock, canEdi
   const taiMau = () => {
     const ds = form.location_code ? parts.filter((p) => stock.some((s) => s.part_id === p.id && s.location_code === form.location_code)) : [];
     downloadXLSX("mau_dieu_chinh_ton_phu_tung.xlsx", [["Ma_PT", "Ten_Phu_Tung", "Ton_Hien_Tai", "Ton_Thuc_Te", "Vi_Tri", "Ly_Do"],
-      ...(ds.length ? ds.map((p) => [p.code, p.name, qtyOf(p.id, form.location_code), "", stock.find((s) => s.part_id === p.id && s.location_code === form.location_code)?.vi_tri || "", ""]) : [["LOP-90", "Lốp xe 90/90-10", 10, 8, "Kệ A1", "Kiểm kê cuối tháng"]])], "Dieu_chinh");
+      ...(ds.length ? ds.map((p) => [p.code, p.name, qtyOf(p.id, form.location_code), "", stock.find((s) => s.part_id === p.id && s.location_code === form.location_code)?.vi_tri || "", ""]) : [["LOP-90", "Lốp xe 90/90-10", 10, 8, "Kệ A1", "Kiểm kê cuối tháng"]])], "Dieu_chinh", "nhap");
   };
   const docFile = async (e) => {
     const file = e.target.files?.[0]; if (!file) return; e.target.value = "";
+    if (!coQuyenExcel("nhap")) return baoKhongCoQuyenExcel("nhap");
     try {
       const XLSX = await import("xlsx");
       const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });

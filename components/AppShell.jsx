@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { NAV, NAV_GROUPS, ROLES, TAB_GROUPS } from "@/lib/const";
 import GlobalSearch from "@/components/GlobalSearch";
 import GridEnhancer from "@/components/GridEnhancer";
+import { coQuyenExcel, RE_NUT_XUAT, RE_NUT_NHAP } from "@/lib/excelPerm";
 
 const base = (href) => href.split("?")[0];
 
@@ -69,9 +70,34 @@ export default function AppShell({ profile, children }) {
       const { data } = await supabase.from("role_perms").select("perm,allowed").eq("role", profile.role);
       if (huy) return;
       const m = {}; (data || []).forEach((x) => { m[x.perm] = x.allowed; }); setPerms(m);
+      window.__mkQuyen = { role: profile.role, perms: m };
+      setQuyenOk((n) => n + 1);
     })();
     return () => { huy = true; };
   }, [profile.role]);
+  // An nut xuat / nhap Excel khi vai tro khong duoc cap quyen (lop chan chinh nam o lib/format.js)
+  const [quyenOk, setQuyenOk] = useState(0);
+  useEffect(() => {
+    if (!quyenOk || profile.role === "CEO") return;
+    const anXuat = !coQuyenExcel("xuat", pathname), anNhap = !coQuyenExcel("nhap");
+    const root = document.getElementById("mk-noi-dung");
+    if (!root) return;
+    const quet = () => {
+      root.querySelectorAll("button, a").forEach((el) => {
+        const t = (el.textContent || "").trim();
+        if (!t || t.length > 60) return;
+        const laMau = /mẫu/i.test(t);
+        const an = (anXuat && !laMau && RE_NUT_XUAT.test(t)) || (anNhap && (RE_NUT_NHAP.test(t) || (laMau && /Tải file mẫu/i.test(t))));
+        if (an && el.style.display !== "none") { el.style.display = "none"; el.setAttribute("data-an-excel", "1"); }
+        else if (!an && el.getAttribute("data-an-excel")) { el.style.display = ""; el.removeAttribute("data-an-excel"); }
+      });
+    };
+    quet();
+    if (!anXuat && !anNhap) return;
+    const ob = new MutationObserver(quet);
+    ob.observe(root, { childList: true, subtree: true, characterData: true });
+    return () => ob.disconnect();
+  }, [quyenOk, pathname]);
   // Item hien khi: role nam trong roles HOAC (co perm gan va user duoc cap perm do)
   const canSee = (n) => {
     // CEO luon thay tat ca
@@ -201,7 +227,7 @@ export default function AppShell({ profile, children }) {
           <GlobalSearch />
           <div className="text-xs text-[#8A93A0] whitespace-nowrap hidden md:block">{new Date().toLocaleDateString("vi-VN")}</div>
         </header>
-        <div className="p-5 pb-24 md:pb-16">
+        <div id="mk-noi-dung" className="p-5 pb-24 md:pb-16">
           {curTabs.length > 1 && (
             <div className="flex gap-1 border-b border-[#E3E8EF] mb-4 overflow-x-auto">
               {curTabs.map((n) => (
