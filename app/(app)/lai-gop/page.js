@@ -68,15 +68,6 @@ export default function LaiGopCongNo() {
   const tongNo = noKhach.reduce((a, b) => a + Number(b.tong_no), 0);
   const noQua30 = noDon.filter((d) => d.tuoi_no > 30);
 
-  const thuThem = async (d) => {
-    const a = prompt(`Đơn ${d.code} — tổng ${fmtVND(d.tong_don)}, đã trả ${fmtVND(d.da_tra)}.\nNhập TỔNG số tiền khách đã trả (sau khi thu thêm):`, d.da_tra);
-    if (a === null) return;
-    const n = prompt("Ghi chú (VD: thu thêm 2tr tiền mặt ngày 22/7):") || "";
-    const { error } = await supabase.rpc("fn_cap_nhat_da_tra", { p_id: d.id, p_paid: Number(a) || 0, p_note: n });
-    if (error) return notify(errMsg(error), "err");
-    notify("Đã cập nhật thanh toán."); load();
-  };
-
   const exportLai = () => {
     downloadCSV(`lai_gop_${from}_den_${to}.csv`,
       [["Mã đơn", "Ngày", "Kho", "Xe", "Số khung", "Khách", "NV bán", "Doanh thu", "Giá vốn", "Lãi gộp", "Tỷ lệ %"],
@@ -213,7 +204,7 @@ export default function LaiGopCongNo() {
                   </div>
                   <Badge tone={d.tuoi_no > 60 ? "red" : d.tuoi_no > 30 ? "amber" : "dark"}>{d.tuoi_no} ngày</Badge>
                   <b className="text-danger whitespace-nowrap">{fmtVND(d.con_no)}</b>
-                  <button className="btn-ghost !px-2 !py-1 !text-xs" onClick={() => thuThem(d)}>Thu thêm</button>
+                  <a className="btn-ghost !px-2 !py-1 !text-xs" href={`/don-ban?q=${encodeURIComponent(d.code)}`} title="Mở đơn ở trang Đơn bán rồi bấm 💵 để thu — chọn đúng hình thức và tài khoản nhận">Thu thêm →</a>
                 </div>
               ))}
               {noDon.length > 50 && <div className="text-xs text-[#8A93A0]">Hiển thị 50 đơn nợ lâu nhất — xuất CSV để xem đầy đủ.</div>}

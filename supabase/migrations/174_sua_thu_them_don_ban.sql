@@ -1,0 +1,10 @@
+-- 174: Sửa lỗi nút "Thu thêm" ở Đơn bán (11/11/2026) — đã áp dụng qua Supabase MCP; file này là ghi chú
+-- Lỗi cũ: fn_cap_nhat_da_tra(p_id, p_paid, p_note) chỉ cập nhật paid_amount + ghi phiếu thu theo phương thức GỐC của đơn;
+-- dòng sale_payments do trình duyệt tự insert nhưng bị RLS chặn (bảng chỉ có policy SELECT) và app bỏ qua lỗi.
+--   → không có dòng thanh toán; paid_amount bị tính lại thành thiếu khi đơn có biến động thanh toán khác; tiền có thể vào sai quỹ.
+-- Sửa: fn_cap_nhat_da_tra(p_id, p_paid, p_note, p_method default null, p_account_id default null)
+--   - ghi phiếu thu đúng hình thức (Tiền mặt / Chuyển khoản), chuyển khoản bắt buộc chọn tài khoản nhận;
+--   - tự insert sale_payments gắn với phiếu thu; trigger tự tính paid_amount; không nhận "Trả góp".
+-- Dữ liệu: bổ sung dòng thanh toán cho PT-2609-82443 (đơn BH-2609-63142, 14.500.000) — đơn duy nhất bị lệch.
+-- Còn 2 phiếu thu thêm 23/07 (PT-2607-41044: 19.990.000; PT-2607-07078: 13.622.000, quỹ SHB) thuộc 2 đơn đã bị xóa — chưa xử lý, chờ CEO xác nhận.
+-- Đã gỡ extension plpgsql_check (cài tạm để quét lỗi hàm).

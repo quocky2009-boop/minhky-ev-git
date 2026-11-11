@@ -7,6 +7,7 @@ import { fmtVND, fmtDate, fmtTime, errMsg, downloadCSV, downloadXLSX } from "@/l
 import { printOrder, printOrderBill } from "@/lib/print";
 import BangGiaDon from "@/components/BangGiaDon";
 import PayAccountInfo from "@/components/PayAccountInfo";
+import BankOptions from "@/components/BankOptions";
 import { InfoRows, MoneyRows } from "@/components/detail";
 import Link from "next/link";
 import { CUSTOMER_TYPES } from "@/lib/const";
@@ -291,17 +292,12 @@ export default function DonBan() {
     if (paid < 0) return notify("Số tiền không hợp lệ.", "err");
     const themTien = paid - (detail.paid_amount || 0);
     if (themTien <= 0) return notify("Số tiền mới phải lớn hơn số đã thu. Muốn giảm/hoàn thì dùng nút Hoàn tiền.", "err");
+    if (payEdit.method === "Chuyển khoản" && !payEdit.account_id) return notify("Chọn tài khoản ngân hàng nhận tiền.", "err");
     setBusy(true);
-    const ghiChu = [payEdit.method, payEdit.note].filter(Boolean).join(" · ");
+    // Mot buoc duy nhat tren server: ghi phieu thu vao dung quy + dong thanh toan cua don
     const { error } = await supabase.rpc("fn_cap_nhat_da_tra", {
-      p_id: detail.id, p_paid: paid, p_note: ghiChu,
+      p_id: detail.id, p_paid: paid, p_note: payEdit.note || "", p_method: payEdit.method, p_account_id: payEdit.method === "Chuyển khoản" ? Number(payEdit.account_id) : null,
     });
-    if (!error && themTien > 0) {
-      await supabase.from("sale_payments").insert({
-        sale_code: detail.code, method: payEdit.method, amount: themTien,
-        note: payEdit.note || "", created_by_name: profile.name,
-      });
-    }
     setBusy(false);
     if (error) return notify(errMsg(error), "err");
     notify("Đã thu thêm — phần thu tự vào sổ quỹ.");
@@ -842,12 +838,17 @@ export default function DonBan() {
                           <div>
                             <label className="lbl">Hình thức thanh toán (khoản thu thêm)</label>
                             <div className="flex gap-1.5 flex-wrap">
-                              {(settings?.payment_methods || "Tiền mặt\nChuyển khoản\nTrả góp")
-                                .split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean).map((m) => (
+                              {["Tiền mặt", "Chuyển khoản"].map((m) => (
                                 <button key={m} className={`btn !px-3 !py-1.5 !text-xs ${payEdit.method === m ? "bg-brand text-white" : "bg-[#EEF1F4]"}`}
-                                  onClick={() => setPayEdit((p) => ({ ...p, method: m }))}>{m}</button>
+                                  onClick={() => setPayEdit((p) => ({ ...p, method: m, account_id: "" }))}>{m}</button>
                               ))}
                             </div>
+                            {payEdit.method === "Chuyển khoản" && (
+                              <select className="inp mt-1.5" value={payEdit.account_id || ""} onChange={(e) => setPayEdit((p) => ({ ...p, account_id: e.target.value }))}>
+                                <option value="">— Chọn đúng tài khoản khách đã chuyển vào —</option>
+                                <BankOptions accounts={accs.filter((a) => a.status === "Hoạt động" && a.type === "Ngân hàng")} companies={cos} buon={detail.customer_type === "Khách buôn"} giu={payEdit.account_id} />
+                              </select>)}
+                            <div className="text-[11px] text-[#8A93A0] mt-1">Khoản trả góp không ghi ở đây — dùng Sửa đơn để thêm khoản trả góp chờ giải ngân.</div>
                           </div>
                           <div>
                             <label className="lbl">Tổng số tiền khách đã trả (sau khi thu thêm)</label>
