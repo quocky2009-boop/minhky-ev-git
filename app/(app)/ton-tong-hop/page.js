@@ -50,6 +50,14 @@ export default function TonTongHop() {
     setCell((c) => c && c.v.id === v.id ? { ...c, units: data || [] } : c);
   };
 
+  // Bam so o cot "Ký gửi KB": liet ke xe dang nam o khach buon nao
+  const openKyGui = async (v) => {
+    setCell({ v, scope: "kygui", code: "", label: "Ký gửi tại khách buôn", units: null }); setCq(""); setCPage(1);
+    const { data } = await supabase.from("sales_orders").select("id, code, sale_date, customer_name, customer_phone, frame_number, location_code, quantity")
+      .eq("vehicle_id", v.id).eq("customer_type", "Khách buôn").is("end_customer_id", null).not("status", "in", '("Đã hủy","Đã trả hàng")').order("sale_date");
+    setCell((c) => c && c.v.id === v.id && c.scope === "kygui" ? { ...c, units: (data || []).map((o) => ({ ...o, frame_number: o.frame_number || "" })) } : c);
+  };
+
   if (loading) return <div className="card">Đang tải dữ liệu…</div>;
   const locs = locations.filter((l) => l.status === "Hoạt động" || vehicles.some((v) => getQty(v.id, l.code) > 0));
   const list = vehicles.filter((v) => {
@@ -151,7 +159,7 @@ export default function TonTongHop() {
                   title={totalQty(v.id) > 0 ? `Xem toàn bộ ${totalQty(v.id)} xe ${v.name}` : ""}
                   onClick={() => totalQty(v.id) > 0 && openCell(v, "all", "", "Toàn hệ thống")}>{totalQty(v.id)}</td>
                 <td data-label="Ký gửi KB" data-m={kyGui[v.id] ? undefined : "hide"} className={`td text-center tabular-nums bg-[#FFFAEB] max-md:!bg-transparent ${kyGui[v.id] ? "font-bold" : "text-[#C6CDD6]"}`}>
-                  {kyGui[v.id] ? <Link href="/ton-ky-gui" className="text-[#A25F00] hover:underline" title="Xem báo cáo xe ký gửi khách buôn">{kyGui[v.id]}</Link> : "·"}</td>
+                  {kyGui[v.id] ? <span className="text-[#A25F00] hover:underline cursor-pointer" title={`Xem ${kyGui[v.id]} xe ${v.name} đang ký gửi tại khách buôn nào`} onClick={() => openKyGui(v)}>{kyGui[v.id]}</span> : "·"}</td>
                 {regions.map((r) => { const n = regionQty(v.id, r);
                   return <td key={r} data-label={`Σ ${r}`} data-m={n === 0 ? "hide" : undefined} className={`td text-center tabular-nums bg-[#F4FBF7] max-md:!bg-transparent ${n === 0 ? "text-[#C6CDD6]" : "font-bold cursor-pointer hover:underline text-brand"}`}
                     title={n > 0 ? `Xem ${n} xe ${v.name} ở khu vực ${r}` : ""}
@@ -180,12 +188,38 @@ export default function TonTongHop() {
             <div className="flex items-center gap-2 mb-1">
               <div className="font-extrabold text-base mr-auto">{cell.v.name} · {cell.v.color}</div>
               {cell.scope === "loc" && <Link href={`/kho/${cell.code}`} className="btn-ghost !px-3 !py-1.5 !text-xs">Mở trang kho →</Link>}
+              {cell.scope === "kygui" && <Link href="/ton-ky-gui" className="btn-ghost !px-3 !py-1.5 !text-xs">Báo cáo ký gửi →</Link>}
               <button className="btn-ghost !px-3 !py-1.5 !text-xs" onClick={() => setCell(null)}>✕</button>
             </div>
             <div className="text-xs text-[#5A6572] mb-3">Phạm vi: <b>{cell.label}</b> · {cell.units ? cell.units.length + " xe" : "đang tải…"}</div>
             {!cell.units ? <div className="text-sm text-[#8A93A0] py-4">Đang tải danh sách xe…</div> : (() => {
               const kw = cq.trim().toLowerCase();
-              const rows = cell.units.filter((u) => !kw || u.frame_number.toLowerCase().includes(kw));
+              const rows = cell.units.filter((u) => !kw || u.frame_number.toLowerCase().includes(kw) || (cell.scope === "kygui" && `${u.customer_name} ${u.code}`.toLowerCase().includes(kw)));
+              if (cell.scope === "kygui") {
+                const pgK = pageSlice(rows, cPage, cPageSize);
+                const theoKh = Object.entries(rows.reduce((m, u) => { m[u.customer_name] = (m[u.customer_name] || 0) + 1; return m; }, {})).sort((a, b) => b[1] - a[1]);
+                return (
+                  <>
+                    <div className="flex gap-1.5 flex-wrap mb-2.5">{theoKh.map(([ten, n]) => <span key={ten} className="text-[11.5px] rounded-lg bg-[#FFF4D6] text-[#8A5A00] px-2 py-1"><b>{ten}</b>: {n} xe</span>)}</div>
+                    <input className="inp !w-full mb-2.5" placeholder="🔎 Tìm số khung, khách buôn, mã đơn…" value={cq} onChange={(e) => { setCq(e.target.value); setCPage(1); }} />
+                    <div className="overflow-x-auto"><table className="w-full border-collapse tbl-card">
+                      <thead><tr><th className="th w-8">#</th><th className="th">Khách buôn</th><th className="th">Số khung</th><th className="th">Ngày xuất</th><th className="th">Ngày ký gửi</th><th className="th">Đơn bán</th></tr></thead>
+                      <tbody>{pgK.map((u, i) => (
+                        <tr key={u.id} className="hover:bg-[#F8FAFC]">
+                          <td data-m="hide" className="td text-center text-xs text-[#8A93A0]">{(pageClamp(cPage, rows.length, cPageSize) - 1) * cPageSize + i + 1}</td>
+                          <td data-m="nolabel full" className="td text-[13px] font-semibold">{u.customer_name}{u.customer_phone && <span className="text-[11px] font-normal text-[#8A93A0]"> · {u.customer_phone}</span>}</td>
+                          <td data-m="title" className="td font-mono text-[12px] font-bold">{u.frame_number || "(chưa có số khung)"}</td>
+                          <td data-label="Xuất" className="td whitespace-nowrap">{fmtDate(u.sale_date)}</td>
+                          <td data-m="end" className="td"><b className={daysIn(u.sale_date) > 90 ? "text-danger" : daysIn(u.sale_date) > 30 ? "text-[#A25F00]" : ""}>{daysIn(u.sale_date)}</b><span className="md:hidden text-[11px] font-normal text-[#8A93A0]"> ngày</span></td>
+                          <td data-label="Đơn" className="td text-xs"><Link href={`/don-ban/${u.id}`} className="text-brand hover:underline font-semibold">{u.code}</Link></td>
+                        </tr>))}
+                        {rows.length === 0 && <tr><td className="td" colSpan={6}>Không có xe nào khớp "{cq}".</td></tr>}
+                      </tbody>
+                    </table></div>
+                    {rows.length > 10 && <Pager total={rows.length} page={cPage} setPage={setCPage} pageSize={cPageSize} setPageSize={setCPageSize} />}
+                  </>
+                );
+              }
               const showKho = cell.scope !== "loc";
               const pg = pageSlice(rows, cPage, cPageSize);
               return (
