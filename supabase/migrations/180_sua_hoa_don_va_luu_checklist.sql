@@ -5,3 +5,6 @@
 --   bỏ bắt buộc Mã đơn DMS (dms_code vẫn lưu nếu có).
 -- fn_sua_hoa_don(p {id, invoice_no, invoice_date, checklist, ly_do}) — quyền xac_nhan_hd:
 --   sửa số / ngày hóa đơn và checklist của đơn ĐÃ xuất HĐ (bắt buộc đủ bao_hanh, coc_giao, pdi, hdsd); ghi don_audit_logs action 'sua_hoa_don'.
+-- Dữ liệu (CEO xác nhận 12/11/2026): 447 đơn ĐÃ xuất hóa đơn có ngày bán ≤ 01/11/2026 được đánh dấu hàng loạt
+--   checklist_giao_xe += {pdi: true, hdsd: true, bao_hanh/coc_giao/app_vf theo cờ đã lưu, danh_dau_hang_loat: '2026-11-12'}.
+--   (không gửi thông báo Discord: app.skip_don_discord = 1)
