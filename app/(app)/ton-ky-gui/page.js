@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useCatalog, useToast } from "@/lib/useData";
 import { usePerms } from "@/lib/usePerms";
+import NhapKhachLeHangLoat from "@/components/NhapKhachLeHangLoat";
 import { Badge, Toast, KPI, Pager, pageSlice, MultiCheck, LocGon } from "@/components/ui";
 import { fmtDate, fmtVND, downloadXLSX, errMsg } from "@/lib/format";
 
@@ -50,6 +51,8 @@ export default function TonKyGui() {
     notify(data?.tat ? "Tính năng nhắc đang tắt." : `Quá hạn: ${data?.so_xe || 0} xe · đã tạo ${data?.viec_moi || 0} việc mới.`);
   };
   const [rows, setRows] = useState(null);
+  const [moNhap, setMoNhap] = useState(false);
+  const [lanTai, setLanTai] = useState(0);
   const [loi, setLoi] = useState("");
   const [chiVF, setChiVF] = useState(false);
   const [fKh, setFKh] = useState([]);
@@ -75,7 +78,7 @@ export default function TonKyGui() {
       }
       setRows(all);
     })();
-  }, [loading, supabase]);
+  }, [loading, supabase, lanTai]);
 
   const ds = useMemo(() => (rows || []).map((o) => {
     const v = vehicles.find((x) => x.id === o.vehicle_id) || {};
@@ -147,8 +150,10 @@ export default function TonKyGui() {
   return (
     <div className="flex flex-col gap-4">
       <Toast toast={toast} />
+      {moNhap && <NhapKhachLeHangLoat supabase={supabase} ds={loc} notify={notify} onDone={() => setLanTai((n) => n + 1)} onClose={() => setMoNhap(false)} />}
       <div className="flex items-center gap-2 flex-wrap">
         <div className="font-extrabold text-lg mr-auto">Xe ký gửi tại khách buôn</div>
+        {(can("xuat_ban") || can("sua_khach")) && <button className="btn-primary !text-xs" onClick={() => setMoNhap(true)}>👤 Nhập khách lẻ hàng loạt</button>}
         <button className="btn-ghost !text-xs" onClick={xuat}>⬇ Xuất Excel</button>
       </div>
       <div className="rounded-xl bg-[#EAF2FF] text-[#1E3A6E] text-[12.5px] px-3 py-2">
