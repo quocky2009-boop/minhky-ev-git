@@ -251,6 +251,33 @@ function KhachBuonInner() {
             </div>
           )}
 
+          {(() => {
+            const kg = orders.filter((o) => !["Đã hủy", "Đã trả hàng"].includes(o.status) && !o.end_customer_id)
+              .map((o) => ({ ...o, tuoi: Math.max(0, Math.floor((Date.now() - new Date(o.sale_date).getTime()) / 86400000)) })).sort((a, b) => b.tuoi - a.tuoi);
+            if (!kg.length) return null;
+            const t30 = kg.filter((o) => o.tuoi > 30).length;
+            return (
+              <div className="card">
+                <div className="flex items-center gap-2 flex-wrap mb-2">
+                  <div className="font-extrabold mr-auto">Xe đang ký gửi ({kg.length}) <span className="text-[11px] font-normal text-[#8A93A0]">· chưa có khách lẻ sau cùng</span></div>
+                  {t30 > 0 && <Badge tone="red">{t30} xe quá 30 ngày</Badge>}
+                  <Link className="text-brand text-[12px] underline" href="/ton-ky-gui">Xem báo cáo ký gửi →</Link>
+                </div>
+                <div className="overflow-x-auto"><table className="w-full text-[12.5px] tbl-card">
+                  <thead><tr className="text-left text-[11px] text-[#8A93A0] uppercase border-b border-[#E3E8EF]"><th className="py-2">Số khung</th><th>Xe</th><th>Ngày xuất</th><th className="text-right">Số ngày ký gửi</th><th>Đơn bán</th><th>Cửa hàng xuất</th></tr></thead>
+                  <tbody>{kg.map((o) => { const v = vOf(o.vehicle_id); return (
+                    <tr key={o.id} className="border-b border-dashed border-[#F0F2F5]">
+                      <td data-m="title" className="py-2 font-mono text-[12px] font-bold">{o.frame_number || "(chưa có số khung)"}</td>
+                      <td data-m="nolabel full">{v ? `${v.name} ${v.color}` : o.vehicle_id}</td>
+                      <td data-label="Xuất" className="whitespace-nowrap">{fmtDate(o.sale_date)}</td>
+                      <td data-m="end" className="text-right"><b className={o.tuoi > 90 ? "text-danger" : o.tuoi > 60 ? "text-[#C2410C]" : o.tuoi > 30 ? "text-[#A25F00]" : ""}>{o.tuoi}</b><span className="md:hidden text-[11px] font-normal text-[#8A93A0]"> ngày</span></td>
+                      <td data-label="Đơn"><Link className="text-brand underline" href={`/don-ban/${o.id}`}>{o.code}</Link></td>
+                      <td data-label="Xuất từ" className="text-[12px]">{locName(o.location_code)}</td>
+                    </tr>); })}</tbody>
+                </table></div>
+              </div>);
+          })()}
+
           <div className="card">
             <div className="font-extrabold mb-2">Sổ công nợ (KM hãng, bù pin, cấn trừ){ky ? ` — tháng ${ky.slice(5)}/${ky.slice(0, 4)}` : ""}</div>
             <div className="overflow-x-auto"><table className="w-full text-[13px] tbl-card">

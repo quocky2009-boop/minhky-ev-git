@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useCatalog } from "@/lib/useData";
 import { usePerms } from "@/lib/usePerms";
@@ -20,6 +20,21 @@ export default function TonTongHop() {
   const [cPageSize, setCPageSize] = useState(10);
   const [showExp, setShowExp] = useState(false);
   const [expBusy, setExpBusy] = useState(false);
+  const [kyGui, setKyGui] = useState({}); // vehicle_id -> so xe dang ky gui tai khach buon (chua co khach le sau cung)
+  useEffect(() => {
+    if (loading) return;
+    (async () => {
+      const m = {};
+      for (let from = 0; ; from += 1000) {
+        const { data, error } = await supabase.from("sales_orders").select("vehicle_id, quantity").eq("customer_type", "Khách buôn").is("end_customer_id", null)
+          .not("status", "in", '("Đã hủy","Đã trả hàng")').order("id").range(from, from + 999);
+        if (error) break;
+        (data || []).forEach((o) => { m[o.vehicle_id] = (m[o.vehicle_id] || 0) + (Number(o.quantity) || 1); });
+        if (!data || data.length < 1000) break;
+      }
+      setKyGui(m);
+    })();
+  }, [loading, supabase]);
 
   // scope: "loc" (1 kho) | "region" (1 khu vuc) | "all" (tong)
   const openCell = async (v, scope, code, label) => {
@@ -39,7 +54,7 @@ export default function TonTongHop() {
   const locs = locations.filter((l) => l.status === "Hoạt động" || vehicles.some((v) => getQty(v.id, l.code) > 0));
   const list = vehicles.filter((v) => {
     if (fBrand && v.brand !== fBrand) return false;
-    if (hideZero && totalQty(v.id) === 0) return false;
+    if (hideZero && totalQty(v.id) === 0 && !kyGui[v.id]) return false;
     const t = (v.id + v.name + v.color).toLowerCase();
     return !q || t.includes(q.toLowerCase());
   });
@@ -123,6 +138,7 @@ export default function TonTongHop() {
             <tr className="bg-[#F3F5F8]">
               <th className="th sticky left-0 bg-[#F3F5F8] z-20 min-w-[190px]">Xe</th>
               <th className="th text-center bg-[#E7EFFD]">TỔNG</th>
+              <th className="th text-center bg-[#FFF4D6]" title="Xe đã xuất cho khách buôn, chưa có khách lẻ sau cùng — không tính vào TỔNG tồn kho">Ký gửi KB</th>
               {regions.map((r) => <th key={r} className="th text-center bg-[#E5F6EE]">Σ {r}</th>)}
               {locs.map((l) => <th key={l.code} className="th text-center !px-2" title={l.name}>{l.name.replace(/(Quang Trung|Trường Chinh|Song Hào)/, (m) => m.split(" ").map(w=>w[0]).join(""))}</th>)}
             </tr>
@@ -134,6 +150,8 @@ export default function TonTongHop() {
                 <td data-m="end" className={`td text-center font-extrabold bg-[#E7EFFD] max-md:!bg-transparent ${totalQty(v.id) > 0 ? "cursor-pointer hover:underline text-brand" : "text-[#C6CDD6]"}`}
                   title={totalQty(v.id) > 0 ? `Xem toàn bộ ${totalQty(v.id)} xe ${v.name}` : ""}
                   onClick={() => totalQty(v.id) > 0 && openCell(v, "all", "", "Toàn hệ thống")}>{totalQty(v.id)}</td>
+                <td data-label="Ký gửi KB" data-m={kyGui[v.id] ? undefined : "hide"} className={`td text-center tabular-nums bg-[#FFFAEB] max-md:!bg-transparent ${kyGui[v.id] ? "font-bold" : "text-[#C6CDD6]"}`}>
+                  {kyGui[v.id] ? <Link href="/ton-ky-gui" className="text-[#A25F00] hover:underline" title="Xem báo cáo xe ký gửi khách buôn">{kyGui[v.id]}</Link> : "·"}</td>
                 {regions.map((r) => { const n = regionQty(v.id, r);
                   return <td key={r} data-label={`Σ ${r}`} data-m={n === 0 ? "hide" : undefined} className={`td text-center tabular-nums bg-[#F4FBF7] max-md:!bg-transparent ${n === 0 ? "text-[#C6CDD6]" : "font-bold cursor-pointer hover:underline text-brand"}`}
                     title={n > 0 ? `Xem ${n} xe ${v.name} ở khu vực ${r}` : ""}
@@ -149,6 +167,7 @@ export default function TonTongHop() {
             <tr className="bg-[#F3F5F8] font-extrabold">
               <td data-m="title" className="td sticky left-0 bg-[#F3F5F8] max-md:!bg-transparent">TỔNG</td>
               <td data-m="end" className="td text-center bg-[#E7EFFD] max-md:!bg-transparent">{grand}</td>
+              <td data-label="Ký gửi KB" className="td text-center tabular-nums bg-[#FFF4D6] max-md:!bg-transparent">{list.reduce((s, v) => s + (kyGui[v.id] || 0), 0)}</td>
               {regions.map((r) => <td key={r} data-label={`Σ ${r}`} className="td text-center tabular-nums bg-[#E5F6EE] max-md:!bg-transparent">{regTotal(r)}</td>)}
               {locs.map((l) => <td key={l.code} data-label={l.name} data-m={colTotal(l.code) === 0 ? "hide" : undefined} className="td text-center tabular-nums">{colTotal(l.code)}</td>)}
             </tr>

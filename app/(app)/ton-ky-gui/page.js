@@ -1,9 +1,10 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useCatalog } from "@/lib/useData";
-import { Badge, KPI, Pager, pageSlice, MultiCheck, LocGon } from "@/components/ui";
-import { fmtDate, fmtVND, downloadXLSX } from "@/lib/format";
+import { useCatalog, useToast } from "@/lib/useData";
+import { usePerms } from "@/lib/usePerms";
+import { Badge, Toast, KPI, Pager, pageSlice, MultiCheck, LocGon } from "@/components/ui";
+import { fmtDate, fmtVND, downloadXLSX, errMsg } from "@/lib/format";
 
 // XE KY GUI TAI KHACH BUON: xe da xuat cho khach buon (don ban loai "Khách buôn") nhung CHUA co khach le sau cung
 // -> dai ly chua xuat hoa don cho khach le, coi nhu xe van ton ky gui tai khach buon do.
@@ -24,7 +25,30 @@ const gom = (ds, keyOf, them) => {
 };
 
 export default function TonKyGui() {
-  const { supabase, vehicles, locations, regions, loading } = useCatalog();
+  const { supabase, vehicles, locations, regions, loading, settings, profile, refresh } = useCatalog();
+  const { toast, notify } = useToast();
+  const can = usePerms(supabase, profile);
+  const [nhac, setNhac] = useState(null); // { ngay, lap } dang sua
+  const [nhacBusy, setNhacBusy] = useState(false);
+  const nguong = parseInt((settings || {}).ky_gui_nhac_ngay ?? "30", 10) || 0;
+  const lapLai = parseInt((settings || {}).ky_gui_nhac_lap_ngay ?? "7", 10) || 7;
+  const luuNhac = async () => {
+    const ngay = Math.max(0, parseInt(nhac.ngay, 10) || 0), lap = Math.max(1, parseInt(nhac.lap, 10) || 7);
+    setNhacBusy(true);
+    const r1 = await supabase.rpc("fn_set_setting", { p_key: "ky_gui_nhac_ngay", p_value: String(ngay) });
+    const r2 = r1.error ? r1 : await supabase.rpc("fn_set_setting", { p_key: "ky_gui_nhac_lap_ngay", p_value: String(lap) });
+    setNhacBusy(false);
+    if (r2.error) return notify(errMsg(r2.error), "err");
+    notify(ngay ? `Đã lưu: nhắc khi xe ký gửi quá ${ngay} ngày.` : "Đã tắt nhắc xe ký gửi."); setNhac(null); refresh && refresh();
+  };
+  const chayNhac = async () => {
+    if (!confirm("Chạy nhắc ngay bây giờ? Hệ thống sẽ tạo việc cho Cửa hàng trưởng và gửi thông báo Discord cho các khách buôn có xe ký gửi quá hạn (bỏ qua khách đã có việc đang mở hoặc vừa nhắc).")) return;
+    setNhacBusy(true);
+    const { data, error } = await supabase.rpc("fn_ky_gui_nhac_now");
+    setNhacBusy(false);
+    if (error) return notify(errMsg(error), "err");
+    notify(data?.tat ? "Tính năng nhắc đang tắt." : `Quá hạn: ${data?.so_xe || 0} xe · đã tạo ${data?.viec_moi || 0} việc mới.`);
+  };
   const [rows, setRows] = useState(null);
   const [loi, setLoi] = useState("");
   const [chiVF, setChiVF] = useState(false);
@@ -122,6 +146,7 @@ export default function TonKyGui() {
 
   return (
     <div className="flex flex-col gap-4">
+      <Toast toast={toast} />
       <div className="flex items-center gap-2 flex-wrap">
         <div className="font-extrabold text-lg mr-auto">Xe ký gửi tại khách buôn</div>
         <button className="btn-ghost !text-xs" onClick={xuat}>⬇ Xuất Excel</button>
@@ -129,6 +154,20 @@ export default function TonKyGui() {
       <div className="rounded-xl bg-[#EAF2FF] text-[#1E3A6E] text-[12.5px] px-3 py-2">
         Xe đã xuất cho <b>khách buôn</b> nhưng <b>chưa có khách lẻ sau cùng</b> (chưa xuất hóa đơn cho khách lẻ) — coi như xe đang tồn ký gửi tại khách buôn đó.
         Số ngày ký gửi tính từ ngày bán trên đơn. Khi nhập khách lẻ sau cùng ở Đơn bán, xe tự rời khỏi báo cáo này.
+      </div>
+
+      <div className="rounded-xl border border-[#F0C000] bg-[#FFFCF0] text-[12.5px] px-3 py-2 flex items-center gap-2 flex-wrap">
+        <span className="mr-auto">🔔 {nguong > 0
+          ? <>Tự động nhắc lúc <b>8h sáng hằng ngày</b>: khách buôn có xe ký gửi quá <b>{nguong} ngày</b> → tạo việc cho <b>Cửa hàng trưởng</b> khu vực xuất xe (hạn 3 ngày) và báo Discord. Mỗi khách buôn nhắc lại sau <b>{lapLai} ngày</b> nếu việc trước đã xong mà xe vẫn chưa bán.</>
+          : <>Nhắc xe ký gửi quá hạn đang <b>tắt</b>.</>}</span>
+        {can("cai_dat") && !nhac && <button className="btn-ghost !text-xs" onClick={() => setNhac({ ngay: String(nguong), lap: String(lapLai) })}>⚙ Cài đặt nhắc</button>}
+        {can("cai_dat") && !nhac && nguong > 0 && <button className="btn-ghost !text-xs" disabled={nhacBusy} onClick={chayNhac}>{nhacBusy ? "Đang chạy…" : "▶ Chạy nhắc ngay"}</button>}
+        {nhac && (
+          <div className="flex items-center gap-2 flex-wrap w-full">
+            <span>Nhắc khi ký gửi quá</span><input type="number" min="0" className="inp !w-20 !py-1 !text-xs" value={nhac.ngay} onChange={(e) => setNhac({ ...nhac, ngay: e.target.value })} /><span>ngày (0 = tắt) · nhắc lại sau</span>
+            <input type="number" min="1" className="inp !w-20 !py-1 !text-xs" value={nhac.lap} onChange={(e) => setNhac({ ...nhac, lap: e.target.value })} /><span>ngày</span>
+            <button className="btn-ok !text-xs" disabled={nhacBusy} onClick={luuNhac}>Lưu</button><button className="btn-ghost !text-xs" onClick={() => setNhac(null)}>Hủy</button>
+          </div>)}
       </div>
 
       <div className="card">

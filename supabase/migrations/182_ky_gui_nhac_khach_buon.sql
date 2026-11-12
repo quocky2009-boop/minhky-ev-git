@@ -1,0 +1,17 @@
+-- 182 (12/11/2026) — Đã chạy trực tiếp trên database.
+-- Nhắc xe ký gửi tại khách buôn quá hạn (đơn "Khách buôn" chưa hủy/trả, chưa có khách lẻ sau cùng, quá N ngày kể từ ngày bán).
+--
+-- app_settings: ky_gui_nhac_ngay = '30' (0 = tắt) · ky_gui_nhac_lap_ngay = '7'
+--
+-- public._ky_gui_nhac() returns jsonb  — SECURITY DEFINER, chỉ service_role/cron gọi
+--   • Gom theo (khách buôn, khu vực của cửa hàng xuất xe).
+--   • Mỗi nhóm tạo 1 việc (tasks) cho Cửa hàng trưởng (MANAGER) của khu vực đó; không có thì MANAGER toàn hệ thống; không có thì CEO.
+--     Tiêu đề "Chăm sóc khách buôn <tên>: N xe ký gửi quá X ngày", mô tả liệt kê từng xe (model, số khung, số ngày, mã đơn),
+--     hạn 3 ngày, bắt buộc ghi kết quả, không cần duyệt; người giao = "Hệ thống (tự động)"; tag "Ký gửi khách buôn".
+--   • Chống trùng bằng tasks.recurrence_instance_key = 'kygui:<customer_id>:<khu vực>:<yyyymmdd>':
+--     bỏ qua nếu còn việc chưa xong, hoặc vừa tạo trong ky_gui_nhac_lap_ngay ngày gần đây.
+--   • Việc mới được đẩy Discord kênh công việc qua _task_outbox(…,'created'); kèm 1 tin tổng hợp ở kênh chung (_notify_discord_kenh('kho', …)).
+--
+-- public.fn_ky_gui_nhac_now() returns jsonb — nút "Chạy nhắc ngay" trên app, cần quyền 'cai_dat'.
+--
+-- Lịch: select cron.schedule('ky-gui-nhac-8h', '0 1 * * *', 'select public._ky_gui_nhac()');   -- 8h sáng giờ VN
