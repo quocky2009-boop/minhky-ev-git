@@ -40,6 +40,7 @@ export default function DonBan() {
   const [fLoc, setFLoc] = useState(() => (_params.get("kho") || "").split(",").filter(Boolean));
   const [fInv, setFInv] = useState(() => _params.get("hd") || "");
   const [fType, setFType] = useState(() => _params.get("loai") || "");
+  const [moLoc, setMoLoc] = useState(false); // dien thoai: mo/gap bo loc
   const [fKl, setFKl] = useState(() => _params.get("kl") || ""); // khach le cua dai ly: "" | co | chua
   const [showHuy, setShowHuy] = useState(() => _params.get("huy") === "1");
   const [q, setQ] = useState(() => _params.get("q") || "");
@@ -462,6 +463,9 @@ export default function DonBan() {
           <div className="font-extrabold mr-auto">Danh sách đơn bán ({sorted.length})</div>
           <Link href="/ban-hang/wizard" className="btn-primary !text-xs">+ Tạo đơn bán mới</Link>
           <Link href="/ban-buon" className="btn-ghost !text-xs" title="Chốt đơn với khách buôn, thu tiền ở đơn bán buôn, khi giao mới chọn số khung — tiền tự chia cho từng xe">+ Tạo đơn bán buôn</Link>
+          <button className={`md:hidden btn-ghost !text-xs ${fLoc.length || fInv || fType || fKl || showHuy ? "!bg-[#EAF2FF] !text-brand" : ""}`} onClick={() => setMoLoc(!moLoc)}>
+            ⚙ Bộ lọc{(fLoc.length ? 1 : 0) + (fInv ? 1 : 0) + (fType ? 1 : 0) + (fKl ? 1 : 0) + (showHuy ? 1 : 0) > 0 ? ` (${(fLoc.length ? 1 : 0) + (fInv ? 1 : 0) + (fType ? 1 : 0) + (fKl ? 1 : 0) + (showHuy ? 1 : 0)})` : ""} {moLoc ? "▴" : "▾"}</button>
+          <div className={`${moLoc ? "flex" : "hidden"} md:contents gap-2 flex-wrap items-center w-full`}>
           <input type="date" className="inp !w-auto" value={from} onChange={(e) => setFrom(e.target.value)} />
           <input type="date" className="inp !w-auto" value={to} onChange={(e) => setTo(e.target.value)} />
           <MultiCheck label="Cửa hàng: tất cả" value={fLoc} onChange={(v) => { setFLoc(v); setPage(1); }}
@@ -479,7 +483,8 @@ export default function DonBan() {
           <button className={`btn-ghost !text-xs ${showHuy ? "!bg-[#FDEDED] !text-danger" : ""}`} onClick={() => { setShowHuy(!showHuy); setPage(1); }}>
             {showHuy ? "Đang hiện đơn hủy/trả" : `Đơn hủy/trả${nHuy ? ` (${nHuy})` : ""}`}
           </button>
-          <input className="inp !w-64" placeholder="Tìm mã đơn, khách, khách lẻ của đại lý, số khung…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
+          </div>
+          <input className="inp !w-64 max-md:!w-full max-md:order-first" placeholder="Tìm mã đơn, khách, khách lẻ của đại lý, số khung…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
           <button className="btn-ghost !text-xs" onClick={exportCSV}>⬇ Excel</button>
           <button className="btn-ghost !text-xs" onClick={() => setShowThuong(!showThuong)}>🏆 Tính thưởng tháng</button>
         </div>
@@ -518,25 +523,25 @@ export default function DonBan() {
                 return [
                   <tr key={o.id} className={huy ? "bg-[#F3F4F6] text-[#8A93A0]" : sel.has(o.id) ? "bg-[#EAF2FF]" : invId === o.id ? "bg-[#FDF6E3]" : done ? "hover:bg-[#F8FAFC]" : "bg-[#FFFCF5] hover:bg-[#FDF6E3]"}>
                     <TdCheck sel={sel} id={o.id} />
-                    <td data-label="Mã đơn" className="td"><div className="font-bold"><Link href={`/don-ban/${o.id}`} className="text-brand hover:underline">{o.code}</Link></div><div className="text-[11px] text-[#5A6572]">{fmtDate(o.sale_date)}</div>{nhanTra ? <Badge tone="red">Đã trả hàng</Badge> : huy && <Badge tone="red">Đã hủy</Badge>}</td>
-                    <td data-label="Xe" className="td">
+                    <td data-label="Mã đơn" data-m="title" className="td"><div className="font-bold"><Link href={`/don-ban/${o.id}`} className="text-brand hover:underline">{o.code}</Link></div><div className="text-[11px] text-[#5A6572]">{fmtDate(o.sale_date)}</div>{nhanTra ? <Badge tone="red">Đã trả hàng</Badge> : huy && <Badge tone="red">Đã hủy</Badge>}</td>
+                    <td data-label="Xe" data-m="nolabel" className="td">
                       <div className="text-[13px] truncate" title={v ? `${v.brand} ${v.name} ${v.color}` : o.vehicle_id}>{v ? `${v.name} ${v.color}` : o.vehicle_id}</div>
                       <div className="font-mono text-[10.5px] text-[#5A6572] truncate" title={o.frame_number}>{o.frame_number}</div>
                     </td>
-                    <td data-label="Điểm bán" className="td text-xs"><div className="break-words" title={locName(o.location_code)}>{locName(o.location_code)}</div></td>
-                    <td data-label="Khách" className="td"><div className="min-w-0 flex-1">
+                    <td data-label="Điểm bán" data-m="nolabel" className="td text-xs"><div className="break-words" title={locName(o.location_code)}>{locName(o.location_code)}</div></td>
+                    <td data-label="Khách" data-m="nolabel full" className="td"><div className="min-w-0 flex-1 max-md:flex max-md:flex-wrap max-md:items-center max-md:gap-x-1.5">
                       <div className="text-[13px] md:truncate break-words max-md:font-semibold" title={o.customer_name}>{o.customer_name}</div>
                       <div className="text-[11px] text-[#5A6572]">{o.customer_phone}</div>
                       <Badge tone={o.customer_type === "Khách buôn" ? "amber" : o.customer_type === "Khách lẻ của Đại lý" ? "blue" : o.customer_type === "Khách lẻ" || !o.customer_type ? "green" : "purple"}>{o.customer_type || "Khách lẻ"}</Badge>
                       {o.end_customer_id
-                        ? <div className="mt-1 text-[12px] leading-tight rounded-md bg-[#F4FBF7] border border-[#BBE3CC] px-1.5 py-1" title="Khách lẻ cuối (người mua từ đại lý / khách buôn)">
+                        ? <div className="mt-1 max-md:mt-0 max-md:w-full text-[12px] leading-tight rounded-md bg-[#F4FBF7] border border-[#BBE3CC] px-1.5 py-1 max-md:py-0.5 max-md:flex max-md:gap-1.5 max-md:items-center" title="Khách lẻ cuối (người mua từ đại lý / khách buôn)">
                             <span className="text-[10.5px] text-[#0E7A4A] font-semibold">👤 Khách lẻ:</span> <b className="text-[11.5px]">{o.end_customer_name}</b>
                             {o.end_customer_phone && <div className="text-[11px] text-[#5A6572]">{o.end_customer_phone}</div>}
                           </div>
                         : thieuKhachLe(o) && <div className="mt-1 text-[11px] font-semibold text-[#A25F00]">👤 Chưa có khách lẻ</div>}
                     </div></td>
-                    <td data-label="Tổng đơn" className="td font-bold">{fmtVND(total(o))}</td>
-                    <td data-label="Hóa đơn" className="td">
+                    <td data-label="Tổng đơn" data-m="end" className="td font-bold">{fmtVND(total(o))}</td>
+                    <td data-label="Hóa đơn" data-m="nolabel" className="td">
                       <div className="flex items-center gap-1 flex-wrap">
                         {huy
                           ? <Badge tone="red">{nhanTra ? "Đã trả hàng" : "Đã hủy"}</Badge>
@@ -546,8 +551,8 @@ export default function DonBan() {
                         {!huy && thieuKhachLe(o) && <Badge tone="red">⚠ Thiếu KL</Badge>}
                       </div>
                     </td>
-                    <td data-label="NV bán" className="td text-xs"><div className="truncate" title={o.seller_name}>{o.seller_name}</div></td>
-                    <td className="td align-middle"><div className="flex gap-1 flex-wrap items-center justify-end">
+                    <td data-label="NV" className="td text-xs"><div className="truncate" title={o.seller_name}>{o.seller_name}</div></td>
+                    <td data-m="actions" className="td align-middle"><div className="flex gap-1 flex-wrap items-center justify-end">
                       {huy ? (<>
                         <Link href={`/don-ban/${o.id}`} className="btn-ghost !px-2 !py-1 !text-xs" title="Xem chi tiết đơn">👁</Link>
                         {profile.role === "CEO" && !nhanTra && <button className="btn-ghost !px-2 !py-1 !text-xs hover:text-brand" title="Mở lại đơn (đã hủy nhầm)" onClick={() => moLaiDon(o)}>↩ Mở lại</button>}

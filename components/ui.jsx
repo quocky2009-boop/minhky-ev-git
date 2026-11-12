@@ -41,10 +41,10 @@ export function Field({ label, required, hint, children }) {
 export function KPI({ label, value, sub, tone }) {
   const colors = { green: "text-[#0E7A4A]", red: "text-[#B01E2C]", amber: "text-[#A25F00]", blue: "text-brand", dark: "text-navy-800" };
   return (
-    <div className="card flex-1 min-w-[140px] !p-4">
-      <div className="text-xs font-semibold text-[#5A6572]">{label}</div>
-      <div className={`text-2xl font-extrabold tabular-nums mt-1 ${colors[tone] || "text-navy-800"}`}>{value}</div>
-      {sub && <div className="text-xs text-[#8A93A0]">{sub}</div>}
+    <div className="card kpi-card flex-1 min-w-[140px] !p-4">
+      <div className="kpi-label text-xs font-semibold text-[#5A6572]">{label}</div>
+      <div className={`kpi-value text-2xl font-extrabold tabular-nums mt-1 ${colors[tone] || "text-navy-800"}`}>{value}</div>
+      {sub && <div className="kpi-sub text-xs text-[#8A93A0]">{sub}</div>}
     </div>
   );
 }

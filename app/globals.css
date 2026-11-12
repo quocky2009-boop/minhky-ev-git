@@ -24,21 +24,42 @@ body { @apply bg-[#F3F5F8] text-[#1B2733] font-sans; }
    Cach dung: them class "tbl-card" vao <table>, va o moi <td> them
    data-label="Ten cot" de hien nhan ben trai tren mobile. */
 @media (max-width: 767px) {
+  /* THE GON: moi dong la 1 the 3-4 dong. Cac o xep lien nhau (tu xuong dong), nhan nho di kem gia tri.
+     Tuy chinh tung cot bang data-m: "title" (dong dau, dam, khong nhan) · "end" (day sang phai dong dau, vd so tien)
+     · "full" (chiem ca dong) · "nolabel" (bo nhan) · "hide" (an tren dien thoai) · "actions" (hang nut cuoi the). */
   .tbl-card thead { display: none; }
-  .tbl-card, .tbl-card tbody, .tbl-card tr, .tbl-card td { display: block; width: 100%; }
+  .tbl-card, .tbl-card tbody { display: block; width: 100%; }
   .tbl-card tr {
-    @apply bg-white rounded-xl border border-[#E6EAEF] mb-2 p-1;
+    @apply bg-white rounded-xl border border-[#E6EAEF] mb-1.5;
+    display: flex; flex-wrap: wrap; align-items: center; column-gap: 10px; row-gap: 3px; padding: 8px 10px; width: 100%;
   }
   .tbl-card td {
-    @apply border-0 py-1.5 px-2.5 text-[13px];
-    display: flex; align-items: flex-start; gap: 8px;
+    @apply border-0 p-0 text-[12.5px];
+    display: inline-flex; flex-wrap: wrap; align-items: center; column-gap: 5px; row-gap: 1px;
+    width: auto; max-width: 100%; min-width: 0; order: 3;
   }
   .tbl-card td::before {
-    content: attr(data-label);
-    @apply text-[11px] font-bold text-[#8A93A0] uppercase shrink-0;
-    min-width: 88px;
+    content: attr(data-label) ":";
+    @apply text-[10.5px] font-semibold text-[#8A93A0] shrink-0;
   }
-  .tbl-card td:empty { display: none; }
+  .tbl-card td:not([data-label])::before, .tbl-card td[data-label=""]::before,
+  .tbl-card td[data-m~="title"]::before, .tbl-card td[data-m~="nolabel"]::before, .tbl-card td[data-m~="end"]::before, .tbl-card td[data-m~="actions"]::before { content: none; }
+  .tbl-card td:empty, .tbl-card td[data-m~="hide"] { display: none; }
+  .tbl-card td[data-label=""] { order: 0; }
+  .tbl-card td[data-m~="title"] { order: 1; flex: 1 1 auto; @apply text-[14px] font-bold; }
+  .tbl-card td[data-m~="end"] { order: 2; margin-left: auto; @apply text-[14px] font-extrabold; white-space: nowrap; }
+  .tbl-card td[data-m~="full"] { flex: 1 1 100%; }
+  .tbl-card td[data-m~="actions"] { order: 9; margin-left: auto; }
+  .tbl-card td:not([data-label]):last-child { order: 9; margin-left: auto; }
+  .tbl-card td span.rounded-full { padding: 1px 7px; font-size: 10.5px; }
+  .tbl-card td[colspan] { display: block; flex: 1 1 100%; margin-left: 0; order: 10; }
+  .tbl-card td .truncate { white-space: normal; overflow: visible; }
+  .tbl-card td .btn, .tbl-card td .btn-ghost, .tbl-card td .btn-ok, .tbl-card td .btn-primary, .tbl-card td .btn-danger { @apply !px-2 !py-1 !text-[11.5px] rounded-lg; }
+  /* O chi so (KPI): 3 o mot hang, chu nho lai */
+  .kpi-card { min-width: 0 !important; flex: 1 1 28%; padding: 8px 10px !important; }
+  .kpi-card .kpi-label { font-size: 10.5px; line-height: 1.2; }
+  .kpi-card .kpi-value { font-size: 16px; margin-top: 2px; }
+  .kpi-card .kpi-sub { font-size: 10px; }
 }
 
 /* Tren mobile: giam padding trang cho rong hon */
