@@ -67,8 +67,10 @@ function KhachBuonInner() {
     if (id && khs.length) { const c = khs.find((x) => String(x.id) === id); if (c) moKhach(c); }
   }, [sp, khs.length]);
 
+  const [csKg, setCsKg] = useState([]); // lich su viec nhac cham soc xe ky gui cua khach buon dang mo
   const moKhach = async (c) => {
-    setChon(c); setKy("");
+    setChon(c); setKy(""); setCsKg([]);
+    supabase.rpc("fn_ky_gui_lich_su", { p_customer_id: c.id }).then(({ data }) => setCsKg(Array.isArray(data) ? data : []));
     const [{ data: os }, { data: ds }] = await Promise.all([
       supabase.from("sales_orders").select("*").eq("customer_id", c.id).eq("customer_type", "Khách buôn").order("sale_date", { ascending: false }).limit(2000),
       supabase.from("kb_so_cai").select("*").eq("customer_id", c.id).order("ngay", { ascending: false }).order("id", { ascending: false }),
@@ -277,6 +279,27 @@ function KhachBuonInner() {
                 </table></div>
               </div>);
           })()}
+
+          {csKg.length > 0 && (
+            <div className="card">
+              <div className="font-extrabold mb-2">Lịch sử chăm sóc xe ký gửi ({csKg.length}) <span className="text-[11px] font-normal text-[#8A93A0]">· việc hệ thống tự giao khi xe ký gửi quá hạn</span></div>
+              <div className="flex flex-col gap-2">{csKg.map((t) => {
+                const st = { completed: ["green", "Đã xong"], cancelled: ["gray", "Đã hủy"], failed: ["red", "Không đạt"], pending_review: ["blue", "Chờ duyệt"], needs_revision: ["amber", "Cần làm lại"], in_progress: ["amber", "Đang làm"], not_started: ["amber", "Chưa làm"] }[t.status] || ["gray", t.status];
+                const treHan = !["completed", "cancelled", "failed"].includes(t.status) && t.due_at && new Date(t.due_at) < new Date();
+                return (
+                  <div key={t.id} className="rounded-xl border border-[#E6EAEF] px-3 py-2 text-[12.5px]">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Link href="/cong-viec" className="font-bold text-brand hover:underline">{t.code}</Link>
+                      <Badge tone={st[0]}>{st[1]}</Badge>{treHan && <Badge tone="red">Trễ hạn</Badge>}
+                      <span className="text-[#5A6572]">Giao {fmtDate(t.created_at)} · {t.assignee}{t.region ? ` (${t.region})` : ""} · hạn {fmtDate(t.due_at)}</span>
+                    </div>
+                    <div className="text-[#5A6572] mt-0.5">{t.title}</div>
+                    {(t.result || t.note)
+                      ? <div className="mt-1 rounded-lg bg-[#F4FBF7] px-2.5 py-1.5 whitespace-pre-wrap"><b>Kết quả{t.submitted_at || t.completed_at ? ` (${fmtDate(t.submitted_at || t.completed_at)})` : ""}:</b> {t.result || t.note}</div>
+                      : <div className="mt-1 text-[11.5px] text-[#8A93A0]">Chưa ghi kết quả liên hệ.</div>}
+                  </div>);
+              })}</div>
+            </div>)}
 
           <div className="card">
             <div className="font-extrabold mb-2">Sổ công nợ (KM hãng, bù pin, cấn trừ){ky ? ` — tháng ${ky.slice(5)}/${ky.slice(0, 4)}` : ""}</div>

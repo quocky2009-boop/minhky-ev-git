@@ -15,3 +15,9 @@
 -- public.fn_ky_gui_nhac_now() returns jsonb — nút "Chạy nhắc ngay" trên app, cần quyền 'cai_dat'.
 --
 -- Lịch: select cron.schedule('ky-gui-nhac-8h', '0 1 * * *', 'select public._ky_gui_nhac()');   -- 8h sáng giờ VN
+
+-- Bổ sung cùng ngày:
+-- public._ky_gui_embed() returns jsonb — khối Discord "XE KÝ GỬI TẠI KHÁCH BUÔN": tổng xe, số quá hạn, tuổi bình quân, bảng theo khách buôn.
+-- public._ton_bao_cao_gui(p_ngay): báo cáo tồn kho 17h30 nối thêm khối trên (chỉ báo cáo của hôm nay).
+-- public.fn_ky_gui_lich_su(p_customer_id bigint) returns jsonb — các việc nhắc ký gửi của 1 khách buôn kèm kết quả đã ghi
+--   (CEO/MANAGER/ADMIN xem tất cả; người khác chỉ thấy việc giao cho mình). Dùng ở Sổ khách buôn.
