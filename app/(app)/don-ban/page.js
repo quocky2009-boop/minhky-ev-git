@@ -37,7 +37,9 @@ export default function DonBan() {
   // khoi phuc va man hinh danh sach hien dung lai dung trang thai dang loc/tim.
   const [from, setFrom] = useState(() => _params.get("from") || (_params.get("q") ? "2000-01-01" : firstOfMonth()));
   const [to, setTo] = useState(() => _params.get("to") || iso(new Date()));
-  const [fLoc, setFLoc] = useState(() => (_params.get("kho") || "").split(",").filter(Boolean));
+  const [fLoc, setFLoc] = useState(() => (_params.get("kv") || "").split(",").filter(Boolean)); // loc theo KHU VUC
+  const [fCl, setFCl] = useState(() => _params.get("cl") || ""); // checklist giao xe: "" | thieu_bb | chua_du | du
+  const [kmKb, setKmKb] = useState({}); // sale_code -> tien KM hang da cong so khach buon
   const [fInv, setFInv] = useState(() => _params.get("hd") || "");
   const [fType, setFType] = useState(() => _params.get("loai") || "");
   const [fPin, setFPin] = useState(() => _params.get("pin") || ""); // hinh thuc kinh doanh pin (xe doi pin)
@@ -64,7 +66,8 @@ export default function DonBan() {
     if (q) sp.set("q", q);
     if (from) sp.set("from", from);
     if (to) sp.set("to", to);
-    if (fLoc.length) sp.set("kho", fLoc.join(","));
+    if (fLoc.length) sp.set("kv", fLoc.join(","));
+    if (fCl) sp.set("cl", fCl);
     if (fInv) sp.set("hd", fInv);
     if (fType) sp.set("loai", fType);
     if (fKl) sp.set("kl", fKl);
@@ -73,7 +76,7 @@ export default function DonBan() {
     if (page > 1) sp.set("trang", String(page));
     const qs = sp.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-  }, [q, from, to, fLoc.join(","), fInv, fType, fKl, fPin, showHuy, page]);
+  }, [q, from, to, fLoc.join(","), fInv, fType, fKl, fPin, fCl, showHuy, page]);
   // Tu mo chi tiet khi den tu o tim kiem toan cuc (khop dung 1 don)
   const [_autoOpened, _setAutoOpened] = useState(false);
   useEffect(() => {
@@ -104,14 +107,16 @@ export default function DonBan() {
     setBusy(true);
     let qy = supabase.from("sales_orders").select("*").gte("sale_date", from).lte("sale_date", to)
       .order("created_at", { ascending: false }).limit(3000);
-    if (fLoc.length) qy = qy.in("location_code", fLoc);
-    const [{ data }, { data: si }, { data: sop }, { data: promoList }, { data: kmAudit }, { data: sp }] = await Promise.all([
+    const [{ data }, { data: si }, { data: sop }, { data: promoList }, { data: kmAudit }, { data: sp }, { data: kb }] = await Promise.all([
       qy, supabase.from("sale_items").select("sale_code, amount, item_type").limit(10000),
       supabase.from("sale_order_promotions").select("sale_code, promotion_id").limit(10000),
       supabase.from("promotions").select("id, name"),
       supabase.from("v_don_ban_km_audit").select("*").limit(10000),
       supabase.from("sale_payments").select("sale_code, method, amount, is_reversed").limit(10000),
+      supabase.from("kb_so_cai").select("sale_code, so_tien").eq("loai", "KHUYEN_MAI").eq("huy", false).limit(10000),
     ]);
+    const kk = {}; (kb || []).forEach((x) => { if (x.sale_code) kk[x.sale_code] = (kk[x.sale_code] || 0) + Number(x.so_tien || 0); });
+    setKmKb(kk);
     setRows(data || []);
     const m = {};
     const byType = {};
@@ -135,7 +140,7 @@ export default function DonBan() {
     setKmAuditMap(km);
     setBusy(false);
   };
-  useEffect(() => { if (!loading) load(); }, [loading, from, to, fLoc.join(",")]);
+  useEffect(() => { if (!loading) load(); }, [loading, from, to]);
   useEffect(() => {
     if (!profile) return;
     if (profile.role === "CEO") { setCanSuaKM(true); return; }
@@ -164,6 +169,16 @@ export default function DonBan() {
   const laDoiPin = (o) => vOf(o.vehicle_id)?.model_pin === "Xe đổi pin";
   const pinOf = (o) => !laDoiPin(o) ? "" : canKhachLe(o) ? (o.end_customer_id ? (o.end_customer_battery_option || "Chưa chọn") : "") : (o.battery_option || "Chưa chọn");
   const daDong = (o) => o.status === "Đã hủy" || o.status === "Đã trả hàng";
+  const kvOf = (o) => locations.find((l) => l.code === o.location_code)?.region || "—";
+  // Checklist giao xe: muc bat buoc (bao hanh, giay COC, app VF voi xe VinFast) + khuyen nghi (anh khach nhan xe, khach khoe FB/Zalo)
+  const clOf = (o) => {
+    const c = o.checklist_giao_xe || {};
+    const bb = [!!(o.warranty_activated || c.bao_hanh), !!(o.coc_giao || c.coc_giao), ...(isVF(o) ? [!!(o.app_activated || c.app_vf)] : [])];
+    const kn = [!!c.anh_khach, !!c.khoe_fb];
+    const xong = [...bb, ...kn].filter(Boolean).length, tong = bb.length + kn.length;
+    return { xong, tong, thieuBB: bb.some((x) => !x), du: xong === tong,
+      thieu: [!bb[0] && "Bảo hành", !bb[1] && "Giấy COC", isVF(o) && !bb[2] && "App VF", !kn[0] && "Ảnh khách nhận xe", !kn[1] && "Khách khoe FB/Zalo"].filter(Boolean) };
+  };
   const filtered = rows.filter((o) => {
     if (daDong(o) && !showHuy) return false;
     if (fInv && (o.invoice_status || "Chờ xuất HĐ") !== fInv) return false;
@@ -171,15 +186,17 @@ export default function DonBan() {
     if (fKl === "co" && !o.end_customer_id) return false;
     if (fKl === "chua" && !thieuKhachLe(o)) return false;
     if (fPin && pinOf(o) !== fPin) return false;
+    if (fLoc.length && !fLoc.includes(kvOf(o))) return false;
+    if (fCl) { const c = clOf(o); if (daDong(o)) return false; if (fCl === "thieu_bb" && !c.thieuBB) return false; if (fCl === "chua_du" && c.du) return false; if (fCl === "du" && !c.du) return false; }
     if (!q) return true;
     const kd = (x) => String(x || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d");
     const kw = kd(q.trim());
     const v = vOf(o.vehicle_id);
-    return kd(`${o.code} ${o.customer_name} ${o.customer_phone} ${o.frame_number} ${o.invoice_no || ""} ${v ? v.name : ""} ${o.seller_name} ${o.end_customer_name || ""} ${o.end_customer_phone || ""} ${pinOf(o)}`).includes(kw);
+    return kd(`${o.code} ${o.customer_name} ${o.customer_phone} ${o.frame_number} ${o.invoice_no || ""} ${v ? v.name : ""} ${o.seller_name} ${o.end_customer_name || ""} ${o.end_customer_phone || ""} ${pinOf(o)} ${kvOf(o)}`).includes(kw);
   });
   const sorted = sort.sortFn(filtered, {
     code: (o) => o.code, date: (o) => o.sale_date, xe: (o) => vOf(o.vehicle_id)?.name || o.vehicle_id, sk: (o) => o.frame_number || "", sdt: (o) => o.customer_phone || "",
-    kho: (o) => locName(o.location_code), kh: (o) => o.customer_name, type: (o) => o.customer_type || "", tien: (o) => total(o),
+    kho: (o) => kvOf(o), kh: (o) => o.customer_name, type: (o) => o.customer_type || "", tien: (o) => total(o),
     hd: (o) => o.invoice_status || "Chờ xuất HĐ", nv: (o) => o.seller_name,
   });
   const rowsActive = rows.filter((o) => o.status !== "Đã hủy" && o.status !== "Đã trả hàng");
@@ -469,13 +486,13 @@ export default function DonBan() {
           <div className="font-extrabold mr-auto">Danh sách đơn bán ({sorted.length})</div>
           <Link href="/ban-hang/wizard" className="btn-primary !text-xs">+ Tạo đơn bán mới</Link>
           <Link href="/ban-buon" className="btn-ghost !text-xs" title="Chốt đơn với khách buôn, thu tiền ở đơn bán buôn, khi giao mới chọn số khung — tiền tự chia cho từng xe">+ Tạo đơn bán buôn</Link>
-          <button className={`md:hidden btn-ghost !text-xs ${fLoc.length || fInv || fType || fKl || fPin || showHuy ? "!bg-[#EAF2FF] !text-brand" : ""}`} onClick={() => setMoLoc(!moLoc)}>
-            ⚙ Bộ lọc{(fLoc.length ? 1 : 0) + (fInv ? 1 : 0) + (fType ? 1 : 0) + (fKl ? 1 : 0) + (fPin ? 1 : 0) + (showHuy ? 1 : 0) > 0 ? ` (${(fLoc.length ? 1 : 0) + (fInv ? 1 : 0) + (fType ? 1 : 0) + (fKl ? 1 : 0) + (fPin ? 1 : 0) + (showHuy ? 1 : 0)})` : ""} {moLoc ? "▴" : "▾"}</button>
+          <button className={`md:hidden btn-ghost !text-xs ${fLoc.length || fInv || fType || fKl || fPin || fCl || showHuy ? "!bg-[#EAF2FF] !text-brand" : ""}`} onClick={() => setMoLoc(!moLoc)}>
+            ⚙ Bộ lọc{(fLoc.length ? 1 : 0) + (fInv ? 1 : 0) + (fType ? 1 : 0) + (fKl ? 1 : 0) + (fPin ? 1 : 0) + (fCl ? 1 : 0) + (showHuy ? 1 : 0) > 0 ? ` (${(fLoc.length ? 1 : 0) + (fInv ? 1 : 0) + (fType ? 1 : 0) + (fKl ? 1 : 0) + (fPin ? 1 : 0) + (fCl ? 1 : 0) + (showHuy ? 1 : 0)})` : ""} {moLoc ? "▴" : "▾"}</button>
           <div className={`${moLoc ? "flex" : "hidden"} md:contents gap-2 flex-wrap items-center w-full`}>
           <input type="date" className="inp !w-auto" value={from} onChange={(e) => setFrom(e.target.value)} />
           <input type="date" className="inp !w-auto" value={to} onChange={(e) => setTo(e.target.value)} />
-          <MultiCheck label="Cửa hàng: tất cả" value={fLoc} onChange={(v) => { setFLoc(v); setPage(1); }}
-            options={[...locations].filter((l) => l.status === "Hoạt động").sort((a, b) => (a.type === "Cửa hàng" ? 0 : 1) - (b.type === "Cửa hàng" ? 0 : 1)).map((l) => ({ key: l.code, label: `[${l.region}] ${l.name}`, group: l.type === "Cửa hàng" ? "Cửa hàng" : "Kho" }))} />
+          <MultiCheck label="Khu vực: tất cả" value={fLoc} onChange={(v) => { setFLoc(v); setPage(1); }} width="w-48"
+            options={regions.map((r) => ({ key: r, label: r }))} />
           <select className="inp !w-auto" value={fInv} onChange={(e) => { setFInv(e.target.value); setPage(1); }}>
             <option value="">Hóa đơn: tất cả</option><option>Chờ xuất HĐ</option><option>Đã xuất HĐ</option>
           </select>
@@ -485,6 +502,9 @@ export default function DonBan() {
           </select>
           <select className="inp !w-auto" value={fKl} onChange={(e) => { setFKl(e.target.value); setPage(1); }} title="Khách lẻ cuối của đơn bán cho đại lý / khách buôn">
             <option value="">Khách lẻ của đại lý: tất cả</option><option value="co">Đã có khách lẻ</option><option value="chua">Chưa có khách lẻ (chờ nhập)</option>
+          </select>
+          <select className="inp !w-auto" value={fCl} onChange={(e) => { setFCl(e.target.value); setPage(1); }} title="Checklist giao xe: bảo hành, giấy COC, app VF (bắt buộc) + ảnh khách nhận xe, khách khoe FB/Zalo (khuyến nghị)">
+            <option value="">Checklist giao xe: tất cả</option><option value="thieu_bb">Thiếu mục bắt buộc</option><option value="chua_du">Chưa hoàn thành (còn thiếu mục)</option><option value="du">Đã hoàn thành đủ</option>
           </select>
           <select className="inp !w-auto" value={fPin} onChange={(e) => { setFPin(e.target.value); setPage(1); }} title="Hình thức kinh doanh pin của xe đổi pin (đơn khách buôn: theo khách lẻ sau cùng)">
             <option value="">Pin (xe đổi pin): tất cả</option>
@@ -523,7 +543,7 @@ export default function DonBan() {
               }}>⬇ Xuất Excel</button>
             </SelectionBar>
             <div className="tbl-scroll"><table className="w-full border-collapse tbl-card table-fixed">
-              <thead><tr><ThCheck sel={sel} rows={pageSlice(sorted, page, pageSize)} idOf={(o) => o.id} /><Th label="Mã đơn / Ngày" k="date" sort={sort} className="w-[12%]" /><Th label="Xe / Số khung" k="xe" sort={sort} className="w-[19%]" /><Th label="Điểm bán" k="kho" sort={sort} className="w-[12%]" /><Th label="Khách / SĐT" k="kh" sort={sort} className="w-[19%]" /><Th label="Tổng đơn" k="tien" sort={sort} className="w-[10%]" /><Th label="Hóa đơn" k="hd" sort={sort} className="w-[10%]" /><Th label="NV bán" k="nv" sort={sort} className="w-[8%]" /><th className="th w-[10%]"></th></tr></thead>
+              <thead><tr><ThCheck sel={sel} rows={pageSlice(sorted, page, pageSize)} idOf={(o) => o.id} /><Th label="Mã đơn / Ngày" k="date" sort={sort} className="w-[12%]" /><Th label="Xe / Số khung" k="xe" sort={sort} className="w-[19%]" /><Th label="Khu vực" k="kho" sort={sort} className="w-[8%]" /><Th label="Khách / SĐT" k="kh" sort={sort} className="w-[19%]" /><Th label="Tổng đơn" k="tien" sort={sort} className="w-[10%]" /><Th label="Hóa đơn" k="hd" sort={sort} className="w-[10%]" /><Th label="NV bán" k="nv" sort={sort} className="w-[8%]" /><th className="th w-[10%]"></th></tr></thead>
               <tbody>{pageSlice(sorted, page, pageSize).map((o, i) => {
                 const v = vOf(o.vehicle_id);
                 const st = o.invoice_status || "Chờ xuất HĐ";
@@ -538,16 +558,16 @@ export default function DonBan() {
                       <div className="text-[13px] truncate" title={v ? `${v.brand} ${v.name} ${v.color}` : o.vehicle_id}>{v ? `${v.name} ${v.color}` : o.vehicle_id}</div>
                       <div className="font-mono text-[10.5px] text-[#5A6572] truncate" title={o.frame_number}>{o.frame_number}</div>
                     </td>
-                    <td data-label="Điểm bán" data-m="nolabel" className="td text-xs"><div className="break-words" title={locName(o.location_code)}>{locName(o.location_code)}</div></td>
+                    <td data-label="Khu vực" data-m="nolabel" className="td text-xs"><div className="break-words font-semibold" title={`Điểm bán: ${locName(o.location_code)}`}>📍 {kvOf(o)}</div></td>
                     <td data-label="Khách" data-m="nolabel full" className="td"><div className="min-w-0 flex-1 max-md:flex max-md:flex-wrap max-md:items-center max-md:gap-x-1.5">
                       <div className="text-[13px] md:truncate break-words max-md:font-semibold" title={o.customer_name}>{o.customer_name}</div>
-                      <div className="text-[11px] text-[#5A6572]">{o.customer_phone}</div>
                       <Badge tone={o.customer_type === "Khách buôn" ? "amber" : o.customer_type === "Khách lẻ của Đại lý" ? "blue" : o.customer_type === "Khách lẻ" || !o.customer_type ? "green" : "purple"}>{o.customer_type || "Khách lẻ"}</Badge>
                       {!canKhachLe(o) && pinOf(o) && <span className={`inline-block text-[11px] font-semibold px-1.5 py-0.5 rounded-md whitespace-nowrap ${pinOf(o) === "Chưa chọn" ? "bg-[#FDE8EA] text-[#B01E2C]" : "bg-[#FFF4D6] text-[#8A5A00]"}`} title="Hình thức kinh doanh pin (xe đổi pin)">🔋 {pinOf(o) === "Chưa chọn" ? "Chưa chọn HT pin" : pinOf(o)}</span>}
                       {o.end_customer_id
-                        ? <div className="mt-1 max-md:mt-0 max-md:w-full text-[12px] leading-tight rounded-md bg-[#F4FBF7] border border-[#BBE3CC] px-1.5 py-1 max-md:py-0.5 max-md:flex max-md:gap-1.5 max-md:items-center" title="Khách lẻ cuối (người mua từ đại lý / khách buôn)">
+                        ? <div className="mt-1 max-md:mt-0 max-md:w-full text-[12px] leading-tight rounded-md bg-[#F4FBF7] border border-[#BBE3CC] px-1.5 py-1 max-md:py-0.5 flex flex-wrap gap-x-1.5 gap-y-0.5 items-center" title="Khách lẻ cuối (người mua từ đại lý / khách buôn)">
                             <span className="text-[10.5px] text-[#0E7A4A] font-semibold">👤 Khách lẻ:</span> <b className="text-[11.5px]">{o.end_customer_name}</b>
-                            {o.end_customer_phone && <div className="text-[11px] text-[#5A6572]">{o.end_customer_phone}</div>}
+                            {Number(o.end_customer_invoice_amount) > 0 && <span className="text-[11px] whitespace-nowrap" title="Số tiền hóa đơn xuất cho khách lẻ sau cùng">HĐ: <b className="text-brand">{fmtVND(o.end_customer_invoice_amount)}</b></span>}
+                            {kmKb[o.code] > 0 && <span className="text-[11px] whitespace-nowrap" title="Tiền khuyến mại hãng (claim) đã cộng vào sổ khách buôn cho đơn này">KM cộng sổ: <b className="text-[#0E7A4A]">+{fmtVND(kmKb[o.code])}</b></span>}
                             {pinOf(o) && <span className={`inline-block text-[11px] font-semibold px-1.5 py-0.5 rounded-md whitespace-nowrap max-md:ml-auto ${pinOf(o) === "Chưa chọn" ? "bg-[#FDE8EA] text-[#B01E2C]" : "bg-[#FFF4D6] text-[#8A5A00]"}`} title="Hình thức kinh doanh pin của khách lẻ sau cùng (xe đổi pin)">🔋 {pinOf(o) === "Chưa chọn" ? "Chưa chọn HT pin" : pinOf(o)}</span>}
                           </div>
                         : thieuKhachLe(o) && <div className="mt-1 text-[11px] font-semibold text-[#A25F00]">👤 Chưa có khách lẻ</div>}
@@ -561,6 +581,9 @@ export default function DonBan() {
                           ? <span title={`HĐ ${o.invoice_no} · ${fmtDate(o.invoice_date)} · ${o.invoice_by_name} · BH✓${o.app_activated ? " App✓" : ""}${o.coc_giao ? " COC✓" : ""}${o.checklist_giao_xe?.anh_khach ? " Ảnh✓" : ""}${o.checklist_giao_xe?.khoe_fb ? " FB✓" : ""}`}><Badge tone="green">✓ {o.invoice_no}</Badge></span>
                           : <Badge tone="amber">Chờ xuất HĐ</Badge>}
                         {!huy && thieuKhachLe(o) && <Badge tone="red">⚠ Thiếu KL</Badge>}
+                        {!huy && (() => { const c = clOf(o); return c.du
+                          ? <span className="inline-block text-[11px] font-semibold px-1.5 py-0.5 rounded-md whitespace-nowrap bg-[#E5F6EE] text-[#0E7A4A]" title="Checklist giao xe đã hoàn thành đủ">☑ {c.xong}/{c.tong}</span>
+                          : <span className={`inline-block text-[11px] font-semibold px-1.5 py-0.5 rounded-md whitespace-nowrap ${c.thieuBB ? "bg-[#FDE8EA] text-[#B01E2C]" : "bg-[#FFF4D6] text-[#8A5A00]"}`} title={`Checklist giao xe chưa hoàn thành — còn thiếu: ${c.thieu.join(", ")}`}>☐ Checklist {c.xong}/{c.tong}</span>; })()}
                       </div>
                     </td>
                     <td data-label="NV" className="td text-xs"><div className="truncate" title={o.seller_name}>{o.seller_name}</div></td>
