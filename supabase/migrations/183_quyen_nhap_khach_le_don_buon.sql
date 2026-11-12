@@ -1,0 +1,6 @@
+-- 183 (12/11/2026) — Đã chạy trực tiếp trên database.
+-- Quyền riêng 'kb_khach_le': nhập / sửa khách lẻ sau cùng của đơn bán buôn (cấu hình ở Quản trị › Phân quyền).
+-- • role_perms: thêm dòng 'kb_khach_le' cho mọi vai trò; giá trị ban đầu = vai trò đó đang có 'xuat_ban' hoặc 'sua_khach'
+--   (ADMIN, MANAGER, SALES = true; TECHNICIAN = false; CEO luôn có mọi quyền) -> không ai bị đổi quyền khi áp dụng.
+-- • fn_luu_khach_le_cuoi, fn_kb_ghi_khach_le_cuoi: thay điều kiện
+--     if not fn_co_quyen('xuat_ban') and not fn_co_quyen('sua_khach')   ->   if not fn_co_quyen('kb_khach_le')

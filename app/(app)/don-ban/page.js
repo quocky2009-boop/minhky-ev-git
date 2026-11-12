@@ -2,6 +2,7 @@
 import { useEffect, useState, useRef, Fragment } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useCatalog, useToast } from "@/lib/useData";
+import { usePerms } from "@/lib/usePerms";
 import { Badge, Toast, KPI, Pager, pageSlice, useSortable, Th, MultiCheck, MoneyInput, useSelection, ThCheck, TdCheck, SelectionBar } from "@/components/ui";
 import { fmtVND, fmtDate, fmtTime, errMsg, downloadXLSX } from "@/lib/format";
 import { printOrder, printOrderBill } from "@/lib/print";
@@ -17,6 +18,7 @@ const firstOfMonth = () => { const d = new Date(); return iso(new Date(d.getFull
 
 export default function DonBan() {
   const { supabase, vehicles, locations, regions, settings, profile, loading } = useCatalog();
+  const coQuyen = usePerms(supabase, profile);
   const { toast, notify } = useToast();
   const _params = useSearchParams();
   const router = useRouter();
@@ -160,6 +162,7 @@ export default function DonBan() {
     return Math.max(tienXe - ckXe + (itemSum[o.code] || 0) - (o.discount_amount || 0) - (o.kb_dieu_chinh || 0), 0);
   };
   const canConfirm = ["SALES", "MANAGER", "ADMIN", "CEO"].includes(profile.role);
+  const canKL = coQuyen("kb_khach_le"); // quyen nhap / sua khach le sau cung cua don ban buon (Phan quyen)
   const canCancel = ["ADMIN", "CEO"].includes(profile.role);
 
   const isVF = (o) => (vOf(o.vehicle_id)?.brand || "").toUpperCase().includes("VINFAST");
@@ -601,7 +604,7 @@ export default function DonBan() {
                         {done && canConfirm && <button className={`!px-2 !py-1 !text-xs ${invId === o.id ? "btn-primary" : clOf(o).du ? "btn-ghost" : "btn-danger"}`} title="Sửa số hóa đơn / bổ sung checklist giao xe"
                           onClick={() => { const c = o.checklist_giao_xe || {}; setInvId(invId === o.id ? null : o.id); setInvF({ no: o.invoice_no || "", date: o.invoice_date || iso(new Date()), dms: o.dms_code || "", checklist: { ...c, bao_hanh: !!(o.warranty_activated || c.bao_hanh), coc_giao: !!(o.coc_giao || c.coc_giao), app_vf: !!(o.app_activated || c.app_vf) } }); }}>✎ HĐ</button>}
                         {!done && canConfirm && <button className={`!px-2 !py-1 !text-xs ${invId === o.id ? "btn-primary" : "btn-ok"}`} onClick={() => { setInvId(invId === o.id ? null : o.id); setInvF({ no: "", date: iso(new Date()), checklist: {}, dms: "" }); }}>{invId === o.id ? "Đóng" : "✓ HĐ"}</button>}
-                        {thieuKhachLe(o) && <button className="btn-primary !px-2 !py-1 !text-xs !bg-danger !border-danger" title="Nhập thông tin khách lẻ mua sau cùng" onClick={() => openDetail(o)}>👤</button>}
+                        {canKL && thieuKhachLe(o) && <button className="btn-primary !px-2 !py-1 !text-xs !bg-danger !border-danger" title="Nhập thông tin khách lẻ mua sau cùng" onClick={() => openDetail(o)}>👤</button>}
                         <button className="btn-ghost !px-2 !py-1 !text-xs" title="Xem nhanh đơn" onClick={() => openDetail(o)}>👁</button>
                         {canSuaTT && total(o) - (o.paid_amount || 0) > 0 && (
                           <button className="btn-ok !px-2 !py-1 !text-xs" title={`Còn thiếu ${fmtVND(total(o) - (o.paid_amount || 0))} — bấm để thu`}
@@ -802,11 +805,11 @@ export default function DonBan() {
                                   <Link href={`/khach-buon?kh=${detail.customer_id}`} className="text-brand underline text-[11.5px]">Xem sổ khách buôn</Link>
                                 </div>
                               )}
-                              <button className="btn-ghost !text-xs mt-1.5 self-start" onClick={() => moKhachLe({
+                              {canKL && <button className="btn-ghost !text-xs mt-1.5 self-start" onClick={() => moKhachLe({
                                 name: detail.end_customer_name, phone: detail.end_customer_phone,
                                 email: detail.end_customer_email, address: detail.end_customer_address,
                                 customer_type: detail.end_customer_type || "", invoice_amount: detail.end_customer_invoice_amount || "",
-                                battery_option: detail.end_customer_battery_option || "" })}>✎ Sửa</button>
+                                battery_option: detail.end_customer_battery_option || "" })}>✎ Sửa</button>}
                             </div>
                           ) : klEdit ? (
                             <div className="flex flex-col gap-2">
@@ -863,7 +866,8 @@ export default function DonBan() {
                                   ? "Xe VinFast bán buôn — bắt buộc có thông tin khách lẻ cuối trước khi xuất hóa đơn."
                                   : "Đại lý bán lại cho khách lẻ thì bổ sung thông tin ở đây."}
                               </div>
-                              <button className="btn-primary !text-xs" onClick={() => moKhachLe({ name: "", phone: "", email: "", address: "", customer_type: "", invoice_amount: "", battery_option: "" })}>+ Thông tin khách lẻ cuối</button>
+                              {canKL ? <button className="btn-primary !text-xs" onClick={() => moKhachLe({ name: "", phone: "", email: "", address: "", customer_type: "", invoice_amount: "", battery_option: "" })}>+ Thông tin khách lẻ cuối</button>
+                                : <div className="text-[11.5px] text-[#8A93A0]">Bạn chưa được cấp quyền nhập khách lẻ sau cùng (Quản trị › Phân quyền).</div>}
                             </div>
                           )}
                         </div>
