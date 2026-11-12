@@ -40,6 +40,7 @@ export default function DonBan() {
   const [fLoc, setFLoc] = useState(() => (_params.get("kho") || "").split(",").filter(Boolean));
   const [fInv, setFInv] = useState(() => _params.get("hd") || "");
   const [fType, setFType] = useState(() => _params.get("loai") || "");
+  const [fPin, setFPin] = useState(() => _params.get("pin") || ""); // hinh thuc kinh doanh pin (xe doi pin)
   const [moLoc, setMoLoc] = useState(false); // dien thoai: mo/gap bo loc
   const [fKl, setFKl] = useState(() => _params.get("kl") || ""); // khach le cua dai ly: "" | co | chua
   const [showHuy, setShowHuy] = useState(() => _params.get("huy") === "1");
@@ -67,11 +68,12 @@ export default function DonBan() {
     if (fInv) sp.set("hd", fInv);
     if (fType) sp.set("loai", fType);
     if (fKl) sp.set("kl", fKl);
+    if (fPin) sp.set("pin", fPin);
     if (showHuy) sp.set("huy", "1");
     if (page > 1) sp.set("trang", String(page));
     const qs = sp.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-  }, [q, from, to, fLoc.join(","), fInv, fType, fKl, showHuy, page]);
+  }, [q, from, to, fLoc.join(","), fInv, fType, fKl, fPin, showHuy, page]);
   // Tu mo chi tiet khi den tu o tim kiem toan cuc (khop dung 1 don)
   const [_autoOpened, _setAutoOpened] = useState(false);
   useEffect(() => {
@@ -158,6 +160,9 @@ export default function DonBan() {
   const isVF = (o) => (vOf(o.vehicle_id)?.brand || "").toUpperCase().includes("VINFAST");
   const canKhachLe = (o) => o.customer_type === "Khách buôn";
   const thieuKhachLe = (o) => canKhachLe(o) && isVF(o) && !o.end_customer_id;
+  // Hinh thuc kinh doanh pin: chi xe doi pin. Khach buon -> theo khach le sau cung; con lai -> theo don.
+  const laDoiPin = (o) => vOf(o.vehicle_id)?.model_pin === "Xe đổi pin";
+  const pinOf = (o) => !laDoiPin(o) ? "" : canKhachLe(o) ? (o.end_customer_id ? (o.end_customer_battery_option || "Chưa chọn") : "") : (o.battery_option || "Chưa chọn");
   const daDong = (o) => o.status === "Đã hủy" || o.status === "Đã trả hàng";
   const filtered = rows.filter((o) => {
     if (daDong(o) && !showHuy) return false;
@@ -165,11 +170,12 @@ export default function DonBan() {
     if (fType && (o.customer_type || "") !== fType) return false;
     if (fKl === "co" && !o.end_customer_id) return false;
     if (fKl === "chua" && !thieuKhachLe(o)) return false;
+    if (fPin && pinOf(o) !== fPin) return false;
     if (!q) return true;
     const kd = (x) => String(x || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d");
     const kw = kd(q.trim());
     const v = vOf(o.vehicle_id);
-    return kd(`${o.code} ${o.customer_name} ${o.customer_phone} ${o.frame_number} ${o.invoice_no || ""} ${v ? v.name : ""} ${o.seller_name} ${o.end_customer_name || ""} ${o.end_customer_phone || ""}`).includes(kw);
+    return kd(`${o.code} ${o.customer_name} ${o.customer_phone} ${o.frame_number} ${o.invoice_no || ""} ${v ? v.name : ""} ${o.seller_name} ${o.end_customer_name || ""} ${o.end_customer_phone || ""} ${pinOf(o)}`).includes(kw);
   });
   const sorted = sort.sortFn(filtered, {
     code: (o) => o.code, date: (o) => o.sale_date, xe: (o) => vOf(o.vehicle_id)?.name || o.vehicle_id, sk: (o) => o.frame_number || "", sdt: (o) => o.customer_phone || "",
@@ -463,8 +469,8 @@ export default function DonBan() {
           <div className="font-extrabold mr-auto">Danh sách đơn bán ({sorted.length})</div>
           <Link href="/ban-hang/wizard" className="btn-primary !text-xs">+ Tạo đơn bán mới</Link>
           <Link href="/ban-buon" className="btn-ghost !text-xs" title="Chốt đơn với khách buôn, thu tiền ở đơn bán buôn, khi giao mới chọn số khung — tiền tự chia cho từng xe">+ Tạo đơn bán buôn</Link>
-          <button className={`md:hidden btn-ghost !text-xs ${fLoc.length || fInv || fType || fKl || showHuy ? "!bg-[#EAF2FF] !text-brand" : ""}`} onClick={() => setMoLoc(!moLoc)}>
-            ⚙ Bộ lọc{(fLoc.length ? 1 : 0) + (fInv ? 1 : 0) + (fType ? 1 : 0) + (fKl ? 1 : 0) + (showHuy ? 1 : 0) > 0 ? ` (${(fLoc.length ? 1 : 0) + (fInv ? 1 : 0) + (fType ? 1 : 0) + (fKl ? 1 : 0) + (showHuy ? 1 : 0)})` : ""} {moLoc ? "▴" : "▾"}</button>
+          <button className={`md:hidden btn-ghost !text-xs ${fLoc.length || fInv || fType || fKl || fPin || showHuy ? "!bg-[#EAF2FF] !text-brand" : ""}`} onClick={() => setMoLoc(!moLoc)}>
+            ⚙ Bộ lọc{(fLoc.length ? 1 : 0) + (fInv ? 1 : 0) + (fType ? 1 : 0) + (fKl ? 1 : 0) + (fPin ? 1 : 0) + (showHuy ? 1 : 0) > 0 ? ` (${(fLoc.length ? 1 : 0) + (fInv ? 1 : 0) + (fType ? 1 : 0) + (fKl ? 1 : 0) + (fPin ? 1 : 0) + (showHuy ? 1 : 0)})` : ""} {moLoc ? "▴" : "▾"}</button>
           <div className={`${moLoc ? "flex" : "hidden"} md:contents gap-2 flex-wrap items-center w-full`}>
           <input type="date" className="inp !w-auto" value={from} onChange={(e) => setFrom(e.target.value)} />
           <input type="date" className="inp !w-auto" value={to} onChange={(e) => setTo(e.target.value)} />
@@ -479,6 +485,10 @@ export default function DonBan() {
           </select>
           <select className="inp !w-auto" value={fKl} onChange={(e) => { setFKl(e.target.value); setPage(1); }} title="Khách lẻ cuối của đơn bán cho đại lý / khách buôn">
             <option value="">Khách lẻ của đại lý: tất cả</option><option value="co">Đã có khách lẻ</option><option value="chua">Chưa có khách lẻ (chờ nhập)</option>
+          </select>
+          <select className="inp !w-auto" value={fPin} onChange={(e) => { setFPin(e.target.value); setPage(1); }} title="Hình thức kinh doanh pin của xe đổi pin (đơn khách buôn: theo khách lẻ sau cùng)">
+            <option value="">Pin (xe đổi pin): tất cả</option>
+            {Array.from(new Set(rows.map(pinOf).filter(Boolean))).sort().map((t) => <option key={t}>{t}</option>)}
           </select>
           <button className={`btn-ghost !text-xs ${showHuy ? "!bg-[#FDEDED] !text-danger" : ""}`} onClick={() => { setShowHuy(!showHuy); setPage(1); }}>
             {showHuy ? "Đang hiện đơn hủy/trả" : `Đơn hủy/trả${nHuy ? ` (${nHuy})` : ""}`}
@@ -533,10 +543,12 @@ export default function DonBan() {
                       <div className="text-[13px] md:truncate break-words max-md:font-semibold" title={o.customer_name}>{o.customer_name}</div>
                       <div className="text-[11px] text-[#5A6572]">{o.customer_phone}</div>
                       <Badge tone={o.customer_type === "Khách buôn" ? "amber" : o.customer_type === "Khách lẻ của Đại lý" ? "blue" : o.customer_type === "Khách lẻ" || !o.customer_type ? "green" : "purple"}>{o.customer_type || "Khách lẻ"}</Badge>
+                      {!canKhachLe(o) && pinOf(o) && <span className={`inline-block text-[11px] font-semibold px-1.5 py-0.5 rounded-md whitespace-nowrap ${pinOf(o) === "Chưa chọn" ? "bg-[#FDE8EA] text-[#B01E2C]" : "bg-[#FFF4D6] text-[#8A5A00]"}`} title="Hình thức kinh doanh pin (xe đổi pin)">🔋 {pinOf(o) === "Chưa chọn" ? "Chưa chọn HT pin" : pinOf(o)}</span>}
                       {o.end_customer_id
                         ? <div className="mt-1 max-md:mt-0 max-md:w-full text-[12px] leading-tight rounded-md bg-[#F4FBF7] border border-[#BBE3CC] px-1.5 py-1 max-md:py-0.5 max-md:flex max-md:gap-1.5 max-md:items-center" title="Khách lẻ cuối (người mua từ đại lý / khách buôn)">
                             <span className="text-[10.5px] text-[#0E7A4A] font-semibold">👤 Khách lẻ:</span> <b className="text-[11.5px]">{o.end_customer_name}</b>
                             {o.end_customer_phone && <div className="text-[11px] text-[#5A6572]">{o.end_customer_phone}</div>}
+                            {pinOf(o) && <span className={`inline-block text-[11px] font-semibold px-1.5 py-0.5 rounded-md whitespace-nowrap max-md:ml-auto ${pinOf(o) === "Chưa chọn" ? "bg-[#FDE8EA] text-[#B01E2C]" : "bg-[#FFF4D6] text-[#8A5A00]"}`} title="Hình thức kinh doanh pin của khách lẻ sau cùng (xe đổi pin)">🔋 {pinOf(o) === "Chưa chọn" ? "Chưa chọn HT pin" : pinOf(o)}</span>}
                           </div>
                         : thieuKhachLe(o) && <div className="mt-1 text-[11px] font-semibold text-[#A25F00]">👤 Chưa có khách lẻ</div>}
                     </div></td>
