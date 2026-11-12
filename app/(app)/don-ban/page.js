@@ -175,8 +175,9 @@ export default function DonBan() {
     const c = o.checklist_giao_xe || {};
     const bb = [["Bảo hành", !!(o.warranty_activated || c.bao_hanh)], ["BB bàn giao xe & hồ sơ", !!(o.coc_giao || c.coc_giao)], ["Phiếu PDI kiểm tra xe", !!c.pdi], ["HDSD xe và mốc bảo dưỡng", !!c.hdsd]];
     const kn = [...(isVF(o) ? [["App VF", !!(o.app_activated || c.app_vf)]] : []), ["Ảnh khách nhận xe", !!c.anh_khach], ["Khách khoe FB/Zalo", !!c.khoe_fb]];
-    const all = [...bb, ...kn]; const xong = all.filter((x) => x[1]).length, tong = all.length;
-    return { xong, tong, thieuBB: bb.some((x) => !x[1]), du: xong === tong, thieu: all.filter((x) => !x[1]).map((x) => x[0]) };
+    // Dem theo cac muc BAT BUOC; muc khuyen nghi chi liet ke o chu thich
+    const xong = bb.filter((x) => x[1]).length, tong = bb.length;
+    return { xong, tong, thieuBB: xong < tong, du: xong === tong, thieu: bb.filter((x) => !x[1]).map((x) => x[0]), thieuKN: kn.filter((x) => !x[1]).map((x) => x[0]) };
   };
   const filtered = rows.filter((o) => {
     if (daDong(o) && !showHuy) return false;
@@ -186,7 +187,7 @@ export default function DonBan() {
     if (fKl === "chua" && !thieuKhachLe(o)) return false;
     if (fPin && pinOf(o) !== fPin) return false;
     if (fLoc.length && !fLoc.includes(kvOf(o))) return false;
-    if (fCl) { const c = clOf(o); if (daDong(o)) return false; if (fCl === "thieu_bb" && !c.thieuBB) return false; if (fCl === "chua_du" && c.du) return false; if (fCl === "du" && !c.du) return false; }
+    if (fCl) { const c = clOf(o); if (daDong(o)) return false; if ((fCl === "thieu_bb" || fCl === "chua_du") && c.du) return false; if (fCl === "du" && !c.du) return false; }
     if (!q) return true;
     const kd = (x) => String(x || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d");
     const kw = kd(q.trim());
@@ -206,7 +207,6 @@ export default function DonBan() {
 
   const confirmInv = async (o) => {
     if (!invF.no.trim()) return notify("Bắt buộc nhập số hóa đơn.", "err");
-    if (!invF.dms?.trim()) return notify("Bắt buộc nhập Mã đơn DMS.", "err");
     if (!invF.checklist?.bao_hanh) return notify("Checklist: phải kích hoạt bảo hành.", "err");
     if (!invF.checklist?.coc_giao) return notify("Checklist: phải xác nhận BB bàn giao xe & hồ sơ.", "err");
     if (!invF.checklist?.pdi) return notify("Checklist: phải có Phiếu PDI kiểm tra xe.", "err");
@@ -504,7 +504,7 @@ export default function DonBan() {
             <option value="">Khách lẻ của đại lý: tất cả</option><option value="co">Đã có khách lẻ</option><option value="chua">Chưa có khách lẻ (chờ nhập)</option>
           </select>
           <select className="inp !w-auto" value={fCl} onChange={(e) => { setFCl(e.target.value); setPage(1); }} title="Checklist giao xe: bảo hành, BB bàn giao xe & hồ sơ, phiếu PDI, HDSD xe và mốc bảo dưỡng (bắt buộc) + app VF, ảnh khách nhận xe, khách khoe FB/Zalo (khuyến nghị)">
-            <option value="">Checklist giao xe: tất cả</option><option value="thieu_bb">Thiếu mục bắt buộc</option><option value="chua_du">Chưa hoàn thành (còn thiếu mục)</option><option value="du">Đã hoàn thành đủ</option>
+            <option value="">Checklist giao xe: tất cả</option><option value="chua_du">Chưa hoàn thành</option><option value="du">Đã hoàn thành</option>
           </select>
           <select className="inp !w-auto" value={fPin} onChange={(e) => { setFPin(e.target.value); setPage(1); }} title="Hình thức kinh doanh pin của xe đổi pin (đơn khách buôn: theo khách lẻ sau cùng)">
             <option value="">Pin (xe đổi pin): tất cả</option>
@@ -558,7 +558,7 @@ export default function DonBan() {
                       <div className="text-[13px] truncate" title={v ? `${v.brand} ${v.name} ${v.color}` : o.vehicle_id}>{v ? `${v.name} ${v.color}` : o.vehicle_id}</div>
                       <div className="font-mono text-[10.5px] text-[#5A6572] truncate" title={o.frame_number}>{o.frame_number}</div>
                     </td>
-                    <td data-label="Khu vực" data-m="nolabel" className="td text-xs"><div className="break-words font-semibold" title={`Điểm bán: ${locName(o.location_code)}`}>📍 {kvOf(o)}</div></td>
+                    <td data-label="Khu vực" data-m="nolabel" className="td text-xs"><div className="break-words" title={`Điểm bán: ${locName(o.location_code)}`}>{kvOf(o)}</div></td>
                     <td data-label="Khách" data-m="nolabel full" className="td"><div className="min-w-0 flex-1 max-md:flex max-md:flex-wrap max-md:items-center max-md:gap-x-1.5">
                       <div className="text-[13px] md:truncate break-words max-md:font-semibold" title={o.customer_name}>{o.customer_name}</div>
                       <Badge tone={o.customer_type === "Khách buôn" ? "amber" : o.customer_type === "Khách lẻ của Đại lý" ? "blue" : o.customer_type === "Khách lẻ" || !o.customer_type ? "green" : "purple"}>{o.customer_type || "Khách lẻ"}</Badge>
@@ -582,8 +582,8 @@ export default function DonBan() {
                           : <Badge tone="amber">Chờ xuất HĐ</Badge>}
                         {!huy && thieuKhachLe(o) && <Badge tone="red">⚠ Thiếu KL</Badge>}
                         {!huy && (() => { const c = clOf(o); return c.du
-                          ? <span className="inline-block text-[11px] font-semibold px-1.5 py-0.5 rounded-md whitespace-nowrap bg-[#E5F6EE] text-[#0E7A4A]" title="Checklist giao xe đã hoàn thành đủ">☑ {c.xong}/{c.tong}</span>
-                          : <span className={`inline-block text-[11px] font-semibold px-1.5 py-0.5 rounded-md whitespace-nowrap ${c.thieuBB ? "bg-[#FDE8EA] text-[#B01E2C]" : "bg-[#FFF4D6] text-[#8A5A00]"}`} title={`Checklist giao xe chưa hoàn thành — còn thiếu: ${c.thieu.join(", ")}`}>☐ Checklist {c.xong}/{c.tong}</span>; })()}
+                          ? <span className="inline-block text-[11px] font-semibold px-1.5 py-0.5 rounded-md whitespace-nowrap bg-[#E5F6EE] text-[#0E7A4A]" title={`Checklist giao xe: đã đủ ${c.tong} mục bắt buộc${c.thieuKN.length ? ` · mục khuyến nghị chưa làm: ${c.thieuKN.join(", ")}` : ""}`}>☑ Checklist {c.xong}/{c.tong}</span>
+                          : <span className="inline-block text-[11px] font-semibold px-1.5 py-0.5 rounded-md whitespace-nowrap bg-[#FDE8EA] text-[#B01E2C]" title={`Checklist giao xe chưa hoàn thành — còn thiếu mục bắt buộc: ${c.thieu.join(", ")}`}>☐ Checklist {c.xong}/{c.tong}</span>; })()}
                       </div>
                     </td>
                     <td data-label="NV" className="td text-xs"><div className="truncate" title={o.seller_name}>{o.seller_name}</div></td>
@@ -610,7 +610,6 @@ export default function DonBan() {
                         <div className="flex gap-1.5 items-end flex-wrap">
                           <div><label className="lbl">Số hóa đơn (bắt buộc)</label><input className="inp !py-2 !w-48" autoFocus value={invF.no} onChange={(e) => setInvF((p) => ({ ...p, no: e.target.value }))} placeholder="VD: 00012345" /></div>
                           <div><label className="lbl">Ngày xuất HĐ</label><input type="date" className="inp !py-2 !w-40" value={invF.date} onChange={(e) => setInvF((p) => ({ ...p, date: e.target.value }))} /></div>
-                          <div><label className="lbl">Mã đơn DMS (bắt buộc)</label><input className="inp !py-2 !w-44" value={invF.dms || ""} onChange={(e) => setInvF((p) => ({ ...p, dms: e.target.value }))} placeholder="VD: DMS00012345" /></div>
                         </div>
                         {/* CHECKLIST GIAO XE */}
                         <div className="border border-[#D5DBE3] rounded-xl p-3 bg-white">
@@ -641,7 +640,7 @@ export default function DonBan() {
                         </div>
                         <div className="flex gap-2 items-center flex-wrap">
                           <button className="btn-ok !py-2 !text-xs" disabled={busy} onClick={() => confirmInv(o)}>Xác nhận hoàn thành đơn</button>
-                          <span className="text-[10.5px] text-[#8A93A0]">Bắt buộc: Số HĐ + Mã DMS + Bảo hành + BB bàn giao xe & hồ sơ + Phiếu PDI + HDSD xe và mốc bảo dưỡng. Các mục còn lại là khuyến nghị.</span>
+                          <span className="text-[10.5px] text-[#8A93A0]">Bắt buộc: Số HĐ + Bảo hành + BB bàn giao xe & hồ sơ + Phiếu PDI + HDSD xe và mốc bảo dưỡng. Các mục còn lại là khuyến nghị.</span>
                         </div>
                       </div>
                     </td></tr>
