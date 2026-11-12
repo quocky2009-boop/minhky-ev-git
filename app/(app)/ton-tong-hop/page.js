@@ -2,6 +2,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useCatalog } from "@/lib/useData";
+import { usePerms } from "@/lib/usePerms";
 import { Badge, Pager, pageSlice, pageClamp } from "@/components/ui";
 import { fmtNum, fmtDate, downloadXLSX } from "@/lib/format";
 
@@ -9,7 +10,8 @@ const daysIn = (t) => Math.max(0, Math.floor((Date.now() - new Date(t).getTime()
 
 // Bang ma tran: dong = ma xe, cot = kho (giong sheet DM_XE cua file Excel cu)
 export default function TonTongHop() {
-  const { supabase, vehicles, locations, brands, loading, getQty, totalQty, regionQty } = useCatalog();
+  const { supabase, vehicles, locations, brands, loading, profile, getQty, totalQty, regionQty } = useCatalog();
+  const can = usePerms(supabase, profile);
   const [q, setQ] = useState(""); const [fBrand, setFBrand] = useState("");
   const [hideZero, setHideZero] = useState(true);
   const [cell, setCell] = useState(null); // {v, scope, code, label, units}
@@ -67,6 +69,34 @@ export default function TonTongHop() {
     downloadXLSX(withSales ? "ton_tong_hop_kem_doanh_so.xlsx" : "ton_tong_hop.xlsx", rows, "Ton_tong_hop");
   };
 
+  // Xuat danh sach tung xe ton theo vi tri kho, du thong tin xe + so khung (theo bo loc dang chon)
+  const exportSoKhung = async () => {
+    setShowExp(false); setExpBusy(true);
+    const ids = new Set(list.map((v) => v.id));
+    const all = [];
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await supabase.from("vehicle_units").select("*")
+        .in("status", ["TON_KHO", "DANG_CHUYEN", "GIU_CHO"]).order("frame_number").range(from, from + 999);
+      if (error) { setExpBusy(false); return alert("Không lấy được danh sách xe tồn: " + (error.message || error)); }
+      all.push(...(data || []));
+      if (!data || data.length < 1000) break;
+    }
+    setExpBusy(false);
+    const lOf = (c) => locations.find((l) => l.code === c);
+    const vOf = (id) => vehicles.find((v) => v.id === id);
+    const TT = { TON_KHO: "Tồn kho", GIU_CHO: "Giữ chỗ", DANG_CHUYEN: "Đang chuyển" };
+    const coVon = can("gia_von_nhap");
+    const ds = all.filter((u) => ids.has(u.vehicle_id)).map((u) => ({ u, v: vOf(u.vehicle_id) || {}, l: lOf(u.location_code) || {} }))
+      .sort((a, b) => (a.l.region || "").localeCompare(b.l.region || "") || (a.l.name || a.u.location_code || "").localeCompare(b.l.name || b.u.location_code || "")
+        || (a.v.name || "").localeCompare(b.v.name || "") || (a.v.color || "").localeCompare(b.v.color || "") || String(a.u.imported_at || "").localeCompare(String(b.u.imported_at || "")));
+    if (!ds.length) return alert("Không có xe tồn nào theo bộ lọc đang chọn.");
+    const head = ["STT", "Khu vực", "Kho / cửa hàng", "Mã kho", "Hãng", "Mã hãng", "Mã xe", "Tên xe", "Màu", "Loại pin", "Số khung", "Số máy", "Giá niêm yết", ...(coVon ? ["Giá vốn"] : []), "Ngày nhập", "Số ngày tồn", "Trạng thái", "Số khung tạm", "Ghi chú"];
+    const body = ds.map(({ u, v, l }, i) => [i + 1, l.region || "", l.name || u.location_code, u.location_code, v.brand || "", v.mfr_code || "", u.vehicle_id, v.name || "", v.color || "", v.model_pin || "",
+      u.frame_number, u.engine_number || "", Number(v.list_price) || "", ...(coVon ? [Number(u.cost_price) || ""] : []), u.imported_at ? String(u.imported_at).slice(0, 10) : "", u.imported_at ? daysIn(u.imported_at) : "",
+      TT[u.status] || u.status, u.is_placeholder ? "Có" : "", u.note || ""]);
+    downloadXLSX("ton_xe_theo_kho_so_khung.xlsx", [head, ...body], "Ton_theo_kho");
+  };
+
   return (
     <div className="card">
       <div className="flex gap-2 flex-wrap items-center mb-3">
@@ -82,12 +112,13 @@ export default function TonTongHop() {
             <div className="absolute right-0 top-full mt-1 z-30 bg-white border border-[#E3E8EF] rounded-xl shadow-lg p-1.5 min-w-[230px] flex flex-col">
               <button className="text-left text-[13px] px-3 py-2 rounded-lg hover:bg-[#F3F5F8]" onClick={() => exportCSV(false)}>Xuất Excel kho<div className="text-[11px] text-[#8A93A0]">Mã hàng + tồn từng điểm</div></button>
               <button className="text-left text-[13px] px-3 py-2 rounded-lg hover:bg-[#F3F5F8]" onClick={() => exportCSV(true)}>Xuất Excel kèm doanh số<div className="text-[11px] text-[#8A93A0]">Thêm 30_days và Sales_avg</div></button>
+              <button className="text-left text-[13px] px-3 py-2 rounded-lg hover:bg-[#F3F5F8]" onClick={exportSoKhung}>Xuất danh sách xe theo kho<div className="text-[11px] text-[#8A93A0]">Từng xe: kho, thông tin xe, số khung, ngày nhập</div></button>
             </div>
           )}
         </div>
       </div>
-      <div className="overflow-x-auto max-h-[70vh] overflow-y-auto border border-[#E6EAEF] rounded-xl">
-        <table className="border-collapse w-full">
+      <div className="overflow-x-auto md:max-h-[70vh] overflow-y-auto md:border border-[#E6EAEF] rounded-xl">
+        <table className="border-collapse w-full tbl-card">
           <thead className="sticky top-0 z-10">
             <tr className="bg-[#F3F5F8]">
               <th className="th sticky left-0 bg-[#F3F5F8] z-20 min-w-[190px]">Xe</th>
@@ -99,27 +130,27 @@ export default function TonTongHop() {
           <tbody>
             {list.map((v) => (
               <tr key={v.id} className="hover:bg-[#F8FAFC]">
-                <td className="td sticky left-0 bg-white font-semibold text-[12.5px]">{v.name} <span className="text-[#8A93A0]">· {v.color}</span></td>
-                <td className={`td text-center font-extrabold bg-[#E7EFFD] ${totalQty(v.id) > 0 ? "cursor-pointer hover:underline text-brand" : "text-[#C6CDD6]"}`}
+                <td data-m="title" className="td sticky left-0 bg-white font-semibold text-[12.5px]">{v.name} <span className="text-[#8A93A0]">· {v.color}</span></td>
+                <td data-m="end" className={`td text-center font-extrabold bg-[#E7EFFD] max-md:!bg-transparent ${totalQty(v.id) > 0 ? "cursor-pointer hover:underline text-brand" : "text-[#C6CDD6]"}`}
                   title={totalQty(v.id) > 0 ? `Xem toàn bộ ${totalQty(v.id)} xe ${v.name}` : ""}
                   onClick={() => totalQty(v.id) > 0 && openCell(v, "all", "", "Toàn hệ thống")}>{totalQty(v.id)}</td>
                 {regions.map((r) => { const n = regionQty(v.id, r);
-                  return <td key={r} className={`td text-center tabular-nums bg-[#F4FBF7] ${n === 0 ? "text-[#C6CDD6]" : "font-bold cursor-pointer hover:underline text-brand"}`}
+                  return <td key={r} data-label={`Σ ${r}`} data-m={n === 0 ? "hide" : undefined} className={`td text-center tabular-nums bg-[#F4FBF7] max-md:!bg-transparent ${n === 0 ? "text-[#C6CDD6]" : "font-bold cursor-pointer hover:underline text-brand"}`}
                     title={n > 0 ? `Xem ${n} xe ${v.name} ở khu vực ${r}` : ""}
                     onClick={() => n > 0 && openCell(v, "region", r, `Khu vực ${r}`)}>{n === 0 ? "·" : n}</td>; })}
                 {locs.map((l) => {
                   const n = getQty(v.id, l.code);
-                  return <td key={l.code} className={`td text-center tabular-nums ${n === 0 ? "text-[#C6CDD6]" : "font-bold text-brand cursor-pointer hover:underline"}`}
+                  return <td key={l.code} data-label={l.name} data-m={n === 0 ? "hide" : undefined} className={`td text-center tabular-nums ${n === 0 ? "text-[#C6CDD6]" : "font-bold text-brand cursor-pointer hover:underline"}`}
                     title={n > 0 ? `Xem ${n} xe ${v.name} tại ${l.name}` : ""}
                     onClick={() => n > 0 && openCell(v, "loc", l.code, l.name)}>{n === 0 ? "·" : n}</td>;
                 })}
               </tr>
             ))}
             <tr className="bg-[#F3F5F8] font-extrabold">
-              <td className="td sticky left-0 bg-[#F3F5F8]">TỔNG</td>
-              <td className="td text-center bg-[#E7EFFD]">{grand}</td>
-              {regions.map((r) => <td key={r} className="td text-center tabular-nums bg-[#E5F6EE]">{regTotal(r)}</td>)}
-              {locs.map((l) => <td key={l.code} className="td text-center tabular-nums">{colTotal(l.code)}</td>)}
+              <td data-m="title" className="td sticky left-0 bg-[#F3F5F8] max-md:!bg-transparent">TỔNG</td>
+              <td data-m="end" className="td text-center bg-[#E7EFFD] max-md:!bg-transparent">{grand}</td>
+              {regions.map((r) => <td key={r} data-label={`Σ ${r}`} className="td text-center tabular-nums bg-[#E5F6EE] max-md:!bg-transparent">{regTotal(r)}</td>)}
+              {locs.map((l) => <td key={l.code} data-label={l.name} data-m={colTotal(l.code) === 0 ? "hide" : undefined} className="td text-center tabular-nums">{colTotal(l.code)}</td>)}
             </tr>
           </tbody>
         </table>
@@ -141,7 +172,7 @@ export default function TonTongHop() {
               return (
                 <>
                   <input className="inp !w-full mb-2.5" placeholder="🔎 Tìm số khung trong danh sách này…" value={cq} onChange={(e) => { setCq(e.target.value); setCPage(1); }} />
-                  <div className="overflow-x-auto"><table className="w-full border-collapse">
+                  <div className="overflow-x-auto"><table className="w-full border-collapse tbl-card">
                     <thead><tr><th className="th w-8">#</th>{showKho && <th className="th">Kho</th>}<th className="th">Số khung</th><th className="th">Ngày nhập</th><th className="th">Ngày tồn</th><th className="th">Trạng thái</th></tr></thead>
                     <tbody>{pg.map((u, i) => (
                       <tr key={u.frame_number} className="hover:bg-[#F8FAFC]">

@@ -160,7 +160,7 @@ export default function PhanQuyen() {
       {/* BẢNG PHÂN QUYỀN */}
       <div className="card !p-0 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
+          <table className="w-full border-collapse tbl-card">
             <thead>
               <tr className="bg-[#1E2B3C] text-white text-[12px]">
                 <th className="text-left px-4 py-3 font-semibold w-64">Quyền</th>
@@ -185,12 +185,12 @@ export default function PhanQuyen() {
                   </tr>
                   {g.items.map((item, ii) => (
                     <tr key={item.key} className={`border-b border-[#F0F2F5] ${ii % 2 === 0 ? "bg-white" : "bg-[#FAFBFC]"} hover:bg-[#EAF2FF]`}>
-                      <td className="px-4 py-2.5">
-                        <div className="text-[13px] font-medium">{item.label}</div>
+                      <td data-m="title full" className="px-4 py-2.5">
+                        <div className="text-[13px] font-medium max-md:font-bold">{item.label}</div>
                         {item.desc && <div className="text-[11px] text-[#8A93A0]">{item.desc}</div>}
                       </td>
                       {ROLES_LIST.map(r => (
-                        <td key={r.key} className="text-center px-2 py-2.5">
+                        <td key={r.key} data-label={r.label} className="text-center px-2 py-2.5">
                           <label className="inline-flex items-center justify-center cursor-pointer">
                             <input
                               type="checkbox"

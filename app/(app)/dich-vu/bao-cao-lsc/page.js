@@ -54,7 +54,7 @@ export default function BaoCaoLSC() {
 
   const bang = (title, arr, ncol = "Số lệnh") => (
     <div className="card"><div className="font-extrabold mb-2">{title}</div>
-      <div className="tbl-scroll"><table className="w-full border-collapse text-[12.5px]"><thead><tr><th className="th">Nhóm</th><th className="th text-right">{ncol}</th><th className="th text-right">Giá trị</th></tr></thead>
+      <div className="tbl-scroll"><table className="w-full border-collapse text-[12.5px] tbl-card"><thead><tr><th className="th">Nhóm</th><th className="th text-right">{ncol}</th><th className="th text-right">Giá trị</th></tr></thead>
         <tbody>{arr.map(([k, v]) => <tr key={k}><td className="td">{k}</td><td className="td text-right">{Math.round(v.n * 100) / 100}</td><td className="td text-right font-bold">{fmtVND(v.v)}</td></tr>)}{arr.length === 0 && <tr><td className="td text-[#8A93A0]" colSpan={3}>Chưa có dữ liệu.</td></tr>}</tbody></table></div></div>);
 
   const xuat = () => downloadXLSX(`bao_cao_lsc_${from}_${to}.xlsx`, [["Số LSC", "Ngày tạo", "Điểm", "Trạng thái", "Loại dịch vụ", "KTV", "Biển số", "Khách", "Tổng chi phí", "Khách trả", "Hãng chịu", "Nội bộ", "Đã thu", "Dự kiến giao"],
@@ -86,7 +86,7 @@ export default function BaoCaoLSC() {
       <div className="grid gap-4 md:grid-cols-2">{bang("Top 10 công việc (theo giá trị)", topLine("CONG"), "Số lần")}{bang("Top 10 phụ tùng (theo giá trị)", topLine("PHU_TUNG"), "Số lượng")}</div>
       <div className="card">
         <div className="font-extrabold mb-2">Lệnh quá hạn giao xe ({quaHan.length})</div>
-        <div className="tbl-scroll"><table className="w-full border-collapse text-[12.5px]"><thead><tr><th className="th">Lệnh</th><th className="th">Biển số</th><th className="th">Khách</th><th className="th">Trạng thái</th><th className="th">Dự kiến giao</th><th className="th">KTV</th></tr></thead>
+        <div className="tbl-scroll"><table className="w-full border-collapse text-[12.5px] tbl-card"><thead><tr><th className="th">Lệnh</th><th className="th">Biển số</th><th className="th">Khách</th><th className="th">Trạng thái</th><th className="th">Dự kiến giao</th><th className="th">KTV</th></tr></thead>
           <tbody>{quaHan.map((r) => <tr key={r.id}><td className="td font-bold"><Link href={`/dich-vu/lenh-sua-chua/${r.id}`} className="text-brand hover:underline">{r.code}</Link></td><td className="td">{r.plate}</td><td className="td">{r.customer_name}</td><td className="td"><Badge tone={LSC_STATUS[r.status]?.tone}>{LSC_STATUS[r.status]?.label}</Badge></td><td className="td text-danger font-bold">{fmtDate(r.du_kien_giao_xe)}</td><td className="td">{r.ktv_name || "—"}</td></tr>)}
             {quaHan.length === 0 && <tr><td className="td text-[#8A93A0]" colSpan={6}>Không có lệnh nào quá hạn giao xe.</td></tr>}</tbody></table></div>
       </div>

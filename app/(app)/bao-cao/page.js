@@ -218,28 +218,28 @@ export default function BaoCao() {
         <div className="font-extrabold mb-2.5">Xem trước {busy ? "· đang tải…" : `· ${fmtNum(rows.length)} dòng`}<span className="text-xs font-normal text-[#8A93A0]"> (file CSV xuất luôn có đủ toàn bộ)</span></div>
         <div className="overflow-x-auto">
           {type === "ban" && (
-            <div className="tbl-scroll"><table className="w-full border-collapse">
+            <div className="tbl-scroll"><table className="w-full border-collapse tbl-card">
               <thead><tr><th className="th">Mã đơn</th><th className="th">Ngày</th><th className="th">Xe</th><th className="th">Kho</th><th className="th">Khách</th><th className="th">Giá bán</th><th className="th">NV</th></tr></thead>
               <tbody>{preview.map((s) => { const v = vOf(s.vehicle_id);
                 return <tr key={s.id}><td className="td font-bold">{s.code}</td><td className="td">{fmtDate(s.sale_date)}</td><td className="td">{v ? `${v.name} ${v.color}` : s.vehicle_id} ×{s.quantity}</td><td className="td">{locName(s.location_code)}</td><td className="td">{s.customer_name}</td><td className="td font-bold">{fmtVND(s.sale_price)}</td><td className="td">{s.seller_name}</td></tr>; })}</tbody>
             </table></div>
           )}
           {type === "dieuchuyen" && (
-            <div className="tbl-scroll"><table className="w-full border-collapse">
+            <div className="tbl-scroll"><table className="w-full border-collapse tbl-card">
               <thead><tr><th className="th">Phiếu</th><th className="th">Ngày</th><th className="th">Xe</th><th className="th">Đi → Đến</th><th className="th">SL</th><th className="th">Trạng thái</th></tr></thead>
               <tbody>{preview.map((t) => { const v = vOf(t.vehicle_id);
                 return <tr key={t.id}><td className="td font-bold">{t.code}</td><td className="td">{fmtTime(t.requested_at)}</td><td className="td">{v ? `${v.name} ${v.color}` : t.vehicle_id}</td><td className="td">{locName(t.from_location)} → {locName(t.to_location)}</td><td className="td font-bold">{t.quantity}</td><td className="td"><Badge tone={t.status === "Đã nhận" ? "green" : t.status === "Đang chuyển" ? "blue" : "gray"}>{t.status}</Badge></td></tr>; })}</tbody>
             </table></div>
           )}
           {type === "lichsu" && (
-            <div className="tbl-scroll"><table className="w-full border-collapse">
+            <div className="tbl-scroll"><table className="w-full border-collapse tbl-card">
               <thead><tr><th className="th">Thời gian</th><th className="th">Loại</th><th className="th">Xe</th><th className="th">Kho</th><th className="th">SL</th><th className="th">Tồn trước → sau</th><th className="th">Người</th></tr></thead>
               <tbody>{preview.map((t) => { const v = vOf(t.vehicle_id);
                 return <tr key={t.id}><td className="td whitespace-nowrap">{fmtTime(t.created_at)}</td><td className="td">{t.txn_type}</td><td className="td">{v ? `${v.name} ${v.color}` : t.vehicle_id}</td><td className="td">{t.from_location && t.to_location ? `${locName(t.from_location)} → ${locName(t.to_location)}` : locName(t.from_location || t.to_location)}</td><td className="td"><b className={t.qty < 0 ? "text-danger" : "text-[#0E7A4A]"}>{t.qty > 0 ? "+" : ""}{t.qty}</b></td><td className="td">{t.stock_before} → <b>{t.stock_after}</b></td><td className="td">{t.created_by_name}</td></tr>; })}</tbody>
             </table></div>
           )}
           {type === "ton" && (
-            <div className="tbl-scroll"><table className="w-full border-collapse">
+            <div className="tbl-scroll"><table className="w-full border-collapse tbl-card">
               <thead><tr><th className="th">Xe</th><th className="th">Hãng</th><th className="th">Màu</th>{fLoc ? <th className="th">{locName(fLoc)}</th> : <>{regions.map((r) => <th key={r} className="th">{r}</th>)}<th className="th">Tổng</th></>}</tr></thead>
               <tbody>{preview.map((v) => (
                 <tr key={v.id}><td className="td font-bold">{v.name}</td><td className="td">{v.brand}</td><td className="td">{v.color}</td>
@@ -263,7 +263,7 @@ export default function BaoCao() {
                 <div className="mb-2.5">
                   <input className="inp !w-full md:!w-96" placeholder="🔎 Tìm theo số khung hoặc tên xe…" value={skq} onChange={(e) => { setSkq(e.target.value); setPage(1); }} />
                 </div>
-                <div className="overflow-x-auto"><table className="w-full border-collapse">
+                <div className="overflow-x-auto"><table className="w-full border-collapse tbl-card">
                   <thead><tr><th className="th w-10">STT</th><th className="th">Hãng</th><th className="th">Tên xe</th><th className="th">Màu</th><th className="th">Số khung</th><th className="th">Kho</th><th className="th">Ngày nhập</th><th className="th">Ngày tồn</th><th className="th">Trạng thái</th></tr></thead>
                   <tbody>{pg.map((u, i) => {
                     const v = vOf(u.vehicle_id);
