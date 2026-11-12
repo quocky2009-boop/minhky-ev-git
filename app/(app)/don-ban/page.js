@@ -212,16 +212,17 @@ export default function DonBan() {
     if (!invF.checklist?.pdi) return notify("Checklist: phải có Phiếu PDI kiểm tra xe.", "err");
     if (!invF.checklist?.hdsd) return notify("Checklist: phải HDSD xe và mốc bảo dưỡng cho khách.", "err");
     setBusy(true);
-    const { error } = await supabase.rpc("fn_xac_nhan_hoa_don", { p: {
-      id: o.id, invoice_no: invF.no, invoice_date: invF.date, dms_code: invF.dms || "",
-      warranty_activated: !!invF.checklist?.bao_hanh,
-      app_activated: !!invF.checklist?.app_vf,
-      coc_giao: !!invF.checklist?.coc_giao,
-    }});
-    if (!error) await supabase.from("sales_orders").update({ checklist_giao_xe: invF.checklist || {} }).eq("id", o.id);
+    const daXuat = (o.invoice_status || "") === "Đã xuất HĐ"; // dang SUA don da xuat hoa don
+    const { error } = daXuat
+      ? await supabase.rpc("fn_sua_hoa_don", { p: { id: o.id, invoice_no: invF.no, invoice_date: invF.date, checklist: invF.checklist || {} } })
+      : await supabase.rpc("fn_xac_nhan_hoa_don", { p: {
+          id: o.id, invoice_no: invF.no, invoice_date: invF.date, dms_code: invF.dms || "",
+          warranty_activated: !!invF.checklist?.bao_hanh, app_activated: !!invF.checklist?.app_vf, coc_giao: !!invF.checklist?.coc_giao,
+          checklist: invF.checklist || {}, // luu checklist ngay tren may chu
+        } });
     setBusy(false);
     if (error) return notify(errMsg(error), "err");
-    notify(`Đơn ${o.code} hoàn thành: HĐ ${invF.no}.`);
+    notify((o.invoice_status || "") === "Đã xuất HĐ" ? `Đã cập nhật hóa đơn / checklist đơn ${o.code}.` : `Đơn ${o.code} hoàn thành: HĐ ${invF.no}.`);
     setInvId(null); setInvF({ no: "", date: iso(new Date()), checklist: {}, dms: "" }); load();
   };
 
@@ -476,6 +477,8 @@ export default function DonBan() {
         {rows.filter((o) => thieuKhachLe(o)).length > 0 && (
           <div className="cursor-pointer" title="Bấm để lọc các đơn chưa có khách lẻ" onClick={() => { setFKl(fKl === "chua" ? "" : "chua"); setPage(1); }}><KPI label={fKl === "chua" ? "Chờ thông tin khách lẻ ✓ đang lọc" : "Chờ thông tin khách lẻ"} value={rows.filter((o) => !daDong(o) && thieuKhachLe(o)).length} tone="red" /></div>
         )}
+        <div className="cursor-pointer contents" title="Bấm để lọc các đơn chưa đủ checklist bắt buộc" onClick={() => { setFCl(fCl === "chua_du" ? "" : "chua_du"); setPage(1); }}>
+          <KPI label={fCl === "chua_du" ? "Checklist chưa đủ ✓ đang lọc" : "Checklist chưa đủ"} value={rowsActive.filter((o) => !clOf(o).du).length} tone="red" /></div>
         <KPI label="Đã hoàn thành" value={nXong} tone="green" />
         <KPI label="Tổng đơn" value={rowsActive.length} tone="dark" />
         <KPI label="Doanh số" value={fmtVND(doanhSo)} tone="blue" />
@@ -510,6 +513,8 @@ export default function DonBan() {
             <option value="">Pin (xe đổi pin): tất cả</option>
             {Array.from(new Set(rows.map(pinOf).filter(Boolean))).sort().map((t) => <option key={t}>{t}</option>)}
           </select>
+          <button className={`btn-ghost !text-xs ${fCl === "chua_du" ? "!bg-[#FDE8EA] !text-[#B01E2C]" : ""}`} title="Lọc các đơn chưa tick đủ 4 mục checklist bắt buộc" onClick={() => { setFCl(fCl === "chua_du" ? "" : "chua_du"); setPage(1); }}>
+            {fCl === "chua_du" ? "✓ Đang lọc: Checklist chưa đủ" : "☐ Checklist chưa đủ"}</button>
           <button className={`btn-ghost !text-xs ${showHuy ? "!bg-[#FDEDED] !text-danger" : ""}`} onClick={() => { setShowHuy(!showHuy); setPage(1); }}>
             {showHuy ? "Đang hiện đơn hủy/trả" : `Đơn hủy/trả${nHuy ? ` (${nHuy})` : ""}`}
           </button>
@@ -592,6 +597,8 @@ export default function DonBan() {
                         <Link href={`/don-ban/${o.id}`} className="btn-ghost !px-2 !py-1 !text-xs" title="Xem chi tiết đơn">👁</Link>
                         {profile.role === "CEO" && !nhanTra && <button className="btn-ghost !px-2 !py-1 !text-xs hover:text-brand" title="Mở lại đơn (đã hủy nhầm)" onClick={() => moLaiDon(o)}>↩ Mở lại</button>}
                       </>) : (<>
+                        {done && canConfirm && <button className={`!px-2 !py-1 !text-xs ${invId === o.id ? "btn-primary" : clOf(o).du ? "btn-ghost" : "btn-danger"}`} title="Sửa số hóa đơn / bổ sung checklist giao xe"
+                          onClick={() => { const c = o.checklist_giao_xe || {}; setInvId(invId === o.id ? null : o.id); setInvF({ no: o.invoice_no || "", date: o.invoice_date || iso(new Date()), dms: o.dms_code || "", checklist: { ...c, bao_hanh: !!(o.warranty_activated || c.bao_hanh), coc_giao: !!(o.coc_giao || c.coc_giao), app_vf: !!(o.app_activated || c.app_vf) } }); }}>✎ HĐ</button>}
                         {!done && canConfirm && <button className={`!px-2 !py-1 !text-xs ${invId === o.id ? "btn-primary" : "btn-ok"}`} onClick={() => { setInvId(invId === o.id ? null : o.id); setInvF({ no: "", date: iso(new Date()), checklist: {}, dms: "" }); }}>{invId === o.id ? "Đóng" : "✓ HĐ"}</button>}
                         {thieuKhachLe(o) && <button className="btn-primary !px-2 !py-1 !text-xs !bg-danger !border-danger" title="Nhập thông tin khách lẻ mua sau cùng" onClick={() => openDetail(o)}>👤</button>}
                         <button className="btn-ghost !px-2 !py-1 !text-xs" title="Xem nhanh đơn" onClick={() => openDetail(o)}>👁</button>
@@ -613,14 +620,14 @@ export default function DonBan() {
                         </div>
                         {/* CHECKLIST GIAO XE */}
                         <div className="border border-[#D5DBE3] rounded-xl p-3 bg-white">
-                          <div className="font-bold text-[13px] mb-2">✅ Checklist giao xe</div>
+                          <div className="font-bold text-[13px] mb-2">✅ Checklist giao xe{done && <span className="font-normal text-[11.5px] text-[#A25F00]"> — đang sửa đơn đã xuất hóa đơn (thay đổi được ghi vào lịch sử đơn)</span>}</div>
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5">
                             {[
                               ["bao_hanh","🛡 Kích hoạt bảo hành", true],
-                              ["app_vf", isVF(o) ? "📱 App VF eScooter" : null, false],
                               ["coc_giao","📄 BB bàn giao xe & hồ sơ", true],
                               ["pdi","📋 Phiếu PDI kiểm tra xe", true],
                               ["hdsd","📖 HDSD xe và mốc bảo dưỡng", true],
+                              ["app_vf", isVF(o) ? "📱 App VF eScooter" : null, false],
                               ["anh_khach","📸 Quay/chụp khách nhận xe", false],
                               ["khoe_fb","📲 Khách khoe ảnh lên FB/Zalo", false],
                             ].filter(([,label]) => label).map(([key, label, required]) => (
@@ -639,7 +646,8 @@ export default function DonBan() {
                           })()}
                         </div>
                         <div className="flex gap-2 items-center flex-wrap">
-                          <button className="btn-ok !py-2 !text-xs" disabled={busy} onClick={() => confirmInv(o)}>Xác nhận hoàn thành đơn</button>
+                          <button className="btn-ok !py-2 !text-xs" disabled={busy} onClick={() => confirmInv(o)}>{done ? "Lưu sửa hóa đơn / checklist" : "Xác nhận hoàn thành đơn"}</button>
+                          <button className="btn-ghost !py-2 !text-xs" onClick={() => setInvId(null)}>Đóng</button>
                           <span className="text-[10.5px] text-[#8A93A0]">Bắt buộc: Số HĐ + Bảo hành + BB bàn giao xe & hồ sơ + Phiếu PDI + HDSD xe và mốc bảo dưỡng. Các mục còn lại là khuyến nghị.</span>
                         </div>
                       </div>

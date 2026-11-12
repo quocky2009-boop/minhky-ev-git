@@ -1,0 +1,7 @@
+-- 180: Lưu checklist giao xe trên máy chủ + sửa hóa đơn sau khi đã xuất (12/11/2026) — đã áp dụng qua Supabase MCP; file này là ghi chú
+-- Lỗi cũ: checklist_giao_xe do trình duyệt tự update bảng sales_orders sau khi gọi RPC — bị RLS chặn (bảng chỉ có policy SELECT)
+--   nên chưa bao giờ được lưu (0/443 đơn đã xuất HĐ có dữ liệu checklist).
+-- fn_xac_nhan_hoa_don: nhận p.checklist (jsonb) và lưu vào checklist_giao_xe; khi có checklist thì bắt buộc pdi + hdsd;
+--   bỏ bắt buộc Mã đơn DMS (dms_code vẫn lưu nếu có).
+-- fn_sua_hoa_don(p {id, invoice_no, invoice_date, checklist, ly_do}) — quyền xac_nhan_hd:
+--   sửa số / ngày hóa đơn và checklist của đơn ĐÃ xuất HĐ (bắt buộc đủ bao_hanh, coc_giao, pdi, hdsd); ghi don_audit_logs action 'sua_hoa_don'.
