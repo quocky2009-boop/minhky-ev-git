@@ -197,7 +197,7 @@ export default function KiemKe() {
       {loc && method === "qty" && (
         <>
           <p className="text-xs text-[#5A6572] mb-2">Đếm số xe thực tế từng mẫu và nhập vào cột "Thực tế". Nếu thiếu, hệ thống tự chọn xe để bớt (ưu tiên số khung tạm, rồi xe nhập lâu nhất); nếu thừa, hệ thống sinh số khung tạm SKT-KK để bổ sung số thật sau. Muốn chính xác từng chiếc, dùng phương pháp theo số khung.</p>
-          <div className="overflow-x-auto"><table className="w-full border-collapse">
+          <div className="overflow-x-auto"><table className="w-full border-collapse tbl-card">
             <thead><tr><th className="th">Xe</th><th className="th">Tồn hệ thống</th><th className="th">Thực tế</th><th className="th">Chênh</th></tr></thead>
             <tbody>
               {qtyRows.map((r) => {

@@ -389,7 +389,7 @@ export default function HangHoa() {
                             <button className="btn-ghost !text-xs ml-auto" onClick={() => setHistId(null)}>✕ Đóng</button>
                           </div>
                           {hist.length === 0 ? <div className="text-[#8A93A0] text-sm">Chưa có giao dịch nào.</div> : (
-                            <div className="tbl-scroll"><table className="w-full text-[12px] border-collapse">
+                            <div className="tbl-scroll"><table className="w-full text-[12px] border-collapse tbl-card">
                               <thead><tr className="text-[11px] text-[#8A93A0] border-b border-[#E3E8EF]">
                                 <th className="text-left py-1.5 pl-2">Thời gian</th>
                                 <th className="text-left py-1.5">Loại</th>

@@ -129,7 +129,7 @@ export default function DieuChinh() {
           {canRequest && <button className="btn-ghost !text-xs" onClick={() => fileRef.current?.click()}>⬆ Nhập Excel</button>}
           <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" className="hidden" onChange={(e) => { if (e.target.files[0]) importCSV(e.target.files[0]); e.target.value = ""; }} />
         </div>
-        <div className="overflow-x-auto"><table className="w-full border-collapse">
+        <div className="overflow-x-auto"><table className="w-full border-collapse tbl-card">
           <thead><tr><th className="th">Phiếu</th><th className="th">Xe · Kho</th><th className="th">Số khung bớt / thêm</th><th className="th">Chênh</th><th className="th">Lý do</th><th className="th">Đề xuất</th><th className="th">Trạng thái</th><th className="th">Duyệt</th></tr></thead>
           <tbody>{pageSlice(list, page, pageSize).map((ad) => {
             const v = vehicles.find((x) => x.id === ad.vehicle_id);

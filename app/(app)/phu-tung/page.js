@@ -217,7 +217,7 @@ export default function KhoPhuTung() {
                 </tr>,
                 moRong[p.id] && (
                   <tr key={p.id + "x"}><td className="td bg-[#F8FAFB]" colSpan={9}>
-                    <table className="border-collapse text-[12.5px] ml-6"><thead><tr><th className="th">Kho</th><th className="th text-right">Tồn</th><th className="th">Vị trí lưu trữ</th></tr></thead>
+                    <table className="border-collapse text-[12.5px] ml-6 tbl-card"><thead><tr><th className="th">Kho</th><th className="th text-right">Tồn</th><th className="th">Vị trí lưu trữ</th></tr></thead>
                       <tbody>{ks.map((s) => { const k = p.id + "|" + s.location_code; return (
                         <tr key={k}><td className="td">{locName(s.location_code)}</td><td className="td text-right font-bold">{s.qty}</td>
                           <td className="td">{canViTri ? <div className="flex gap-1"><input className="inp !py-1 !text-xs !w-36" value={vtEdit[k] ?? s.vi_tri ?? ""} onChange={(e) => setVtEdit((m) => ({ ...m, [k]: e.target.value }))} placeholder="VD: Kệ A1-T2" />{vtEdit[k] != null && vtEdit[k] !== (s.vi_tri || "") && <button className="btn-ok !px-2 !py-1 !text-xs" onClick={() => luuViTri(p.id, s.location_code)}>Lưu</button>}</div> : (s.vi_tri || "—")}</td></tr>); })}</tbody></table>

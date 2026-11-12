@@ -119,7 +119,7 @@ export default function EOD() {
       <div className="card">
         <div className="font-extrabold mb-2">Lịch sử chốt ngày ({lichSu.length})</div>
         {lichSu.length === 0 ? <div className="text-sm text-[#8A93A0]">Chưa có ngày nào được tính.</div> : (
-          <div className="overflow-x-auto"><table className="w-full border-collapse">
+          <div className="overflow-x-auto"><table className="w-full border-collapse tbl-card">
             <thead><tr><th className="th">Ngày</th><th className="th">Điểm</th><th className="th">Phiếu</th><th className="th">Phải thu</th><th className="th">CK</th><th className="th">Tiền mặt</th><th className="th">Công nợ</th><th className="th">Lệch</th><th className="th">Trạng thái</th></tr></thead>
             <tbody>{lichSu.map((e) => (
               <tr key={e.id} className={e.lech !== 0 ? "bg-[#FFF6F6]" : "hover:bg-[#F8FAFC]"}>

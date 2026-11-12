@@ -424,7 +424,7 @@ export default function DMXe() {
             <option value="con">🟢 Còn hàng</option>
           </select>
         </div>
-        <div className="overflow-x-auto"><table className="w-full border-collapse">
+        <div className="overflow-x-auto"><table className="w-full border-collapse tbl-card">
           <thead><tr><Th label="Mã nội bộ" k="id" sort={sort} /><Th label="Mã hãng" k="mfr" sort={sort} /><Th label="Hãng" k="brand" sort={sort} /><Th label="Tên xe" k="name" sort={sort} /><Th label="Màu" k="color" sort={sort} /><Th label="Giá niêm yết" k="price" sort={sort} /><Th label="Tồn min" k="min" sort={sort} /><Th label="Tổng tồn" k="qty" sort={sort} /><th className="th">Cảnh báo</th><th className="th"></th></tr></thead>
           <tbody>{pageSlice(sort.sortFn(list, { id: (v) => v.id, mfr: (v) => v.mfr_code || "", brand: (v) => v.brand, name: (v) => v.name, color: (v) => v.color, price: (v) => v.list_price, min: (v) => v.min_stock, qty: (v) => totalQty(v.id) }), page, pageSize).map((v) => {
             const qty = totalQty(v.id);
@@ -494,7 +494,7 @@ export default function DMXe() {
                     notify(`Đã xuất ${rs.length} xe đã chọn.`);
                   }}>⬇ Xuất Excel</button>
                 </SelectionBar>
-                <div className="overflow-x-auto"><table className="w-full border-collapse">
+                <div className="overflow-x-auto"><table className="w-full border-collapse tbl-card">
                   <thead><tr><ThCheck sel={uSel} rows={pg} idOf={(u) => u.frame_number} /><Th label="Hãng" k="brand" sort={uSort} /><Th label="Tên xe" k="name" sort={uSort} /><Th label="Màu" k="color" sort={uSort} /><Th label="Số khung" k="frame" sort={uSort} /><Th label="Kho" k="kho" sort={uSort} /><Th label="Giá vốn" k="von" sort={uSort} /><Th label="Ngày nhập" k="nhap" sort={uSort} /><Th label="Ngày tồn" k="ton" sort={uSort} /><Th label="Trạng thái" k="tt" sort={uSort} /><th className="th"></th></tr></thead>
                   <tbody>{pg.map((u, i) => {
                     const v = vehicles.find((x) => x.id === u.vehicle_id);

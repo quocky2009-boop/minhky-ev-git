@@ -222,7 +222,7 @@ export default function SoQuy() {
           </TongLoc>
 
           {tabQuy.length > 0 && (
-            <div className="tbl-scroll mb-3"><table className="w-full border-collapse text-[12.5px]">
+            <div className="tbl-scroll mb-3"><table className="w-full border-collapse text-[12.5px] tbl-card">
               <thead><tr><th className="th">Quỹ</th><th className="th text-right">Đầu kỳ</th><th className="th text-right">Thu</th><th className="th text-right">Chi</th><th className="th text-right">Cuối kỳ</th></tr></thead>
               <tbody>{tabQuy.map((r) => (<tr key={r.id}><td className="td">{r.name}</td><td className="td text-right">{fmtVND(r.dk)}</td><td className="td text-right text-[#0E7A4A]">{fmtVND(r.thu)}</td><td className="td text-right text-danger">{fmtVND(r.chi)}</td><td className="td text-right font-bold">{fmtVND(r.dk + r.thu - r.chi)}</td></tr>))}</tbody>
             </table></div>

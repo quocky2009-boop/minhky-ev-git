@@ -109,7 +109,7 @@ export default function DieuChinhTon({ supabase, locations, parts, stock, canEdi
                 <button key={p.id} className="w-full text-left px-3 py-2 border-b border-[#F2F4F7] hover:bg-[#F0FDF6] text-[13px]" onClick={() => themDong(p)}><b>{p.code}</b> · {p.name}{form.location_code && <span className="text-[#8A93A0]"> · tồn: {qtyOf(p.id, form.location_code)}</span>}{p.track_serial && <span className="text-danger"> · serial</span>}</button>))}</div>}
             </div>)}
           {form.lines.length > 0 && (
-            <div className="tbl-scroll max-h-[420px] overflow-y-auto"><table className="w-full border-collapse text-[12.5px]">
+            <div className="tbl-scroll max-h-[420px] overflow-y-auto"><table className="w-full border-collapse text-[12.5px] tbl-card">
               <thead><tr><th className="th">#</th><th className="th">Mã PT</th><th className="th">Tên phụ tùng</th><th className="th text-right">Tồn sổ</th><th className="th text-right">Tồn thực tế</th><th className="th text-right">Chênh lệch</th><th className="th">Vị trí</th><th className="th">Lý do</th><th className="th"></th></tr></thead>
               <tbody>{form.lines.map((l, i) => { const so = l.part_id && form.location_code ? qtyOf(l.part_id, form.location_code) : null; const cl = l.qty_moi !== "" && so != null ? Number(l.qty_moi) - so : null; return (
                 <tr key={i} className={!l.part_id || l.serial ? "bg-[#FFF6F6]" : ""}>
@@ -134,7 +134,7 @@ export default function DieuChinhTon({ supabase, locations, parts, stock, canEdi
             <button className="btn-ghost !text-xs" onClick={() => setDetail(null)}>Đóng</button>
           </div>
           <div className="text-[12px] text-[#5A6572] mb-2">{PT[detail.h.phuong_thuc]}{detail.h.file_name ? ` (${detail.h.file_name})` : ""} · {detail.h.by_name} · {fmtTime(detail.h.created_at)}{detail.h.note ? ` · ${detail.h.note}` : ""}</div>
-          <div className="tbl-scroll max-h-[420px] overflow-y-auto"><table className="w-full border-collapse text-[12.5px]">
+          <div className="tbl-scroll max-h-[420px] overflow-y-auto"><table className="w-full border-collapse text-[12.5px] tbl-card">
             <thead><tr><th className="th">#</th><th className="th">Mã PT</th><th className="th">Tên</th><th className="th text-right">Tồn trước</th><th className="th text-right">Tồn sau</th><th className="th text-right">Chênh lệch</th><th className="th">Vị trí</th><th className="th">Lý do</th><th className="th">Kết quả</th></tr></thead>
             <tbody>{detail.lines.map((l) => (
               <tr key={l.id}><td className="td text-[#8A93A0]">{l.stt}</td><td className="td font-mono text-[11.5px]">{l.ma}</td><td className="td">{l.ten}</td>

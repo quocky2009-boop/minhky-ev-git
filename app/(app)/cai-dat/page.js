@@ -586,7 +586,7 @@ export default function CaiDat() {
             <button className="btn-ok !text-xs !py-2" onClick={luuSvc}>{svcF.id ? "Cập nhật" : "+ Thêm"}</button>
             {svcF.id && <button className="btn-ghost !text-xs !py-2" onClick={() => setSvcF({ id: null, code: "", name: "", group_name: "Chung", price: 0 })}>Hủy sửa</button>}
           </div>
-          <div className="overflow-x-auto"><table className="w-full border-collapse">
+          <div className="overflow-x-auto"><table className="w-full border-collapse tbl-card">
             <thead><tr><th className="th">Mã</th><th className="th">Tên dịch vụ</th><th className="th">Nhóm</th><th className="th">Giá công</th><th className="th"></th></tr></thead>
             <tbody>{svcs.map((sv) => (
               <tr key={sv.id} className="hover:bg-[#F8FAFC]">
@@ -733,7 +733,7 @@ export default function CaiDat() {
           </div>
         )}
 
-        <div className="overflow-x-auto"><table className="w-full border-collapse">
+        <div className="overflow-x-auto"><table className="w-full border-collapse tbl-card">
           <thead><tr><th className="th">Tên trường</th><th className="th">Kiểu</th><th className="th">Chi tiết</th><th className="th">Bắt buộc</th><th className="th"></th></tr></thead>
           <tbody>{customFields.map((c) => (
             <tr key={c.id}>

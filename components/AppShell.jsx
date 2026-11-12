@@ -84,10 +84,10 @@ export default function AppShell({ profile, children }) {
     const quet = () => {
       cho = null;
       root.querySelectorAll("table.tbl-card").forEach((tb) => {
-        const ths = [...tb.querySelectorAll("thead tr:last-child th")];
+        const ths = [...tb.querySelectorAll(":scope > thead > tr:last-child > th")];
         if (!ths.length || ths.some((th) => th.colSpan > 1)) return;
         const nhan = ths.map((th) => (th.textContent || "").replace(/[▲▼⇅]/g, "").trim());
-        tb.querySelectorAll("tbody > tr:not([data-mk]), tfoot > tr:not([data-mk])").forEach((tr) => {
+        tb.querySelectorAll(":scope > tbody > tr:not([data-mk]), :scope > tfoot > tr:not([data-mk])").forEach((tr) => {
           const tds = [...tr.children];
           // Dong tong/cong: co o gop cot + o so tien -> hien 1 hang "nhan … so tien"
           if (tds.length > 1 && tds.some((td) => td.colSpan > 1)) { tr.setAttribute("data-mk", "1"); if (!tr.hasAttribute("data-m")) tr.setAttribute("data-m", "sum"); return; }
@@ -102,8 +102,12 @@ export default function AppShell({ profile, children }) {
           });
           if (coSan) return;
           let coTitle = false, coEnd = false;
+          // Uu tien cot "Tên …" lam dong tieu de (bang co Mã dung truoc Tên)
+          const iTen = nhan.findIndex((l) => /^tên/i.test(l));
+          if (iTen >= 0) { coTitle = true; tds[iTen].setAttribute("data-m", "title"); }
           tds.forEach((td, i) => {
             const l = nhan[i];
+            if (i === iTen) return;
             if (/^(#|stt|tt)$/i.test(l)) return td.setAttribute("data-m", "hide");
             if (!l || td.getAttribute("data-label") === "") return;
             if (!coTitle) { coTitle = true; return td.setAttribute("data-m", "title"); }

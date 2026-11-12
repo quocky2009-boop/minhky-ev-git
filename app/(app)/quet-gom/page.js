@@ -358,7 +358,7 @@ export default function QuetGom() {
                       </button>
                     ))}
                   </div>
-                  <div className="overflow-x-auto"><table className="w-full border-collapse">
+                  <div className="overflow-x-auto"><table className="w-full border-collapse tbl-card">
                     <thead><tr><th className="th w-10">STT</th><th className="th">Xe (theo file hãng)</th><th className="th">Số khung</th><th className="th">Trạng thái</th><th className="th w-20"></th></tr></thead>
                     <tbody>{pageSlice(filtered, poolPage, poolPageSize).map((x, i) => {
                       const v = vOf(x.vehicle_id);
@@ -423,7 +423,7 @@ export default function QuetGom() {
           {rows.length > 0 && <button className="btn-danger !text-xs" onClick={() => confirm("Xóa toàn bộ danh sách đang gom?") && newDraft()}>Làm lại</button>}
         </div>
         {rows.length === 0 ? <div className="text-sm text-[#8A93A0]">Chưa quét xe nào. Chọn mẫu xe rồi bấm nút quét, hoặc mở một phiếu nháp bên dưới để sửa.</div> : (
-          <div className="overflow-x-auto"><table className="w-full border-collapse">
+          <div className="overflow-x-auto"><table className="w-full border-collapse tbl-card">
             <thead><tr><th className="th w-10">STT</th><th className="th">Hãng</th><th className="th">Tên xe</th><th className="th">Màu</th><th className="th">Số khung (sửa được)</th><th className="th w-8"></th></tr></thead>
             <tbody>{rows.map((r, i) => {
               const v = vOf(r.vehicle_id);
@@ -452,7 +452,7 @@ export default function QuetGom() {
           ))}
         </div>
         {shown.length === 0 ? <div className="text-sm text-[#8A93A0]">Chưa có phiếu nào ở mục này.</div> : (
-          <div className="overflow-x-auto"><table className="w-full border-collapse">
+          <div className="overflow-x-auto"><table className="w-full border-collapse tbl-card">
             <thead><tr><th className="th">Phiếu</th><th className="th">Kho</th><th className="th">Số xe</th><th className="th">Người tạo</th><th className="th">Cập nhật</th><th className="th">Trạng thái</th><th className="th"></th></tr></thead>
             <tbody>{shown.map((d) => [
               <tr key={d.id} className={editId === d.id ? "bg-[#FDF6E3]" : "hover:bg-[#F8FAFC]"}>
@@ -477,7 +477,7 @@ export default function QuetGom() {
                     <button className="btn-ok !px-3 !py-2 !text-xs" disabled={busy} onClick={() => saveEdit(d)}>💾 Lưu phiếu</button>
                     <button className="btn-ghost !px-3 !py-2 !text-xs" onClick={() => { openDraft(d); setEditId(null); }}>📷 Quét thêm xe vào phiếu này</button>
                   </div>
-                  <div className="overflow-x-auto"><table className="w-full border-collapse">
+                  <div className="overflow-x-auto"><table className="w-full border-collapse tbl-card">
                     <thead><tr><th className="th w-10">STT</th><th className="th">Hãng</th><th className="th">Tên xe</th><th className="th">Màu</th><th className="th">Số khung (sửa được)</th><th className="th w-8"></th></tr></thead>
                     <tbody>{editRows.map((r, i) => {
                       const v = vOf(r.vehicle_id);

@@ -295,7 +295,7 @@ export default function KiemSoatTon() {
 
           <div className="card">
             <div className="font-extrabold mb-2">📍 Theo điểm ({byLoc.length}) <span className="text-[11px] font-normal text-[#8A93A0]">· bấm một điểm để lọc</span></div>
-            <div className="tbl-scroll"><table className="w-full border-collapse">
+            <div className="tbl-scroll"><table className="w-full border-collapse tbl-card">
               {thTable("Điểm")}
               <tbody>
                 {byLoc.map((o) => (
@@ -326,7 +326,7 @@ export default function KiemSoatTon() {
           <div className="card">
             <div className="font-extrabold mb-1">🛵 Theo model — tồn & tốc độ bán 30 ngày ({byModel.length}) <span className="text-[11px] font-normal text-[#8A93A0]">· bấm một model để lọc</span></div>
             <p className="text-[11px] text-[#8A93A0] mb-2">Đủ hàng (ngày) = tồn ÷ (bán lẻ 30 ngày ÷ 30). Bán buôn tính riêng, không đưa vào tốc độ bán. Chỉ là cảnh báo sớm, chưa phải căn cứ đặt hàng hay điều chuyển chắc chắn.</p>
-            <div className="tbl-scroll"><table className="w-full border-collapse">
+            <div className="tbl-scroll"><table className="w-full border-collapse tbl-card">
               <thead><tr>
                 <th className="th">Model</th><th className="th text-right">Tồn</th><th className="th text-right">Trên 30 ngày</th>
                 <th className="th text-right">Bán lẻ 30n</th><th className="th text-right">Bán buôn 30n</th><th className="th text-right">Lẻ/ngày</th><th className="th text-right">Đủ hàng (ngày)</th><th className="th">Cảnh báo</th>
@@ -360,7 +360,7 @@ export default function KiemSoatTon() {
             {ngay !== hom_nay && <div className="text-[12px] text-[#8A93A0]">Danh sách số khung chỉ xem được cho hôm nay. Ngày cũ chỉ lưu số tổng hợp.</div>}
             {sk && (
               <>
-                <div className="tbl-scroll"><table className="w-full border-collapse">
+                <div className="tbl-scroll"><table className="w-full border-collapse tbl-card">
                   <thead><tr><th className="th">Số khung</th><th className="th">Model · màu</th><th className="th">Điểm</th><th className="th">Trạng thái</th><th className="th">Ngày nhập</th><th className="th text-right">Tuổi tồn</th></tr></thead>
                   <tbody>{pageSlice(sk, skPage, skSoDong).map((u) => (
                     <tr key={u.frame_number} className="hover:bg-[#F8FAFC]">
