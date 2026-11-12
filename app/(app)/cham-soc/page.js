@@ -56,19 +56,19 @@ export default function LichSuChamSoc() {
         </select>
         <button className="btn-ghost !text-xs" onClick={exportCSV}>⬇ Xuất Excel</button>
       </div>
-      <div className="overflow-x-auto"><table className="w-full border-collapse">
+      <div className="overflow-x-auto"><table className="w-full border-collapse tbl-card">
         <thead><tr><th className="th">Ngày chăm sóc</th><th className="th">Khách hàng</th><th className="th">Lead</th><th className="th">Nội dung</th><th className="th">Kết quả</th><th className="th">Người ghi</th><th className="th">Ngày nhập hệ thống</th></tr></thead>
         <tbody>{pageSlice(list, page, pageSize).map((l) => {
           const backdated = new Date(l.created_at).toISOString().slice(0, 10) !== l.care_date;
           return (
             <tr key={l.id}>
-              <td className="td font-bold">{fmtDate(l.care_date)}</td>
-              <td className="td">{l.customers ? <><b>{l.customers.name}</b><div className="text-[11px] text-[#8A93A0]">{l.customers.code} · {l.customers.phone}</div></> : "—"}</td>
-              <td className="td">{l.customers?.temperature ? <Badge tone={tempTone(l.customers.temperature)}>{l.customers.temperature}</Badge> : <span className="text-[#C6CDD6]">—</span>}</td>
-              <td className="td text-[13px]">{l.content}</td>
+              <td data-m="nolabel" className="td font-bold">{fmtDate(l.care_date)}</td>
+              <td data-m="title" className="td">{l.customers ? <><b>{l.customers.name}</b><div className="text-[11px] text-[#8A93A0]">{l.customers.code} · {l.customers.phone}</div></> : "—"}</td>
+              <td data-m="end" className="td">{l.customers?.temperature ? <Badge tone={tempTone(l.customers.temperature)}>{l.customers.temperature}</Badge> : <span className="text-[#C6CDD6]">—</span>}</td>
+              <td data-m="full" className="td text-[13px]">{l.content}</td>
               <td className="td text-[13px]">{l.result || "—"}</td>
               <td className="td">{l.created_by_name}</td>
-              <td className={`td text-[11px] italic ${backdated ? "text-[#A25F00] font-semibold" : "text-[#8A93A0]"}`}>{fmtTime(l.created_at)}{backdated ? " ⚠" : ""}</td>
+              <td data-m="hide" className={`td text-[11px] italic ${backdated ? "text-[#A25F00] font-semibold" : "text-[#8A93A0]"}`}>{fmtTime(l.created_at)}{backdated ? " ⚠" : ""}</td>
             </tr>
           );
         })}

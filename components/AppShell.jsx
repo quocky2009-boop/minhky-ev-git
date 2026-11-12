@@ -75,6 +75,41 @@ export default function AppShell({ profile, children }) {
     })();
     return () => { huy = true; };
   }, [profile.role]);
+  // THE GON tren dien thoai: bang "tbl-card" chua khai bao thi tu dien nhan cot (lay tu tieu de bang),
+  // tu chon cot dau lam dong tieu de va cot tien dam lam so noi bat. Cot da ghi data-label / data-m thi giu nguyen.
+  useEffect(() => {
+    const root = document.getElementById("mk-noi-dung");
+    if (!root) return;
+    let cho = null;
+    const quet = () => {
+      cho = null;
+      root.querySelectorAll("table.tbl-card").forEach((tb) => {
+        const ths = [...tb.querySelectorAll("thead tr:last-child th")];
+        if (!ths.length || ths.some((th) => th.colSpan > 1)) return;
+        const nhan = ths.map((th) => (th.textContent || "").replace(/[▲▼⇅]/g, "").trim());
+        tb.querySelectorAll("tbody > tr:not([data-mk])").forEach((tr) => {
+          const tds = [...tr.children];
+          if (tds.length !== nhan.length || tds.some((td) => td.colSpan > 1)) return;
+          tr.setAttribute("data-mk", "1");
+          const coSan = tds.some((td) => td.hasAttribute("data-m"));
+          tds.forEach((td, i) => { if (!td.hasAttribute("data-label") && nhan[i]) td.setAttribute("data-label", nhan[i]); });
+          if (coSan) return;
+          let coTitle = false, coEnd = false;
+          tds.forEach((td, i) => {
+            const l = nhan[i];
+            if (/^(#|stt|tt)$/i.test(l)) return td.setAttribute("data-m", "hide");
+            if (!l || td.getAttribute("data-label") === "") return;
+            if (!coTitle) { coTitle = true; return td.setAttribute("data-m", "title"); }
+            if (!coEnd && /(^|\s)(text-right|rt)(\s|$)/.test(td.className) && /font-(bold|extrabold)/.test(td.className)) { coEnd = true; td.setAttribute("data-m", "end"); }
+          });
+        });
+      });
+    };
+    quet();
+    const ob = new MutationObserver(() => { if (!cho) cho = setTimeout(quet, 80); });
+    ob.observe(root, { childList: true, subtree: true });
+    return () => { ob.disconnect(); if (cho) clearTimeout(cho); };
+  }, [pathname]);
   // An nut xuat / nhap Excel khi vai tro khong duoc cap quyen (lop chan chinh nam o lib/format.js)
   const [quyenOk, setQuyenOk] = useState(0);
   useEffect(() => {

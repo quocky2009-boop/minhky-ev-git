@@ -254,12 +254,12 @@ export default function SoQuy() {
                 <tbody>{pageSlice(sorted, page, pageSize).map((t) => (
                   <tr key={t.id} className={`hover:bg-[#F8FAFC] ${sel.has(t.id) ? "bg-[#EAF2FF]" : ""}`}>
                     <TdCheck sel={sel} id={t.id} />
-                    <td data-label="Mã phiếu" className="td"><button className="font-bold text-brand hover:underline" onClick={() => setDetail(t)}>{t.code}</button></td>
-                    <td data-label="Loại phiếu" className="td text-[13px]">{t.ref_doc ? <Badge tone="blue">Tự động</Badge> : <Badge tone="gray">Thủ công</Badge>} {t.category}</td>
-                    <td data-label="Quỹ" className="td text-xs">{accName(t.account_id)}</td>
-                    <td data-label="Tiền thu" className="td rt font-bold text-[#0E7A4A]">{t.direction === "Thu" ? fmtVND(t.amount) : "—"}</td>
-                    <td data-label="Tiền chi" className="td rt font-bold text-danger">{t.direction === "Chi" ? fmtVND(t.amount) : "—"}</td>
-                    <td data-label="Ngày tạo" className="td text-xs whitespace-nowrap">{fmtTime(t.created_at)}</td>
+                    <td data-label="Mã phiếu" data-m="title" className="td"><button className="font-bold text-brand hover:underline" onClick={() => setDetail(t)}>{t.code}</button></td>
+                    <td data-label="Loại phiếu" data-m="nolabel" className="td text-[13px]">{t.ref_doc ? <Badge tone="blue">Tự động</Badge> : <Badge tone="gray">Thủ công</Badge>} {t.category}</td>
+                    <td data-label="Quỹ" data-m="nolabel" className="td text-xs">{accName(t.account_id)}</td>
+                    <td data-label="Tiền thu" data-m={t.direction === "Thu" ? "end" : "hide"} className="td rt font-bold text-[#0E7A4A]">{t.direction === "Thu" ? fmtVND(t.amount) : "—"}</td>
+                    <td data-label="Tiền chi" data-m={t.direction === "Chi" ? "end" : "hide"} className="td rt font-bold text-danger">{t.direction === "Chi" ? fmtVND(t.amount) : "—"}</td>
+                    <td data-label="Ngày tạo" data-m="nolabel" className="td text-xs whitespace-nowrap">{fmtTime(t.created_at)}</td>
                     <td data-label="Chứng từ gốc" className="td text-xs"><RefLink code={t.ref_doc} /></td>
                   </tr>
                 ))}
@@ -336,11 +336,11 @@ export default function SoQuy() {
             <thead><tr><th className="th">Ngày</th><th className="th">Quỹ</th><th className="th">Số dư hệ thống</th><th className="th">Thực tế đếm</th><th className="th">Lệch</th><th className="th">Người chốt</th><th className="th">Ghi chú</th></tr></thead>
             <tbody>{closings.map((c) => (
               <tr key={c.id} className={c.diff !== 0 ? "bg-[#FFF6F6]" : "hover:bg-[#F8FAFC]"}>
-                <td data-label="Ngày" className="td whitespace-nowrap">{fmtDate(c.close_date)}</td>
-                <td data-label="Quỹ" className="td text-[13px]">{accName(c.account_id)}</td>
+                <td data-label="Ngày" data-m="title" className="td whitespace-nowrap">{fmtDate(c.close_date)}</td>
+                <td data-label="Quỹ" data-m="nolabel" className="td text-[13px]">{accName(c.account_id)}</td>
                 <td data-label="Số dư HT" className="td">{fmtVND(c.system_balance)}</td>
                 <td data-label="Thực tế" className="td">{fmtVND(c.actual_balance)}</td>
-                <td data-label="Lệch" className="td"><b className={c.diff === 0 ? "text-[#0E7A4A]" : "text-danger"}>{fmtVND(c.diff)}</b></td>
+                <td data-label="Lệch" data-m="end" className="td"><b className={c.diff === 0 ? "text-[#0E7A4A]" : "text-danger"}>{fmtVND(c.diff)}</b></td>
                 <td data-label="Người chốt" className="td text-xs">{c.closed_by_name}</td>
                 <td data-label="Ghi chú" className="td text-xs">{c.note}</td>
               </tr>

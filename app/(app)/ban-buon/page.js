@@ -3,7 +3,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Badge, Toast, KPI, Field, MoneyInput, VehicleSearch, LocSearch, SearchPicker, MultiCheck, Pager, pageSlice, pageClamp, useSortable, Th } from "@/components/ui";
+import { Badge, Toast, KPI, Field, MoneyInput, VehicleSearch, LocSearch, SearchPicker, MultiCheck, Pager, pageSlice, pageClamp, useSortable, Th, LocGon } from "@/components/ui";
 import { QuickDates, AmountFilter, SavedFilters, TongLoc, trongKhoang } from "@/components/FinFilters";
 import BankOptions from "@/components/BankOptions";
 import { usePerms } from "@/lib/usePerms";
@@ -245,6 +245,7 @@ function BanBuonInner() {
               {(from || to) && <button className="btn-ghost !text-xs !py-1" onClick={() => { setFrom(""); setTo(""); resetPage(); }}>Mọi ngày</button>}
             </div>
             <div className="flex gap-2 flex-wrap items-center mb-3">
+              <LocGon n={(fKh.length ? 1 : 0) + (fLoc.length ? 1 : 0) + (fTT.length ? 1 : 0) + (fTra ? 1 : 0) + (fNv.length ? 1 : 0) + (aMin || aMax ? 1 : 0) + (showHuy ? 1 : 0)}>
               <MultiCheck label="Khách buôn: tất cả" value={fKh} onChange={(v) => { setFKh(v); resetPage(); }}
                 options={[...new Map(ds.map((d) => [String(d.customer_id), { key: String(d.customer_id), label: d.customer_name }])).values()].sort((a, b) => a.label.localeCompare(b.label))} />
               <MultiCheck label="Cửa hàng: tất cả" value={fLoc} onChange={(v) => { setFLoc(v); resetPage(); }}
@@ -258,7 +259,8 @@ function BanBuonInner() {
                 options={[...new Set(ds.map((d) => d.created_by_name || ""))].filter(Boolean).sort().map((n) => ({ key: n, label: n }))} />
               <AmountFilter min={aMin} max={aMax} setMin={setAMin} setMax={setAMax} onChange={resetPage} />
               <button className={`btn-ghost !text-xs ${showHuy ? "!bg-[#FDEDED] !text-danger" : ""}`} onClick={() => { setShowHuy(!showHuy); resetPage(); }}>{showHuy ? "Đang hiện đơn hủy" : `Lô hủy${nHuy ? ` (${nHuy})` : ""}`}</button>
-              <input className="inp !w-64" placeholder="Tìm mã đơn, khách, SĐT, số khung, mã đơn xe, khách lẻ cuối…" value={q} onChange={(e) => { setQ(e.target.value); resetPage(); }} />
+              </LocGon>
+              <input className="inp !w-64 max-md:!w-full max-md:order-first" placeholder="Tìm mã đơn, khách, SĐT, số khung, mã đơn xe, khách lẻ cuối…" value={q} onChange={(e) => { setQ(e.target.value); resetPage(); }} />
               <SavedFilters k="ban-buon" state={{ fKh, fLoc, fTT, fTra, fNv }} apply={(x) => { setFKh(x.fKh || []); setFLoc(x.fLoc || []); setFTT(x.fTT || []); setFTra(x.fTra || ""); setFNv(x.fNv || []); }} />
             </div>
             <div className="text-[11px] text-[#8A93A0] -mt-1 mb-2">Ô số tiền lọc theo <b>Còn phải trả</b>.</div>
@@ -268,7 +270,7 @@ function BanBuonInner() {
               <span>Đã trả: <b className="text-[#0E7A4A]">{fmtVND(dsActive.reduce((s, d) => s + Number(d.da_tra), 0))}</b></span>
               <span>Còn: <b className="text-danger">{fmtVND(dsActive.reduce((s, d) => s + Number(d.con_phai_tra), 0))}</b></span>
             </TongLoc>
-            <div className="overflow-x-auto"><table className="w-full text-[13px]">
+            <div className="overflow-x-auto"><table className="w-full text-[13px] tbl-card">
               <thead><tr className="text-left text-[11.5px] text-[#8A93A0] uppercase border-b border-[#E3E8EF]">
                 <Th label="Mã đơn" k="code" sort={sort} /><Th label="Ngày chốt" k="ngay" sort={sort} /><Th label="Khách buôn" k="kh" sort={sort} /><th className="th">Cửa hàng</th>
                 <Th label="Đặt / giao" k="sl" sort={sort} className="text-right" /><Th label="Phải trả" k="pt" sort={sort} className="text-right" /><Th label="Đã trả" k="dt" sort={sort} className="text-right" />
@@ -276,13 +278,13 @@ function BanBuonInner() {
               </tr></thead>
               <tbody>{pageSlice(dsSort, curPage, pageSize).map((d) => (
                 <tr key={d.id} className={`border-b border-dashed border-[#F0F2F5] cursor-pointer hover:bg-[#F8FAFC] ${d.trang_thai === "Đã hủy" ? "opacity-50" : ""}`} onClick={() => { moLo(d.id); router.replace(`/ban-buon?id=${d.id}`); }}>
-                  <td className="py-2 font-bold text-brand">{d.code}</td><td>{fmtDate(d.ngay_chot)}</td><td>{d.customer_name}<div className="text-[11px] text-[#8A93A0]">{d.customer_code}</div></td>
-                  <td className="text-[12px]">{locName(d.location_code)}</td>
-                  <td className="text-right">{d.sl_giao}/{d.sl_dat}</td><td className="text-right">{fmtVND(d.phai_tra)}</td><td className="text-right">{fmtVND(d.da_tra)}</td>
-                  <td className={`text-right font-bold ${d.con_phai_tra > 0 ? "text-danger" : ""}`}>{d.con_phai_tra > 0 ? fmtVND(d.con_phai_tra) : "—"}</td>
-                  <td><Badge tone={TT_TONE[d.trang_thai]}>{d.trang_thai}</Badge></td>
-                  <td className="text-[12px] text-[#5A6572]">{d.created_by_name}</td>
-                  <td>{d.trang_thai !== "Đã hủy" && d.con_phai_tra > 0 && <button className="btn-ok !px-2 !py-1 !text-xs whitespace-nowrap" onClick={(e) => { e.stopPropagation(); router.replace(`/ban-buon?id=${d.id}&thu=1`); }}>💵 Thu tiền</button>}</td>
+                  <td data-label="Mã đơn" data-m="title" className="py-2 font-bold text-brand">{d.code}</td><td data-label="Ngày chốt" data-m="nolabel">{fmtDate(d.ngay_chot)}</td><td data-label="Khách buôn" data-m="nolabel full"><span className="max-md:font-semibold">{d.customer_name}</span><div className="text-[11px] text-[#8A93A0]">{d.customer_code}</div></td>
+                  <td data-label="Cửa hàng" data-m="nolabel" className="text-[12px]">{locName(d.location_code)}</td>
+                  <td data-label="Giao/đặt" className="text-right">{d.sl_giao}/{d.sl_dat}</td><td data-label="Phải trả" data-m="end" className="text-right">{fmtVND(d.phai_tra)}</td><td data-label="Đã trả" className="text-right">{fmtVND(d.da_tra)}</td>
+                  <td data-label="Còn" className={`text-right font-bold ${d.con_phai_tra > 0 ? "text-danger" : ""}`}>{d.con_phai_tra > 0 ? fmtVND(d.con_phai_tra) : "—"}</td>
+                  <td data-label="Trạng thái" data-m="nolabel"><Badge tone={TT_TONE[d.trang_thai]}>{d.trang_thai}</Badge></td>
+                  <td data-label="Người tạo" data-m="hide" className="text-[12px] text-[#5A6572]">{d.created_by_name}</td>
+                  <td data-m="actions">{d.trang_thai !== "Đã hủy" && d.con_phai_tra > 0 && <button className="btn-ok !px-2 !py-1 !text-xs whitespace-nowrap" onClick={(e) => { e.stopPropagation(); router.replace(`/ban-buon?id=${d.id}&thu=1`); }}>💵 Thu tiền</button>}</td>
                 </tr>
               ))}
               {dsSort.length === 0 && <tr><td colSpan={11} className="py-3 text-[#8A93A0]">Không có đơn nào theo bộ lọc.</td></tr>}</tbody>

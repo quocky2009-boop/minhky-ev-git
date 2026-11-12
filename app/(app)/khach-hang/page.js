@@ -3,7 +3,7 @@ import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Field, Badge, Toast, KPI, Pager, pageSlice, useSortable, Th, LocSearch } from "@/components/ui";
+import { Field, Badge, Toast, KPI, Pager, pageSlice, useSortable, Th, LocSearch, LocGon } from "@/components/ui";
 import { fmtVND, fmtDate, fmtTime, errMsg, downloadXLSX } from "@/lib/format";
 import { CUSTOMER_TYPES, CUSTOMER_SOURCES } from "@/lib/const";
 
@@ -550,7 +550,7 @@ function KhachHangInner() {
 
       <div className="card">
         {/* PIPELINE FILTER TABS như Getfly */}
-        <div className="flex gap-1.5 flex-wrap mb-3 pb-3 border-b border-[#EEF1F4]">
+        <div className="flex gap-1.5 flex-wrap max-md:flex-nowrap max-md:overflow-x-auto mb-3 pb-3 border-b border-[#EEF1F4] [&>button]:shrink-0 [&>button]:whitespace-nowrap">
           <button onClick={() => { setFStage(""); setPage(1); }}
             className={`btn !px-3 !py-1.5 !text-xs ${fStage === "" ? "bg-brand text-white" : "bg-[#EEF1F4]"}`}>
             Tất cả <span className="font-bold ml-1">{rows.length}</span>
@@ -568,7 +568,8 @@ function KhachHangInner() {
         </div>
 
         <div className="flex gap-2 flex-wrap items-center mb-3">
-          <input className="inp !w-64" placeholder="Tìm tên, SĐT, email, mã KH…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
+          <input className="inp !w-64 max-md:!w-full" placeholder="Tìm tên, SĐT, email, mã KH…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
+          <LocGon n={(fType ? 1 : 0) + (fStatus ? 1 : 0) + (fPotential ? 1 : 0)}>
           <select className="inp !w-auto" value={fType} onChange={(e) => { setFType(e.target.value); setPage(1); }}>
             <option value="">Loại: tất cả</option>
             {[...CUSTOMER_TYPES, "Khách lẻ của Đại lý"].map((x) => <option key={x}>{x}</option>)}
@@ -581,6 +582,7 @@ function KhachHangInner() {
             <option value="">Tiềm năng: tất cả</option>
             {POTENTIALS.map((x) => <option key={x}>{x}</option>)}
           </select>
+          </LocGon>
         </div>
 
         <div className="tbl-scroll"><table className="w-full border-collapse tbl-card">
@@ -597,20 +599,20 @@ function KhachHangInner() {
             const quaHan = t.hen_ke_tiep && new Date(t.hen_ke_tiep) <= new Date();
             return (
               <tr key={c.id} className={quaHan ? "bg-[#FFFCF0]" : "hover:bg-[#F8FAFC]"}>
-                <td data-label="#" className="td text-center text-xs text-[#8A93A0]">{i + 1}</td>
-                <td data-label="Khách hàng" className="td">
+                <td data-label="#" data-m="hide" className="td text-center text-xs text-[#8A93A0]">{i + 1}</td>
+                <td data-label="Khách hàng" data-m="title" className="td">
                   <div className="font-semibold text-[13px]">{c.name}</div>
                   <div className="text-[10.5px] text-[#8A93A0]">{c.code}{c.assigned_name ? ` · ${c.assigned_name}` : ""}</div>
                 </td>
-                <td data-label="Liên hệ" className="td text-[12.5px]">
+                <td data-label="Liên hệ" data-m="nolabel" className="td text-[12.5px]">
                   {c.phone}
                   {c.email && <div className="text-[10.5px] text-[#8A93A0]">{c.email}</div>}
                 </td>
-                <td data-label="Loại" className="td text-xs">{c.customer_type}
+                <td data-label="Loại" data-m="nolabel" className="td text-xs">{c.customer_type}
                   {c.potential && <div><Badge tone={c.potential === "Cao" ? "red" : c.potential === "Trung bình" ? "amber" : "dark"}>{c.potential}</Badge></div>}
                 </td>
-                <td data-label="Trạng thái" className="td"><Badge tone={c.status === "Đã mua" ? "green" : c.status === "Không mua" ? "red" : "amber"}>{c.status}</Badge></td>
-                <td data-label="Giai đoạn" className="td">
+                <td data-label="Trạng thái" data-m="nolabel" className="td"><Badge tone={c.status === "Đã mua" ? "green" : c.status === "Không mua" ? "red" : "amber"}>{c.status}</Badge></td>
+                <td data-label="Giai đoạn" data-m="nolabel" className="td">
                   {c.pipeline_stage ? (
                     <div className="flex flex-col gap-0.5 items-start">
                       <Badge tone={STAGE_TONE[c.pipeline_stage] || "dark"}>{c.pipeline_stage}</Badge>

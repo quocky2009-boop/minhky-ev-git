@@ -85,17 +85,17 @@ export default function ViecChamSoc() {
             <option value="">Lead: tất cả</option><option>Hot</option><option>Warm</option><option>Cold</option>
           </select>
         </div>
-        <div className="overflow-x-auto"><table className="w-full border-collapse">
+        <div className="overflow-x-auto"><table className="w-full border-collapse tbl-card">
           <thead><tr><th className="th">Hẹn ngày</th><th className="th">Tình trạng</th><th className="th">Khách hàng</th><th className="th">Lead</th><th className="th">Việc cần làm</th><th className="th">Phụ trách</th><th className="th"></th></tr></thead>
           <tbody>{pageSlice(scoped, page, pageSize).map((c) => [
             <tr key={c.id} className="hover:bg-[#F8FAFC]">
-              <td className="td font-bold whitespace-nowrap">{fmtDate(c.next_care_date)}</td>
-              <td className="td">{dueBadge(c.next_care_date)}</td>
-              <td className="td"><b>{c.name}</b><div className="text-[11px] text-[#8A93A0]">{c.code} · <a className="text-brand font-bold" href={`tel:${c.phone}`}>{c.phone}</a></div></td>
-              <td className="td">{c.temperature ? <Badge tone={tempTone(c.temperature)}>{c.temperature}</Badge> : <span className="text-[#C6CDD6]">—</span>}</td>
-              <td className="td text-[13px] max-w-[220px]">{c.next_care_note || c.note || "—"}</td>
+              <td data-label="Hẹn" className="td font-bold whitespace-nowrap">{fmtDate(c.next_care_date)}</td>
+              <td data-m="nolabel" className="td">{dueBadge(c.next_care_date)}</td>
+              <td data-m="title" className="td"><b>{c.name}</b><div className="text-[11px] text-[#8A93A0]">{c.code} · <a className="text-brand font-bold" href={`tel:${c.phone}`}>{c.phone}</a></div></td>
+              <td data-m="end" className="td">{c.temperature ? <Badge tone={tempTone(c.temperature)}>{c.temperature}</Badge> : <span className="text-[#C6CDD6]">—</span>}</td>
+              <td data-m="full" className="td text-[13px] max-w-[220px]">{c.next_care_note || c.note || "—"}</td>
               <td className="td text-xs">{c.assigned_name || c.created_by_name}</td>
-              <td className="td"><button className="btn-primary !px-2.5 !py-1.5 !text-xs" onClick={() => startLog(c)}>{openId === c.id ? "Đóng" : "✓ Ghi chăm sóc"}</button></td>
+              <td data-m="actions" className="td"><button className="btn-primary !px-2.5 !py-1.5 !text-xs" onClick={() => startLog(c)}>{openId === c.id ? "Đóng" : "✓ Ghi chăm sóc"}</button></td>
             </tr>,
             openId === c.id && (
               <tr key={c.id + "f"}><td colSpan={7} className="td bg-[#F8FAFC]">

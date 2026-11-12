@@ -103,7 +103,7 @@ export default function KhoChiTiet() {
             <option value="model">Sắp xếp: theo mẫu xe</option>
           </select>
         </div>
-        <div className="overflow-x-auto"><table className="w-full border-collapse">
+        <div className="overflow-x-auto"><table className="w-full border-collapse tbl-card">
           <thead><tr><th className="th">Số khung</th><th className="th">Xe</th><th className="th">Màu</th><th className="th">Ngày nhập</th><th className="th">Số ngày tồn</th><th className="th">Trạng thái</th>{canEdit && <th className="th"></th>}</tr></thead>
           <tbody>{list.map((u) => {
             const v = vOf(u.vehicle_id);

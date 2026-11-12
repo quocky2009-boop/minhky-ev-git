@@ -488,3 +488,15 @@ export function MultiCheck({ options, value, onChange, label = "Tất cả", wid
     </div>
   );
 }
+
+// ===== BO LOC GON TREN DIEN THOAI =====
+// Bao quanh cac o loc: tren dien thoai gap lai sau nut "⚙ Bộ lọc (n)", tren may tinh hien nhu cu.
+//   <LocGon n={soBoLocDangBat}>…cac o loc…</LocGon>            // dat TRONG 1 hang flex (cung hang voi o tim kiem)
+//   <LocGon khoi n={…}><div>hang 1</div><div>hang 2</div></LocGon> // bao ca cac hang loc
+export function LocGon({ n = 0, khoi = false, children }) {
+  const [mo, setMo] = useSt(false);
+  return (<>
+    <button type="button" className={`md:hidden btn-ghost !text-xs ${khoi ? "self-start mb-2" : ""} ${n ? "!bg-[#EAF2FF] !text-brand" : ""}`} onClick={() => setMo(!mo)}>⚙ Bộ lọc{n ? ` (${n})` : ""} {mo ? "▴" : "▾"}</button>
+    <div className={khoi ? `${mo ? "" : "max-md:hidden"} md:contents` : `${mo ? "flex" : "hidden"} md:contents gap-2 flex-wrap items-center w-full`}>{children}</div>
+  </>);
+}

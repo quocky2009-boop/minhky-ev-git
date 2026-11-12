@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCatalog, useToast } from "@/lib/useData";
-import { Badge, Toast, Pager, pageSlice, useSortable, Th, MultiCheck, LocSearch } from "@/components/ui";
+import { Badge, Toast, Pager, pageSlice, useSortable, Th, MultiCheck, LocSearch, LocGon } from "@/components/ui";
 import { QuickDates } from "@/components/FinFilters";
 import { fmtDate, errMsg, downloadXLSX } from "@/lib/format";
 import { LOAI_DV, NHOM_SC, LSC_STATUS } from "@/lib/lsc";
@@ -107,7 +107,8 @@ export default function LenhSuaChua() {
         {canTao && <button className="btn-primary !text-xs" onClick={() => setPopup(true)}>Tạo lệnh sửa chữa +</button>}
       </div>
 
-      <div className="card">
+      <div className="card max-md:flex max-md:flex-col">
+        <LocGon khoi n={fTT.length + fLoai.length + fNhom.length + fKtv.length + (fUt ? 1 : 0) + (d1 || d2 ? 1 : 0) + (q1 || q2 ? 1 : 0)}>
         <div className="flex gap-2 flex-wrap items-center mb-2">
           <MultiCheck label="Trạng thái: tất cả" value={fTT} onChange={(v) => { setFTT(v); setPage(1); }} options={Object.entries(LSC_STATUS).map(([k, v]) => ({ key: k, label: v.label }))} />
           <MultiCheck label="Loại dịch vụ: tất cả" value={fLoai} onChange={(v) => { setFLoai(v); setPage(1); }} options={LOAI_DV.map((x) => ({ key: x, label: x }))} />
@@ -125,8 +126,9 @@ export default function LenhSuaChua() {
           <input type="date" className="inp !w-auto" value={q1} onChange={(e) => { setQ1(e.target.value); setPage(1); }} />
           <input type="date" className="inp !w-auto" value={q2} onChange={(e) => { setQ2(e.target.value); setPage(1); }} />
         </div>
+        </LocGon>
         <div className="flex gap-2 flex-wrap items-center mb-3">
-          <input className="inp !w-80" placeholder="Nhập Mã LSC, biển số, số khung, tên khách, SĐT…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
+          <input className="inp !w-80 max-md:!w-full" placeholder="Nhập Mã LSC, biển số, số khung, tên khách, SĐT…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
           <button className="btn-ghost !text-xs" onClick={xoaLoc} disabled={!coLoc}>Xóa lọc ⛌</button>
           <button className="btn-ghost !text-xs" onClick={xuat}>Xuất Excel ⬇</button>
           <span className="ml-auto text-[12px] text-[#5A6572]">{sorted.length} lệnh</span>
@@ -140,19 +142,19 @@ export default function LenhSuaChua() {
           </tr></thead>
           <tbody>{pageSlice(sorted, page, pageSize).map((r) => (
             <tr key={r.id} className={`hover:bg-[#F8FAFC] ${r.status === "HUY" ? "text-[#8A93A0] bg-[#F7F8FA]" : ""}`}>
-              <td data-label="Số LSC" className="td font-bold whitespace-nowrap"><Link href={`/dich-vu/lenh-sua-chua/${r.id}`} className="text-brand hover:underline">{r.code}</Link></td>
-              <td data-label="Ngày tạo" className="td text-xs whitespace-nowrap">{fmtDate(r.created_at)}</td>
+              <td data-label="Số LSC" data-m="title" className="td font-bold whitespace-nowrap"><Link href={`/dich-vu/lenh-sua-chua/${r.id}`} className="text-brand hover:underline">{r.code}</Link></td>
+              <td data-label="Ngày tạo" data-m="nolabel" className="td text-xs whitespace-nowrap">{fmtDate(r.created_at)}</td>
               <td data-label="KTV" className="td text-[13px]">{r.ktv_name || "—"}</td>
-              <td data-label="Trạng thái" className="td"><Badge tone={LSC_STATUS[r.status]?.tone}>{LSC_STATUS[r.status]?.label}</Badge></td>
-              <td data-label="Loại dịch vụ" className="td text-[13px]">{r.loai_dich_vu}</td>
-              <td data-label="Biển số xe" className="td font-bold">{r.plate || <span className="text-[#C6CDD6]">—</span>}<div className="font-mono text-[10px] text-[#8A93A0] font-normal">{r.frame_number}</div></td>
-              <td data-label="Khách hàng" className="td text-[13px]">{r.customer_name}<div className="text-[11px] text-[#8A93A0]">{r.sdt_lai_xe || r.customer_phone}</div></td>
-              <td data-label="Yêu cầu" className="td text-[12.5px] max-w-[220px]"><div className="line-clamp-2">{r.yeu_cau || "—"}</div></td>
-              <td data-label="Ưu tiên" className="td text-center">{r.uu_tien ? "🔥" : ""}</td>
-              <td data-label="Nhóm sửa chữa" className="td text-[12px]">{r.nhom_sua_chua}</td>
-              <td data-label="Dự kiến giao xe" className="td text-xs whitespace-nowrap">{r.du_kien_giao_xe ? fmtDate(r.du_kien_giao_xe) : "—"}</td>
-              <td data-label="Phát hành LSC" className="td text-xs whitespace-nowrap">{r.phat_hanh_at ? fmtDate(r.phat_hanh_at) : "—"}</td>
-              <td data-label="Ngày quyết toán" className="td text-xs whitespace-nowrap">{r.quyet_toan_at ? fmtDate(r.quyet_toan_at) : "—"}</td>
+              <td data-label="Trạng thái" data-m="nolabel" className="td"><Badge tone={LSC_STATUS[r.status]?.tone}>{LSC_STATUS[r.status]?.label}</Badge></td>
+              <td data-label="Loại dịch vụ" data-m="nolabel" className="td text-[13px]">{r.loai_dich_vu}</td>
+              <td data-label="Biển số xe" data-m="nolabel" className="td font-bold">{r.plate || <span className="text-[#C6CDD6]">—</span>}<div className="font-mono text-[10px] text-[#8A93A0] font-normal">{r.frame_number}</div></td>
+              <td data-label="Khách hàng" data-m="nolabel full" className="td text-[13px]">{r.customer_name}<div className="text-[11px] text-[#8A93A0]">{r.sdt_lai_xe || r.customer_phone}</div></td>
+              <td data-label="Yêu cầu" data-m="full" className="td text-[12.5px] max-w-[220px]"><div className="line-clamp-2">{r.yeu_cau || "—"}</div></td>
+              <td data-label="Ưu tiên" data-m="end" className="td text-center">{r.uu_tien ? "🔥" : ""}</td>
+              <td data-label="Nhóm sửa chữa" data-m="nolabel" className="td text-[12px]">{r.nhom_sua_chua}</td>
+              <td data-label="Dự kiến giao xe" data-m={r.du_kien_giao_xe ? undefined : "hide"} className="td text-xs whitespace-nowrap">{r.du_kien_giao_xe ? fmtDate(r.du_kien_giao_xe) : "—"}</td>
+              <td data-label="Phát hành LSC" data-m="hide" className="td text-xs whitespace-nowrap">{r.phat_hanh_at ? fmtDate(r.phat_hanh_at) : "—"}</td>
+              <td data-label="Ngày quyết toán" data-m={r.quyet_toan_at ? undefined : "hide"} className="td text-xs whitespace-nowrap">{r.quyet_toan_at ? fmtDate(r.quyet_toan_at) : "—"}</td>
             </tr>
           ))}
           {sorted.length === 0 && <tr><td className="td" colSpan={13}>{busy ? "Đang tải…" : coLoc ? "Không có lệnh nào khớp bộ lọc." : "Chưa có lệnh sửa chữa. Bấm “Tạo lệnh sửa chữa +” để bắt đầu."}</td></tr>}

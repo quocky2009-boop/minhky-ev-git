@@ -126,21 +126,21 @@ export default function LichSu() {
             ...rs.map((t) => { const v = vehicles.find((x) => x.id === t.vehicle_id); return [fmtTime(t.created_at), t.txn_type, v ? `${v.name} ${v.color}` : t.vehicle_id, t.from_location && t.to_location ? `${locName(t.from_location)} → ${locName(t.to_location)}` : locName(t.from_location || t.to_location), t.qty, t.stock_before, t.stock_after, t.created_by_name, t.doc_code, t.note]; })]);
         }}>⬇ Xuất Excel</button>
       </SelectionBar>
-      <div className="overflow-x-auto"><table className="w-full border-collapse">
+      <div className="overflow-x-auto"><table className="w-full border-collapse tbl-card">
         <thead><tr><ThCheck sel={sel} rows={pageSlice(list, page, pageSize)} idOf={(t) => t.id} /><th className="th">Thời gian</th><th className="th">Loại</th><th className="th">Xe</th><th className="th">Kho</th><th className="th">SL</th><th className="th">Tồn trước → sau</th><th className="th">Người</th><th className="th">Phiếu / Ghi chú</th></tr></thead>
         <tbody>{pageSlice(list, page, pageSize).map((t) => {
           const v = vehicles.find((x) => x.id === t.vehicle_id);
           return (
             <tr key={t.id} className={`hover:bg-[#F8FAFC] cursor-pointer ${sel.has(t.id) ? "bg-[#EAF2FF]" : ""}`} onClick={() => openDetail(t)}>
               <TdCheck sel={sel} id={t.id} />
-              <td className="td whitespace-nowrap">{fmtTime(t.created_at)}</td>
-              <td className="td">{tb(t.txn_type)}</td>
-              <td className="td">{v ? `${v.name} ${v.color}` : t.vehicle_id}</td>
+              <td data-m="nolabel" className="td whitespace-nowrap">{fmtTime(t.created_at)}</td>
+              <td data-m="nolabel" className="td">{tb(t.txn_type)}</td>
+              <td data-m="title" className="td">{v ? `${v.name} ${v.color}` : t.vehicle_id}</td>
               <td className="td">{t.from_location && t.to_location ? `${locName(t.from_location)} → ${locName(t.to_location)}` : locName(t.from_location || t.to_location)}</td>
-              <td className="td"><b className={t.qty < 0 ? "text-danger" : "text-[#0E7A4A]"}>{t.qty > 0 ? "+" : ""}{t.qty}</b></td>
-              <td className="td">{t.stock_before} → <b>{t.stock_after}</b></td>
+              <td data-m="end" className="td"><b className={t.qty < 0 ? "text-danger" : "text-[#0E7A4A]"}>{t.qty > 0 ? "+" : ""}{t.qty}</b></td>
+              <td data-label="Tồn" className="td">{t.stock_before} → <b>{t.stock_after}</b></td>
               <td className="td">{t.created_by_name}</td>
-              <td className="td"><b className="text-brand underline">{t.doc_code}</b>{t.note && <div className="text-[11px] text-[#8A93A0]">{t.note}</div>}</td>
+              <td data-m="nolabel full" className="td"><b className="text-brand underline">{t.doc_code}</b>{t.note && <div className="text-[11px] text-[#8A93A0]">{t.note}</div>}</td>
             </tr>
           );
         })}</tbody>

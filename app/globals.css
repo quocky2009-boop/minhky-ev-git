@@ -31,7 +31,7 @@ body { @apply bg-[#F3F5F8] text-[#1B2733] font-sans; }
   .tbl-card, .tbl-card tbody { display: block; width: 100%; }
   .tbl-card tr {
     @apply bg-white rounded-xl border border-[#E6EAEF] mb-1.5;
-    display: flex; flex-wrap: wrap; align-items: center; column-gap: 10px; row-gap: 3px; padding: 8px 10px; width: 100%;
+    display: flex; flex-wrap: wrap; align-items: center; column-gap: 10px; row-gap: 3px; padding: 8px 10px; width: 100%; border-style: solid;
   }
   .tbl-card td {
     @apply border-0 p-0 text-[12.5px];

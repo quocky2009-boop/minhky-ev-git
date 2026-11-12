@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useCatalog, useToast } from "@/lib/useData";
 import { QuickDates, AmountFilter, SavedFilters, RefLink, TongLoc, trongKhoang } from "@/components/FinFilters";
-import { Badge, Toast, KPI, Field, MultiCheck, MoneyInput, Pager, pageSlice, useSortable, Th, useSelection, ThCheck, TdCheck, SelectionBar } from "@/components/ui";
+import { Badge, Toast, KPI, Field, MultiCheck, MoneyInput, Pager, pageSlice, useSortable, Th, useSelection, ThCheck, TdCheck, SelectionBar, LocGon } from "@/components/ui";
 import { fmtVND, fmtTime, fmtDate, errMsg, downloadXLSX } from "@/lib/format";
 
 const iso = (d) => d.toLocaleDateString("sv-SE");
@@ -299,6 +299,7 @@ export default function PhieuThuChi({ dir }) {
           <input type="date" className="inp !w-auto" value={to} onChange={(e) => setTo(e.target.value)} />
         </div>
         <div className="flex gap-2 items-center mb-3 flex-wrap">
+          <LocGon n={(fAcc.length ? 1 : 0) + (fCat.length ? 1 : 0) + (fWho.length ? 1 : 0) + (fAuto ? 1 : 0) + (fAppr ? 1 : 0) + (aMin || aMax ? 1 : 0)}>
           <MultiCheck label="Quỹ: tất cả" value={fAcc} onChange={(v) => { setFAcc(v); setPage(1); }}
             options={accs.map((a) => ({ key: a.id, label: a.name, group: a.type }))} />
           <MultiCheck label="Danh mục: tất cả" value={fCat} onChange={(v) => { setFCat(v); setPage(1); }}
@@ -314,7 +315,8 @@ export default function PhieuThuChi({ dir }) {
             </select>
           )}
           <AmountFilter min={aMin} max={aMax} setMin={setAMin} setMax={setAMax} onChange={() => setPage(1)} />
-          <input className="inp !w-56" placeholder="Tìm mã phiếu, chứng từ gốc, đối tượng, số tiền…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
+          </LocGon>
+          <input className="inp !w-56 max-md:!w-full max-md:order-first" placeholder="Tìm mã phiếu, chứng từ gốc, đối tượng, số tiền…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
           <SavedFilters k={isThu ? "phieu-thu" : "phieu-chi"} state={{ fAcc, fCat, fWho, fAuto, fAppr, aMin, aMax, q }}
             apply={(o) => { setFAcc(o.fAcc || []); setFCat(o.fCat || []); setFWho(o.fWho || []); setFAuto(o.fAuto || ""); setFAppr(o.fAppr || ""); setAMin(o.aMin || ""); setAMax(o.aMax || ""); setQ(o.q || ""); }} />
         </div>
@@ -344,15 +346,15 @@ export default function PhieuThuChi({ dir }) {
               <tbody>{pageSlice(sorted, page, pageSize).map((t) => (
                 <tr key={t.id} className={`hover:bg-[#F8FAFC] ${sel.has(t.id) ? "bg-[#EAF2FF]" : ""}`}>
                   <TdCheck sel={sel} id={t.id} />
-                  <td data-label="Ngày tạo" className="td text-xs whitespace-nowrap">{fmtTime(t.created_at)}</td>
-                  <td data-label="Mã phiếu" className="td"><button className="font-bold text-brand hover:underline" onClick={() => setDetail(t)}>{t.code}</button></td>
-                  <td data-label="Danh mục" className="td text-[13px]">{t.ref_doc ? <Badge tone="blue">Tự động</Badge> : null} {t.category}
+                  <td data-label="Ngày tạo" data-m="nolabel" className="td text-xs whitespace-nowrap">{fmtTime(t.created_at)}</td>
+                  <td data-label="Mã phiếu" data-m="title" className="td"><button className="font-bold text-brand hover:underline" onClick={() => setDetail(t)}>{t.code}</button></td>
+                  <td data-label="Danh mục" data-m="nolabel" className="td text-[13px]">{t.ref_doc ? <Badge tone="blue">Tự động</Badge> : null} {t.category}
                     {!isThu && t.approval_status === "pending" && <span className="ml-1"><Badge tone="amber">⏳ Chờ duyệt</Badge></span>}
                     {!isThu && t.approval_status === "rejected" && <span className="ml-1"><Badge tone="red">✗ Từ chối</Badge></span>}
                   </td>
-                  <td data-label={`Tên ${nhomNhan}`} className="td text-[13px]">{t.counterparty || <span className="text-[#8A93A0]">—</span>}</td>
-                  <td data-label="Số tiền" className="td rt font-bold"><span className={isThu ? "text-[#0E7A4A]" : "text-danger"}>{fmtVND(t.amount)}</span></td>
-                  <td data-label="Quỹ" className="td text-xs">{accName(t.account_id)}</td>
+                  <td data-label={`Tên ${nhomNhan}`} data-m="nolabel full" className="td text-[13px]">{t.counterparty || <span className="text-[#8A93A0]">—</span>}</td>
+                  <td data-label="Số tiền" data-m="end" className="td rt font-bold"><span className={isThu ? "text-[#0E7A4A]" : "text-danger"}>{fmtVND(t.amount)}</span></td>
+                  <td data-label="Quỹ" data-m="nolabel" className="td text-xs">{accName(t.account_id)}</td>
                   <td data-label="Chứng từ gốc" className="td text-xs"><RefLink code={t.ref_doc} /></td>
                   {!isThu && (
                     <td className="td">

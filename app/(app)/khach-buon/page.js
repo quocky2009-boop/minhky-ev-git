@@ -198,7 +198,7 @@ function KhachBuonInner() {
               <input className="inp !w-56" placeholder="Tìm tên, mã, SĐT…" value={q} onChange={(e) => setQ(e.target.value)} />
             </div>
             {busy ? <div className="text-sm text-[#8A93A0]">Đang tải…</div> : (
-              <div className="overflow-x-auto"><table className="w-full text-[13px]">
+              <div className="overflow-x-auto"><table className="w-full text-[13px] tbl-card">
                 <thead><tr className="text-left text-[11.5px] text-[#8A93A0] uppercase border-b border-[#E3E8EF]"><th className="py-2">Khách buôn</th><th>SĐT</th><th>Cấn trừ</th><th className="text-right">Số dư bù</th><th className="text-right">Được cấn trừ</th><th></th></tr></thead>
                 <tbody>{dsLoc.map((c) => {
                   const sd = soDu(c.id, c.kb_can_tru_mode);
@@ -310,7 +310,7 @@ function KhachBuonInner() {
             {ckAdmin && <button className="btn-primary !text-xs" onClick={() => setCkF({ id: null, customer_id: ckKh || "", bm: "", pct: "", tu_ngay: homNay(), den_ngay: "", note: "" })}>+ Thêm</button>}
           </div>
           <p className="text-[12px] text-[#5A6572] mb-2">Khi lên đơn cho khách buôn (trang Bán hàng), hệ thống tự điền CK sỉ đang hiệu lực theo model xe. Đổi mức CK thì thêm dòng mới với ngày bắt đầu mới — không sửa lại các đơn đã lên.{!ckAdmin && " Cần quyền “Sửa bảng chiết khấu sỉ” để thêm/sửa."}</p>
-          <div className="overflow-x-auto"><table className="w-full text-[13px]">
+          <div className="overflow-x-auto"><table className="w-full text-[13px] tbl-card">
             <thead><tr className="text-left text-[11.5px] text-[#8A93A0] uppercase border-b border-[#E3E8EF]"><th className="py-2">Khách buôn</th><th>Model</th><th className="text-right">CK sỉ</th><th>Từ ngày</th><th>Đến ngày</th><th>Ghi chú</th><th></th></tr></thead>
             <tbody>{ckLoc.map((r) => (
               <tr key={r.id} className={`border-b border-dashed border-[#F0F2F5] ${conHieuLuc(r) ? "" : "text-[#8A93A0]"}`}>

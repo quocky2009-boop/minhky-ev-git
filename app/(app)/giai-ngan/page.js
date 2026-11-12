@@ -112,22 +112,22 @@ export default function GiaiNgan() {
           <SavedFilters k="giai-ngan" state={{ fStatus, fCo, fLoc, fLate, aMin, aMax, q }}
             apply={(o) => { setFStatus(o.fStatus || "Chờ giải ngân"); setFCo(o.fCo || []); setFLoc(o.fLoc || []); setFLate(!!o.fLate); setAMin(o.aMin || ""); setAMax(o.aMax || ""); setQ(o.q || ""); }} />
         </div>
-        <div className="overflow-x-auto"><table className="w-full border-collapse">
+        <div className="overflow-x-auto"><table className="w-full border-collapse tbl-card">
           <thead><tr><th className="th">Đơn bán</th><th className="th">Khách</th><th className="th">Công ty TC</th><th className="th">Số tiền</th><th className="th">Dự kiến</th><th className="th">Trạng thái</th><th className="th"></th></tr></thead>
           <tbody>{pageSlice(filtered, page, pageSize).map((x) => {
             const o = orders[x.sale_code];
             const late = x.status === "Chờ giải ngân" && x.expected_date && x.expected_date < today;
             return (
               <tr key={x.id} className={late ? "bg-[#FDF6F0]" : ""}>
-                <td className="td"><b>{x.sale_code}</b><div className="text-[11px] text-[#8A93A0]">{o ? fmtDate(o.sale_date) + " · NV " + o.seller_name : ""}</div></td>
-                <td className="td">{o ? <><b>{o.customer_name}</b><div className="text-[11px] text-[#8A93A0]">{o.customer_phone}</div></> : "—"}</td>
-                <td className="td">{x.finance_company}</td>
-                <td className="td font-extrabold">{fmtVND(x.amount)}</td>
+                <td data-m="title" className="td"><b>{x.sale_code}</b><div className="text-[11px] text-[#8A93A0]">{o ? fmtDate(o.sale_date) + " · NV " + o.seller_name : ""}</div></td>
+                <td data-m="nolabel full" className="td">{o ? <><b>{o.customer_name}</b><div className="text-[11px] text-[#8A93A0]">{o.customer_phone}</div></> : "—"}</td>
+                <td data-m="nolabel" className="td">{x.finance_company}</td>
+                <td data-m="end" className="td font-extrabold">{fmtVND(x.amount)}</td>
                 <td className="td">{x.expected_date ? <span className={late ? "text-danger font-bold" : ""}>{fmtDate(x.expected_date)}{late ? " ⚠" : ""}</span> : "—"}</td>
-                <td className="td">{x.status === "Đã giải ngân"
+                <td data-m="nolabel" className="td">{x.status === "Đã giải ngân"
                   ? <><Badge tone="green">Đã giải ngân</Badge><div className="text-[11px] text-[#8A93A0]">{x.disbursed_txn_code} · {x.disbursed_by_name} · {fmtDate(x.disbursed_at)}</div></>
                   : <Badge tone="amber">Chờ giải ngân</Badge>}</td>
-                <td className="td">{x.status === "Chờ giải ngân" && (
+                <td data-m="actions" className="td">{x.status === "Chờ giải ngân" && (
                   <button className="btn-ok !px-2.5 !py-1.5 !text-xs" onClick={() => { setConfirmRow(x); setAccSel(""); setNoteSel(""); }}>✓ Đã nhận tiền</button>
                 )}</td>
               </tr>
