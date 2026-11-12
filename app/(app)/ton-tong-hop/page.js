@@ -92,32 +92,52 @@ export default function TonTongHop() {
     downloadXLSX(withSales ? "ton_tong_hop_kem_doanh_so.xlsx" : "ton_tong_hop.xlsx", rows, "Ton_tong_hop");
   };
 
-  // Xuat danh sach tung xe ton theo vi tri kho, du thong tin xe + so khung (theo bo loc dang chon)
-  const exportSoKhung = async () => {
+  // Xuat danh sach tung xe ton theo vi tri, du thong tin xe + so khung (theo bo loc dang chon).
+  // kemKyGui=true: them ca xe dang ky gui tai khach buon (don ban buon chua ghep khach le sau cung).
+  const exportSoKhung = async (kemKyGui) => {
     setShowExp(false); setExpBusy(true);
     const ids = new Set(list.map((v) => v.id));
-    const all = [];
-    for (let from = 0; ; from += 1000) {
-      const { data, error } = await supabase.from("vehicle_units").select("*")
-        .in("status", ["TON_KHO", "DANG_CHUYEN", "GIU_CHO"]).order("frame_number").range(from, from + 999);
-      if (error) { setExpBusy(false); return alert("Không lấy được danh sách xe tồn: " + (error.message || error)); }
-      all.push(...(data || []));
-      if (!data || data.length < 1000) break;
-    }
+    const taiHet = async (taoQuery) => {
+      const out = [];
+      for (let from = 0; ; from += 1000) {
+        const { data, error } = await taoQuery().range(from, from + 999);
+        if (error) throw error;
+        out.push(...(data || []));
+        if (!data || data.length < 1000) break;
+      }
+      return out;
+    };
+    let all = [], kg = [];
+    try {
+      all = await taiHet(() => supabase.from("vehicle_units").select("*").in("status", ["TON_KHO", "DANG_CHUYEN", "GIU_CHO"]).order("frame_number"));
+      if (kemKyGui) kg = await taiHet(() => supabase.from("sales_orders").select("id, code, sale_date, customer_name, customer_phone, vehicle_id, frame_number, location_code, quantity, seller_name")
+        .eq("customer_type", "Khách buôn").is("end_customer_id", null).not("status", "in", '("Đã hủy","Đã trả hàng")').order("id"));
+    } catch (error) { setExpBusy(false); return alert("Không lấy được danh sách xe tồn: " + (error.message || error)); }
     setExpBusy(false);
     const lOf = (c) => locations.find((l) => l.code === c);
     const vOf = (id) => vehicles.find((v) => v.id === id);
     const TT = { TON_KHO: "Tồn kho", GIU_CHO: "Giữ chỗ", DANG_CHUYEN: "Đang chuyển" };
     const coVon = can("gia_von_nhap");
+    const cmp = (a, b) => String(a || "").localeCompare(String(b || ""));
     const ds = all.filter((u) => ids.has(u.vehicle_id)).map((u) => ({ u, v: vOf(u.vehicle_id) || {}, l: lOf(u.location_code) || {} }))
-      .sort((a, b) => (a.l.region || "").localeCompare(b.l.region || "") || (a.l.name || a.u.location_code || "").localeCompare(b.l.name || b.u.location_code || "")
-        || (a.v.name || "").localeCompare(b.v.name || "") || (a.v.color || "").localeCompare(b.v.color || "") || String(a.u.imported_at || "").localeCompare(String(b.u.imported_at || "")));
-    if (!ds.length) return alert("Không có xe tồn nào theo bộ lọc đang chọn.");
-    const head = ["STT", "Khu vực", "Kho / cửa hàng", "Mã kho", "Hãng", "Mã hãng", "Mã xe", "Tên xe", "Màu", "Loại pin", "Số khung", "Số máy", "Giá niêm yết", ...(coVon ? ["Giá vốn"] : []), "Ngày nhập", "Số ngày tồn", "Trạng thái", "Số khung tạm", "Ghi chú"];
-    const body = ds.map(({ u, v, l }, i) => [i + 1, l.region || "", l.name || u.location_code, u.location_code, v.brand || "", v.mfr_code || "", u.vehicle_id, v.name || "", v.color || "", v.model_pin || "",
+      .sort((a, b) => cmp(a.l.region, b.l.region) || cmp(a.l.name || a.u.location_code, b.l.name || b.u.location_code)
+        || cmp(a.v.name, b.v.name) || cmp(a.v.color, b.v.color) || cmp(a.u.imported_at, b.u.imported_at));
+    const dsKg = kg.filter((o) => ids.has(o.vehicle_id)).map((o) => ({ o, v: vOf(o.vehicle_id) || {}, l: lOf(o.location_code) || {} }))
+      .sort((a, b) => cmp(a.o.customer_name, b.o.customer_name) || cmp(a.v.name, b.v.name) || cmp(a.v.color, b.v.color) || cmp(a.o.sale_date, b.o.sale_date));
+    if (!ds.length && !dsKg.length) return alert("Không có xe tồn nào theo bộ lọc đang chọn.");
+    // Cot "Loại vị trí" + "Vị trí hiện tại" + thong tin khach buon chi co khi xuat kem ky gui
+    const head = ["STT", ...(kemKyGui ? ["Loại vị trí", "Vị trí hiện tại"] : []), "Khu vực", "Kho / cửa hàng", "Mã kho", "Hãng", "Mã hãng", "Mã xe", "Tên xe", "Màu", "Loại pin", "Số khung", "Số máy", "Giá niêm yết",
+      ...(coVon ? ["Giá vốn"] : []), "Ngày nhập", "Số ngày tồn", "Trạng thái", "Số khung tạm", "Ghi chú",
+      ...(kemKyGui ? ["Khách buôn đang giữ xe", "SĐT khách buôn", "Mã đơn bán", "Ngày xuất cho khách buôn", "Số ngày ký gửi", "NV bán"] : [])];
+    const body = ds.map(({ u, v, l }) => [...(kemKyGui ? ["Kho đại lý", l.name || u.location_code] : []), l.region || "", l.name || u.location_code, u.location_code, v.brand || "", v.mfr_code || "", u.vehicle_id, v.name || "", v.color || "", v.model_pin || "",
       u.frame_number, u.engine_number || "", Number(v.list_price) || "", ...(coVon ? [Number(u.cost_price) || ""] : []), u.imported_at ? String(u.imported_at).slice(0, 10) : "", u.imported_at ? daysIn(u.imported_at) : "",
-      TT[u.status] || u.status, u.is_placeholder ? "Có" : "", u.note || ""]);
-    downloadXLSX("ton_xe_theo_kho_so_khung.xlsx", [head, ...body], "Ton_theo_kho");
+      TT[u.status] || u.status, u.is_placeholder ? "Có" : "", u.note || "", ...(kemKyGui ? ["", "", "", "", "", ""] : [])]);
+    // Xe ky gui: "Kho / cửa hàng" la cua hang da xuat xe; ngay nhap / gia von de trong (xe da xuat khoi kho)
+    const bodyKg = dsKg.map(({ o, v, l }) => ["Ký gửi khách buôn", o.customer_name || "", l.region || "", l.name || o.location_code || "", o.location_code || "", v.brand || "", v.mfr_code || "", o.vehicle_id, v.name || "", v.color || "", v.model_pin || "",
+      o.frame_number || "", "", Number(v.list_price) || "", ...(coVon ? [""] : []), "", "", "Ký gửi (chưa có khách lẻ)", "", "",
+      o.customer_name || "", o.customer_phone || "", o.code, o.sale_date || "", o.sale_date ? daysIn(o.sale_date) : "", o.seller_name || ""]);
+    const rows = [...body, ...bodyKg].map((r, i) => [i + 1, ...r]);
+    downloadXLSX(kemKyGui ? "ton_xe_theo_so_khung_kem_ky_gui.xlsx" : "ton_xe_theo_kho_so_khung.xlsx", [head, ...rows], kemKyGui ? "Ton_kho_va_ky_gui" : "Ton_theo_kho");
   };
 
   return (
@@ -135,7 +155,8 @@ export default function TonTongHop() {
             <div className="absolute right-0 top-full mt-1 z-30 bg-white border border-[#E3E8EF] rounded-xl shadow-lg p-1.5 min-w-[230px] flex flex-col">
               <button className="text-left text-[13px] px-3 py-2 rounded-lg hover:bg-[#F3F5F8]" onClick={() => exportCSV(false)}>Xuất Excel kho<div className="text-[11px] text-[#8A93A0]">Mã hàng + tồn từng điểm</div></button>
               <button className="text-left text-[13px] px-3 py-2 rounded-lg hover:bg-[#F3F5F8]" onClick={() => exportCSV(true)}>Xuất Excel kèm doanh số<div className="text-[11px] text-[#8A93A0]">Thêm 30_days và Sales_avg</div></button>
-              <button className="text-left text-[13px] px-3 py-2 rounded-lg hover:bg-[#F3F5F8]" onClick={exportSoKhung}>Xuất danh sách xe theo kho<div className="text-[11px] text-[#8A93A0]">Từng xe: kho, thông tin xe, số khung, ngày nhập</div></button>
+              <button className="text-left text-[13px] px-3 py-2 rounded-lg hover:bg-[#F3F5F8]" onClick={() => exportSoKhung(false)}>Xuất danh sách xe theo kho<div className="text-[11px] text-[#8A93A0]">Từng xe: kho, thông tin xe, số khung, ngày nhập</div></button>
+              <button className="text-left text-[13px] px-3 py-2 rounded-lg hover:bg-[#F3F5F8]" onClick={() => exportSoKhung(true)}>Xuất tồn theo số khung + ký gửi<div className="text-[11px] text-[#8A93A0]">Xe trong kho và xe đang ở khách buôn (chưa có khách lẻ)</div></button>
             </div>
           )}
         </div>
