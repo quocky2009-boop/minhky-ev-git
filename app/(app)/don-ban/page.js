@@ -164,7 +164,8 @@ export default function DonBan() {
 
   const isVF = (o) => (vOf(o.vehicle_id)?.brand || "").toUpperCase().includes("VINFAST");
   const canKhachLe = (o) => o.customer_type === "Khách buôn";
-  const thieuKhachLe = (o) => canKhachLe(o) && isVF(o) && !o.end_customer_id;
+  // Don khach buon chua co khach le sau cung = xe dang ky gui tai khach buon (moi hang). Rieng VinFast: bat buoc truoc khi xuat hoa don.
+  const thieuKhachLe = (o) => canKhachLe(o) && !o.end_customer_id;
   // Hinh thuc kinh doanh pin: chi xe doi pin. Khach buon -> theo khach le sau cung; con lai -> theo don.
   const laDoiPin = (o) => vOf(o.vehicle_id)?.model_pin === "Xe đổi pin";
   const pinOf = (o) => !laDoiPin(o) ? "" : canKhachLe(o) ? (o.end_customer_id ? (o.end_customer_battery_option || "Chưa chọn") : "") : (o.battery_option || "Chưa chọn");
@@ -781,7 +782,7 @@ export default function DonBan() {
                             <span className="font-bold text-[13.5px] mr-auto">👤 Khách lẻ cuối (đứng tên hóa đơn)</span>
                             {detail.end_customer_id
                               ? <Badge tone="green">✓ Đã có</Badge>
-                              : thieuKhachLe(detail) ? <Badge tone="amber">Bắt buộc — xe VinFast</Badge> : <Badge tone="dark">Chưa có</Badge>}
+                              : thieuKhachLe(detail) ? <Badge tone="amber">{isVF(detail) ? "Bắt buộc — xe VinFast" : "Cần nhập — xe đang ký gửi"}</Badge> : <Badge tone="dark">Chưa có</Badge>}
                           </div>
 
                           {detail.end_customer_id && !klEdit ? (
@@ -856,7 +857,9 @@ export default function DonBan() {
                           ) : (
                             <div>
                               <div className="text-[12px] text-[#5A6572] mb-2">
-                                {thieuKhachLe(detail)
+                                {thieuKhachLe(detail) && !isVF(detail)
+                                  ? "Xe bán buôn chưa có khách lẻ cuối — đang tính là xe ký gửi tại khách buôn. Khi khách buôn bán cho khách lẻ thì bổ sung thông tin ở đây (không chặn xuất hóa đơn)."
+                                  : thieuKhachLe(detail)
                                   ? "Xe VinFast bán buôn — bắt buộc có thông tin khách lẻ cuối trước khi xuất hóa đơn."
                                   : "Đại lý bán lại cho khách lẻ thì bổ sung thông tin ở đây."}
                               </div>

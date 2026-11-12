@@ -1,0 +1,7 @@
+-- 181 (12/11/2026) — Đã chạy trực tiếp trên database.
+-- fn_xac_nhan_hoa_don: Phiếu PDI kiểm tra xe và HDSD xe & mốc bảo dưỡng bắt buộc Ở MÁY CHỦ trong mọi trường hợp.
+-- Trước đây chỉ kiểm tra khi lời gọi có gửi kèm checklist (để tương thích bản app cũ) -> có thể lách bằng cách không gửi checklist.
+--   cũ: if jsonb_typeof(p->'checklist') = 'object' and not coalesce((p->'checklist'->>'pdi')::boolean, false) then raise ...
+--   mới: if not coalesce((p->'checklist'->>'pdi')::boolean, false) then raise 'THIEU_CHECKLIST: ...'
+--   (tương tự cho 'hdsd'). fn_sua_hoa_don vốn đã bắt buộc cả 4 mục.
+-- Quyền thực thi giữ nguyên (authenticated, service_role; không cấp cho anon).
