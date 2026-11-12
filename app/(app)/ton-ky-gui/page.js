@@ -27,7 +27,7 @@ export default function TonKyGui() {
   const { supabase, vehicles, locations, regions, loading } = useCatalog();
   const [rows, setRows] = useState(null);
   const [loi, setLoi] = useState("");
-  const [chiVF, setChiVF] = useState(true);
+  const [chiVF, setChiVF] = useState(false);
   const [fKh, setFKh] = useState([]);
   const [fModel, setFModel] = useState("");
   const [fRegion, setFRegion] = useState("");
@@ -75,8 +75,8 @@ export default function TonKyGui() {
   const sk = [...loc].sort((a, b) => b.tuoi - a.tuoi);
   const khOpts = [...new Map(ds.filter((x) => !chiVF || x.vf).map((x) => [String(x.customer_id), { key: String(x.customer_id), label: x.customer_name }])).values()].sort((a, b) => a.label.localeCompare(b.label));
   const modelOpts = [...new Set(ds.filter((x) => !chiVF || x.vf).map((x) => x.v.name).filter(Boolean))].sort();
-  const dangLoc = fKh.length || fModel || fRegion || fTuoi || q;
-  const boLoc = () => { setFKh([]); setFModel(""); setFRegion(""); setFTuoi(""); setQ(""); setPage(1); };
+  const dangLoc = fKh.length || fModel || fRegion || fTuoi || q || chiVF;
+  const boLoc = () => { setFKh([]); setFModel(""); setFRegion(""); setFTuoi(""); setQ(""); setChiVF(false); setPage(1); };
   const tuoiCls = (t) => (t > 90 ? "text-danger" : t > 60 ? "text-[#C2410C]" : t > 30 ? "text-[#A25F00]" : "");
 
   const xuat = () => downloadXLSX("xe_ky_gui_khach_buon.xlsx", [
@@ -134,13 +134,13 @@ export default function TonKyGui() {
       <div className="card">
         <div className="flex gap-2 flex-wrap items-center">
           <input className="inp !w-64 max-md:!w-full" placeholder="Tìm số khung, mã đơn, khách buôn, tên xe…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
-          <LocGon n={(fKh.length ? 1 : 0) + (fModel ? 1 : 0) + (fRegion ? 1 : 0) + (fTuoi ? 1 : 0) + (chiVF ? 0 : 1)}>
+          <LocGon n={(fKh.length ? 1 : 0) + (fModel ? 1 : 0) + (fRegion ? 1 : 0) + (fTuoi ? 1 : 0) + (chiVF ? 1 : 0)}>
             <MultiCheck label="Khách buôn: tất cả" value={fKh} onChange={(v) => { setFKh(v); setPage(1); }} options={khOpts} />
             <select className="inp !w-auto" value={fModel} onChange={(e) => { setFModel(e.target.value); setPage(1); }}><option value="">Model: tất cả</option>{modelOpts.map((m) => <option key={m}>{m}</option>)}</select>
             <select className="inp !w-auto" value={fRegion} onChange={(e) => { setFRegion(e.target.value); setPage(1); }}><option value="">Khu vực xuất: tất cả</option>{regions.map((r) => <option key={r}>{r}</option>)}</select>
             <select className="inp !w-auto" value={fTuoi} onChange={(e) => { setFTuoi(e.target.value); setPage(1); }}>
               <option value="">Số ngày ký gửi: tất cả</option><option value="30">≤ 30 ngày</option><option value="60">31–60 ngày</option><option value="90">61–90 ngày</option><option value="90p">Trên 90 ngày</option></select>
-            <label className="flex items-center gap-1.5 text-xs font-semibold cursor-pointer" title="Xe VinFast bắt buộc nhập khách lẻ sau cùng; hãng khác không bắt buộc nên thường không có">
+            <label className="flex items-center gap-1.5 text-xs font-semibold cursor-pointer" title="Chỉ xem xe VinFast (hãng bắt buộc nhập khách lẻ sau cùng)">
               <input type="checkbox" className="w-4 h-4" checked={chiVF} onChange={(e) => { setChiVF(e.target.checked); setFKh([]); setFModel(""); setPage(1); }} />Chỉ xe VinFast</label>
           </LocGon>
           {dangLoc ? <button className="btn-ghost !text-xs" onClick={boLoc}>✕ Bỏ lọc</button> : null}
