@@ -82,7 +82,7 @@ export default function GiuHoPhapNhan() {
                   <button className="btn-primary !py-1.5 !text-xs" onClick={() => setF({ from: String(a.id), to: "", amount: k.giu > 0 ? k.giu : 0, note: "" })}>Ghi chuyển trả</button>
                 </div>
                 <div className="text-xs text-[#5A6572] mb-2">Nhận {fmtVND(k.thu)} · Đã chuyển trả {fmtVND(k.tra)}{k.chiKhac ? ` · Chi khác ${fmtVND(k.chiKhac)}` : ""}{a.opening_balance ? ` · Đầu kỳ ${fmtVND(a.opening_balance)}` : ""}</div>
-                <div className="overflow-x-auto"><table className="w-full text-[12.5px]">
+                <div className="overflow-x-auto"><table className="w-full text-[12.5px] tbl-card">
                   <thead><tr className="text-left text-[#5A6572]"><th className="py-1 pr-2">Ngày</th><th className="pr-2">Mã phiếu</th><th className="pr-2">Loại</th><th className="pr-2">Diễn giải</th><th className="text-right">Số tiền</th></tr></thead>
                   <tbody>
                     {list.map((t) => (

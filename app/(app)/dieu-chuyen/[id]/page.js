@@ -101,7 +101,7 @@ export default function DieuChuyenChiTiet() {
           <div className="card">
             <div className="font-extrabold mb-3">Xe điều chuyển ({t.quantity} chiếc)</div>
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-[13px]">
+              <table className="w-full border-collapse text-[13px] tbl-card">
                 <thead><tr className="text-[11.5px] text-[#8A93A0] uppercase border-b border-[#E3E8EF]">
                   <th className="text-left py-2 pl-2">Xe</th>
                   <th className="text-left py-2">Số khung</th>
@@ -112,19 +112,19 @@ export default function DieuChuyenChiTiet() {
                   {Object.entries(byVehicle).map(([vid, items]) => (
                     items.map(({ frame, unit }, i) => (
                       <tr key={frame} className="border-b border-dashed border-[#F0F2F5]">
-                        {i === 0 && <td rowSpan={items.length} className="py-2.5 pl-2 align-top">
+                        {i === 0 && <td rowSpan={items.length} data-label="" data-m="full" className="py-2.5 pl-2 align-top">
                           <div className="font-semibold">{vName(vid)}</div>
                           <div className="text-[10.5px] text-[#8A93A0]">{items.length} xe</div>
                         </td>}
-                        <td className="py-2 font-mono text-[12px]">{frame}</td>
-                        <td className="py-2">
+                        <td data-m="title" className="py-2 font-mono text-[12px]">{frame}</td>
+                        <td data-m="nolabel" className="py-2">
                           {unit ? (
                             <Badge tone={unit.status === "TON_KHO" ? "green" : unit.status === "DANG_CHUYEN" ? "amber" : "dark"}>
                               {unit.status === "TON_KHO" ? "Tồn kho" : unit.status === "DANG_CHUYEN" ? "Đang chuyển" : unit.status}
                             </Badge>
                           ) : <span className="text-[#8A93A0]">—</span>}
                         </td>
-                        <td className="py-2 text-xs">{unit ? locName(unit.location_code) : "—"}</td>
+                        <td data-label="Kho hiện tại" className="py-2 text-xs">{unit ? locName(unit.location_code) : "—"}</td>
                       </tr>
                     ))
                   ))}

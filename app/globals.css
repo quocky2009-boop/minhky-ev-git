@@ -54,6 +54,14 @@ body { @apply bg-[#F3F5F8] text-[#1B2733] font-sans; }
   .tbl-card td span.rounded-full { padding: 1px 7px; font-size: 10.5px; }
   .tbl-card td[colspan] { display: block; flex: 1 1 100%; margin-left: 0; order: 10; }
   .tbl-card td .truncate { white-space: normal; overflow: visible; }
+  /* Dong tong / cong (o co colspan + so tien): 1 hang gon "nhan ........ so tien", khong vien the */
+  .tbl-card tfoot { display: block; width: 100%; }
+  .tbl-card tr[data-m~="sum"] { border-width: 0; background: #F8FAFB; margin-bottom: 2px; padding: 4px 10px; border-radius: 8px; }
+  .tbl-card tr[data-m~="sum"] td, .tbl-card tr[data-m~="sum"] td[colspan] { display: inline-flex; flex: 0 1 auto; order: 1; margin-left: 0; }
+  .tbl-card tr[data-m~="sum"] td:first-child { flex: 1 1 auto; }
+  .tbl-card tr[data-m~="sum"] td:last-child { margin-left: auto; font-weight: 700; white-space: nowrap; }
+  .tbl-card tr[data-m~="sum"] td:empty { display: none; }
+  .tbl-card td .inp { @apply !py-1 !text-xs; }
   .tbl-card td .btn, .tbl-card td .btn-ghost, .tbl-card td .btn-ok, .tbl-card td .btn-primary, .tbl-card td .btn-danger { @apply !px-2 !py-1 !text-[11.5px] rounded-lg; }
   /* O chi so (KPI): 3 o mot hang, chu nho lai */
   .kpi-card { min-width: 0 !important; flex: 1 1 28%; padding: 8px 10px !important; }

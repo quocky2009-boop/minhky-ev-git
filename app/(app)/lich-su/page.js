@@ -219,7 +219,7 @@ export default function LichSu() {
                 {(detail.units || []).length > 0 && (
                   <div>
                     <div className="font-extrabold text-[13.5px] mb-1.5">Chi tiết {detail.units.length} xe</div>
-                    <div className="tbl-scroll"><table className="w-full border-collapse">
+                    <div className="tbl-scroll"><table className="w-full border-collapse tbl-card">
                       <thead><tr>
                         <th className="th w-8">#</th><th className="th">Số khung</th><th className="th">Xe</th>
                         {detail.units[0]?.cost_price !== undefined && <th className="th">Giá vốn</th>}

@@ -400,7 +400,7 @@ function BanBuonInner() {
                     const T = rows.reduce((t, r) => ({ sl: t.sl + r.d.qty, giao: t.giao + r.g, ny: t.ny + r.gn * r.d.qty, ck: t.ck + r.ckx * r.d.qty, tt: t.tt + r.dgx * r.d.qty }), { sl: 0, giao: 0, ny: 0, ck: 0, tt: 0 });
                     const lech = Number(h.phai_tra) - T.tt;
                     return (
-                      <div className="overflow-x-auto mb-2"><table className="w-full text-[12.5px] border-collapse">
+                      <div className="overflow-x-auto mb-2"><table className="w-full text-[12.5px] border-collapse tbl-card">
                         <thead><tr className="text-[11px] text-[#5A6572] uppercase bg-[#F8FAFB] border-y border-[#E3E8EF]">
                           <th className="py-2 px-1.5 text-left">#</th><th className="px-1.5 text-left">Model + màu</th><th className="px-1.5 text-right">SL</th><th className="px-1.5 text-center">Đã giao</th>
                           <th className="px-1.5 text-right">Giá niêm yết/xe</th><th className="px-1.5 text-right">CK %</th><th className="px-1.5 text-right">Tiền CK/xe</th><th className="px-1.5 text-right">Giá bán/xe</th>
@@ -414,8 +414,8 @@ function BanBuonInner() {
                             <td className="px-1.5 text-right">{fmtVND(gn * d.qty)}</td><td className="px-1.5 text-right text-[#A25F00]">{fmtVND(ckx * d.qty)}</td><td className="px-1.5 text-right font-bold">{fmtVND(dgx * d.qty)}</td>
                           </tr>))}</tbody>
                         <tfoot>
-                          <tr className="bg-[#F8FAFB] font-bold border-t border-[#E3E8EF]"><td className="py-2 px-1.5" colSpan={2}>Tổng cộng</td><td className="px-1.5 text-right">{T.sl}</td><td className="px-1.5 text-center">{T.giao}/{T.sl}</td><td colSpan={4}></td>
-                            <td className="px-1.5 text-right">{fmtVND(T.ny)}</td><td className="px-1.5 text-right text-[#A25F00]">{fmtVND(T.ck)}</td><td className="px-1.5 text-right">{fmtVND(T.tt)}</td></tr>
+                          <tr className="bg-[#F8FAFB] font-bold border-t border-[#E3E8EF]"><td className="py-2 px-1.5" colSpan={2}>Tổng cộng</td><td data-label="SL" className="px-1.5 text-right">{T.sl}</td><td data-label="Đã giao" className="px-1.5 text-center">{T.giao}/{T.sl}</td><td colSpan={4}></td>
+                            <td data-label="Niêm yết" className="px-1.5 text-right">{fmtVND(T.ny)}</td><td data-label="CK" className="px-1.5 text-right text-[#A25F00]">{fmtVND(T.ck)}</td><td data-label="Thành tiền" className="px-1.5 text-right">{fmtVND(T.tt)}</td></tr>
                           {lech !== 0 && <tr className="text-[12px]"><td className="py-1.5 px-1.5 text-[#5A6572]" colSpan={10}>Điều chỉnh trên đơn xe đã giao (giảm giá thêm, bù thuê pin… — xem từng đơn xe bên dưới)</td><td className={`px-1.5 text-right font-semibold ${lech < 0 ? "text-[#A25F00]" : ""}`}>{lech > 0 ? "+" : ""}{fmtVND(lech)}</td></tr>}
                           <tr className="font-extrabold text-brand"><td className="py-2 px-1.5" colSpan={10}>Khách buôn cần trả</td><td className="px-1.5 text-right text-[14px]">{fmtVND(h.phai_tra)}</td></tr>
                         </tfoot>
@@ -467,7 +467,7 @@ function BanBuonInner() {
 
                 <div className="card">
                   <div className="font-extrabold mb-2">Đơn bán từng xe ({lo.orders.length})</div>
-                  <div className="overflow-x-auto"><table className="w-full text-[12.5px]">
+                  <div className="overflow-x-auto"><table className="w-full text-[12.5px] tbl-card">
                     <thead><tr className="text-left text-[11px] text-[#8A93A0] uppercase border-b border-[#E3E8EF]"><th className="py-2">Đơn</th><th>Ngày</th><th>Xe · số khung</th><th>Kho</th><th className="text-right">Cần trả</th><th className="text-right">Đã trả</th><th>Khách lẻ cuối</th></tr></thead>
                     <tbody>{lo.orders.map((o) => (
                       <tr key={o.id} className={`border-b border-dashed border-[#F0F2F5] ${["Đã hủy", "Đã trả hàng"].includes(o.status) ? "opacity-50" : ""}`}>

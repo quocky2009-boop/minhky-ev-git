@@ -153,7 +153,7 @@ export default function NhapChiTiet() {
           <div className="card">
             <div className="font-extrabold mb-3">Thông tin hàng hóa</div>
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-[13px]">
+              <table className="w-full border-collapse text-[13px] tbl-card">
                 <thead><tr className="text-[11.5px] text-[#8A93A0] uppercase border-b border-[#E3E8EF]">
                   <th className="text-left py-2 pl-2">Tên sản phẩm</th>
                   <th className="text-right py-2">Số lượng</th>

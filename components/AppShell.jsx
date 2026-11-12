@@ -87,12 +87,19 @@ export default function AppShell({ profile, children }) {
         const ths = [...tb.querySelectorAll("thead tr:last-child th")];
         if (!ths.length || ths.some((th) => th.colSpan > 1)) return;
         const nhan = ths.map((th) => (th.textContent || "").replace(/[▲▼⇅]/g, "").trim());
-        tb.querySelectorAll("tbody > tr:not([data-mk])").forEach((tr) => {
+        tb.querySelectorAll("tbody > tr:not([data-mk]), tfoot > tr:not([data-mk])").forEach((tr) => {
           const tds = [...tr.children];
-          if (tds.length !== nhan.length || tds.some((td) => td.colSpan > 1)) return;
+          // Dong tong/cong: co o gop cot + o so tien -> hien 1 hang "nhan … so tien"
+          if (tds.length > 1 && tds.some((td) => td.colSpan > 1)) { tr.setAttribute("data-mk", "1"); if (!tr.hasAttribute("data-m")) tr.setAttribute("data-m", "sum"); return; }
+          if (tr.parentElement.tagName === "TFOOT" && tds.length > 1) { tr.setAttribute("data-mk", "1"); if (!tr.hasAttribute("data-m")) tr.setAttribute("data-m", "sum"); return; }
+          if (tds.length !== nhan.length || tds.some((td) => td.colSpan > 1 || td.rowSpan > 1)) return;
           tr.setAttribute("data-mk", "1");
           const coSan = tds.some((td) => td.hasAttribute("data-m"));
-          tds.forEach((td, i) => { if (!td.hasAttribute("data-label") && nhan[i]) td.setAttribute("data-label", nhan[i]); });
+          tds.forEach((td, i) => {
+            if (td.hasAttribute("data-label")) return;
+            if (nhan[i]) td.setAttribute("data-label", nhan[i]);
+            else if (td.querySelector(":scope > input[type=checkbox]")) td.setAttribute("data-label", "");
+          });
           if (coSan) return;
           let coTitle = false, coEnd = false;
           tds.forEach((td, i) => {

@@ -213,24 +213,24 @@ export default function ChiTietLSC() {
                 {(tab === "cv" ? dsCv : dsPt).filter((c) => `${c.code} ${c.name}`.toLowerCase().includes(pick.trim().toLowerCase())).length === 0 && <div className="px-3 py-2 text-xs text-[#8A93A0]">Không có trong danh mục. {tab === "cv" ? "Thêm ở Dịch vụ → Danh mục công việc." : "Thêm ở Kho phụ tùng."}</div>}
               </div>)}
           </div>)}
-        <div className="tbl-scroll"><table className="w-full border-collapse text-[12.5px]">
+        <div className="tbl-scroll"><table className="w-full border-collapse text-[12.5px] tbl-card">
           <thead><tr><th className="th">Mã</th><th className="th">{tab === "cv" ? "Công việc" : "Phụ tùng"}</th>{tab === "cv" && <th className="th">Loại CV</th>}<th className="th">Phân loại TT</th><th className="th text-right">SL</th><th className="th text-right">Đơn giá</th><th className="th text-right">Giảm %</th><th className="th text-right">Giảm tiền</th><th className="th text-right">TT chưa VAT</th><th className="th text-right">VAT %</th><th className="th text-right">Số tiền VAT</th><th className="th text-right">Giá bán gồm VAT</th>{canEditLines && <th className="th"></th>}</tr></thead>
           <tbody>{(tab === "cv" ? phayCv : phayPt).map((l) => (
             <tr key={l.key}>
-              <td className="td font-mono text-[11px]">{l.ma}</td><td className="td">{l.name}{l.line_type === "PHU_TUNG" && <div className="text-[10.5px] text-[#8A93A0]">{l.da_xuat_kho ? "✓ đã xuất kho" : `tồn tại điểm: ${tonKho[l.part_id] || 0}`}</div>}</td>
+              <td data-m="nolabel" className="td font-mono text-[11px]">{l.ma}</td><td data-m="title" className="td">{l.name}{l.line_type === "PHU_TUNG" && <div className="text-[10.5px] text-[#8A93A0]">{l.da_xuat_kho ? "✓ đã xuất kho" : `tồn tại điểm: ${tonKho[l.part_id] || 0}`}</div>}</td>
               {tab === "cv" && <td className="td text-[11.5px]">{l.loai_cv}</td>}
               <td className="td">{canEditLines ? <select className="inp !py-1 !text-xs !w-auto" value={l.phan_loai_tt} onChange={(e) => upLine(l.key, "phan_loai_tt", e.target.value)}>{Object.entries(PL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select> : <Badge tone={l.phan_loai_tt === "KHACH_HANG" ? "blue" : l.phan_loai_tt === "BAO_HANH" ? "green" : "gray"}>{PL[l.phan_loai_tt]}</Badge>}</td>
               {["qty", "unit_price", "giam_pct", "giam_tien"].map((k) => <td key={k} className="td text-right">{canEditLines ? <input type="number" min="0" className="inp !py-1 !text-xs !w-24 text-right" value={l[k]} onChange={(e) => upLine(l.key, k, e.target.value)} /> : (k === "unit_price" || k === "giam_tien" ? fmtVND(l[k]) : l[k])}</td>)}
               <td className="td text-right">{fmtVND(tinhTT(l))}</td>
               <td className="td text-right">{canEditLines ? <input type="number" min="0" max="100" className="inp !py-1 !text-xs !w-16 text-right" value={l.vat_pct ?? 0} onChange={(e) => upLine(l.key, "vat_pct", e.target.value)} /> : `${Number(l.vat_pct) || 0}%`}</td>
               <td className="td text-right">{fmtVND(tinhVat(l))}</td>
-              <td className="td text-right font-bold">{fmtVND(tinhTTV(l))}</td>
+              <td data-m="end" className="td text-right font-bold">{fmtVND(tinhTTV(l))}</td>
               {canEditLines && <td className="td"><button className="text-danger font-bold" onClick={() => xoaDong(l.key)}>✕</button></td>}
             </tr>))}
             {(tab === "cv" ? phayCv : phayPt).length === 0 && <tr><td className="td text-[#8A93A0]" colSpan={13}>{canEditLines ? "Chưa có dòng nào — gõ vào ô phía trên để thêm từ danh mục." : "Không có dòng nào."}</td></tr>}
           </tbody>
           {(tab === "cv" ? phayCv : phayPt).length > 0 && (() => { const ds = tab === "cv" ? phayCv : phayPt; const s1 = ds.reduce((a, l) => a + tinhTT(l), 0); const s2 = ds.reduce((a, l) => a + tinhVat(l), 0); return (
-            <tfoot><tr className="bg-[#F8FAFB] font-bold"><td className="td" colSpan={tab === "cv" ? 8 : 7}>Cộng {tab === "cv" ? "công việc" : "vật tư / phụ tùng"}</td><td className="td text-right">{fmtVND(s1)}</td><td className="td"></td><td className="td text-right">{fmtVND(s2)}</td><td className="td text-right text-brand">{fmtVND(s1 + s2)}</td>{canEditLines && <td className="td"></td>}</tr></tfoot>); })()}
+            <tfoot><tr className="bg-[#F8FAFB] font-bold"><td className="td" colSpan={tab === "cv" ? 8 : 7}>Cộng {tab === "cv" ? "công việc" : "vật tư / phụ tùng"}</td><td data-label="Chưa VAT" className="td text-right">{fmtVND(s1)}</td><td className="td"></td><td data-label="VAT" className="td text-right">{fmtVND(s2)}</td><td data-label="Gồm VAT" className="td text-right text-brand">{fmtVND(s1 + s2)}</td>{canEditLines && <td className="td"></td>}</tr></tfoot>); })()}
         </table></div>
         <div className="text-[11px] text-[#8A93A0] mt-1">Đơn giá trong danh mục là giá chưa VAT. % VAT mặc định cài ở Cài đặt → Thuế VAT dịch vụ; có thể đặt riêng cho từng công việc / phụ tùng trong danh mục.</div>
       </div>

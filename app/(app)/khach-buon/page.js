@@ -253,7 +253,7 @@ function KhachBuonInner() {
 
           <div className="card">
             <div className="font-extrabold mb-2">Sổ công nợ (KM hãng, bù pin, cấn trừ){ky ? ` — tháng ${ky.slice(5)}/${ky.slice(0, 4)}` : ""}</div>
-            <div className="overflow-x-auto"><table className="w-full text-[13px]">
+            <div className="overflow-x-auto"><table className="w-full text-[13px] tbl-card">
               <thead><tr className="text-left text-[11.5px] text-[#8A93A0] uppercase border-b border-[#E3E8EF]"><th className="py-2">Ngày</th><th>Loại</th><th>Đơn</th><th>Diễn giải</th><th className="text-right">Số tiền</th><th></th></tr></thead>
               <tbody>{dongKy.map((d) => (
                 <tr key={d.id} className={`border-b border-dashed border-[#F0F2F5] ${d.huy ? "opacity-50 line-through" : ""}`}>
@@ -271,7 +271,7 @@ function KhachBuonInner() {
 
           <div className="card">
             <div className="font-extrabold mb-2">Đơn bán buôn{ky ? ` — tháng ${ky.slice(5)}/${ky.slice(0, 4)}` : ""} ({ordKy.length})</div>
-            <div className="overflow-x-auto"><table className="w-full text-[12.5px]">
+            <div className="overflow-x-auto"><table className="w-full text-[12.5px] tbl-card">
               <thead><tr className="text-left text-[11px] text-[#8A93A0] uppercase border-b border-[#E3E8EF]">
                 <th className="py-2">Ngày</th><th>Đơn</th><th>Xe</th><th>Số khung · kho</th><th className="text-right">Niêm yết</th><th className="text-right">CK sỉ</th><th className="text-right">Phải trả</th><th className="text-right">Đã trả</th><th>Khách lẻ cuối</th><th className="text-right">KM / bù</th>
               </tr></thead>

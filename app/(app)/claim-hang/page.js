@@ -154,7 +154,7 @@ export default function ClaimHang() {
             <button className="btn-ghost !text-xs" onClick={() => setPick({})}>Bỏ chọn</button>
             {can && <button className="btn-primary !text-xs" disabled={busy || selIds.length === 0} onClick={lap}>Lập hồ sơ claim</button>}
           </div>
-          <div className="tbl-scroll"><table className="w-full border-collapse">
+          <div className="tbl-scroll"><table className="w-full border-collapse tbl-card">
             <thead><tr><th className="th w-8"></th><th className="th">Ngày nhận</th><th className="th">Đơn</th><th className="th">Khách</th><th className="th">Số khung</th><th className="th text-right">Số tiền</th><th className="th text-right">Đã</th></tr></thead>
             <tbody>
               {cho.map((x) => (
@@ -183,7 +183,7 @@ export default function ClaimHang() {
             <button className="btn-ghost !text-xs" onClick={() => setPickBh({})}>Bỏ chọn</button>
             {can && <button className="btn-primary !text-xs" disabled={busy || selBh.length === 0} onClick={lapBh}>Lập hồ sơ claim bảo hành</button>}
           </div>
-          <div className="tbl-scroll"><table className="w-full border-collapse">
+          <div className="tbl-scroll"><table className="w-full border-collapse tbl-card">
             <thead><tr><th className="th w-8"></th><th className="th">Ngày</th><th className="th">Lệnh sửa chữa</th><th className="th">Khách</th><th className="th">Biển số / Số khung</th><th className="th text-right">Hãng chịu</th><th className="th text-right">Đã chờ</th></tr></thead>
             <tbody>
               {choBh.map((x) => (
@@ -220,7 +220,7 @@ export default function ClaimHang() {
                 </button>
                 {open === c.id && (
                   <div className="border-t border-[#E3E8EF] p-3 bg-[#FBFCFE] flex flex-col gap-2">
-                    <div className="tbl-scroll"><table className="w-full border-collapse">
+                    <div className="tbl-scroll"><table className="w-full border-collapse tbl-card">
                       <thead><tr><th className="th">Đơn</th><th className="th">Khách</th><th className="th">Số khung</th><th className="th text-right">Số tiền</th><th className="th">Kết quả</th></tr></thead>
                       <tbody>{ls.map((d) => (
                         <tr key={d.id}>
