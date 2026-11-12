@@ -325,7 +325,7 @@ export default function DonBanChiTiet() {
             <div className="card">
               <div className="font-extrabold mb-2 text-[13px]">✅ Checklist giao xe</div>
               <div className="flex flex-col gap-1">
-                {[["da_thu_du_tien","💰 Thu đủ tiền"],["dung_so_khung","🔢 Đúng số khung"],["bao_hanh","🛡 Bảo hành"],["app_vf","📱 App VF"],["coc_giao","📄 Giấy COC"],["phu_kien","🎁 Phụ kiện/sạc/chìa"],["anh_khach","📸 Ảnh nhận xe"]].map(([k, label]) => (
+                {[["da_thu_du_tien","💰 Thu đủ tiền"],["dung_so_khung","🔢 Đúng số khung"],["bao_hanh","🛡 Bảo hành"],["app_vf","📱 App VF"],["coc_giao","📄 Giấy COC"],["pdi","📋 Phiếu PDI"],["hdsd","📖 HDSD & bảo dưỡng"],["phu_kien","🎁 Phụ kiện/sạc/chìa"],["anh_khach","📸 Ảnh nhận xe"]].map(([k, label]) => (
                   <div key={k} className={`flex items-center gap-1.5 text-[12px] ${o.checklist_giao_xe[k] ? "text-[#0E7A4A]" : "text-[#C6CDD6]"}`}>
                     <span>{o.checklist_giao_xe[k] ? "✓" : "○"}</span><span>{label}</span>
                   </div>

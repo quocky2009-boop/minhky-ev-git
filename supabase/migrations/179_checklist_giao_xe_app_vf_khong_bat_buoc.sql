@@ -1,0 +1,5 @@
+-- 179: Checklist giao xe (12/11/2026) — đã áp dụng qua Supabase MCP; file này là ghi chú
+-- fn_xac_nhan_hoa_don: bỏ điều kiện bắt buộc "xe VinFast phải kích hoạt app VF eScooter" (CHUA_KICH_HOAT_APP).
+--   Vẫn bắt buộc: số hóa đơn, mã DMS, kích hoạt bảo hành, bàn giao giấy COC, khách lẻ cuối với đơn bán buôn xe VinFast.
+-- Checklist (sales_orders.checklist_giao_xe, jsonb) thêm 2 mục khuyến nghị: pdi (Phiếu PDI kiểm tra xe trước giao),
+--   hdsd (Hướng dẫn sử dụng, bảo dưỡng xe). app_vf chuyển thành khuyến nghị.
