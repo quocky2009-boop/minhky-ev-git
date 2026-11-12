@@ -524,17 +524,17 @@ export default function DonBan() {
                       <div className="font-mono text-[10.5px] text-[#5A6572] truncate" title={o.frame_number}>{o.frame_number}</div>
                     </td>
                     <td data-label="Điểm bán" className="td text-xs"><div className="break-words" title={locName(o.location_code)}>{locName(o.location_code)}</div></td>
-                    <td data-label="Khách" className="td">
-                      <div className="text-[13px] truncate" title={o.customer_name}>{o.customer_name}</div>
+                    <td data-label="Khách" className="td"><div className="min-w-0 flex-1">
+                      <div className="text-[13px] md:truncate break-words max-md:font-semibold" title={o.customer_name}>{o.customer_name}</div>
                       <div className="text-[11px] text-[#5A6572]">{o.customer_phone}</div>
                       <Badge tone={o.customer_type === "Khách buôn" ? "amber" : o.customer_type === "Khách lẻ của Đại lý" ? "blue" : o.customer_type === "Khách lẻ" || !o.customer_type ? "green" : "purple"}>{o.customer_type || "Khách lẻ"}</Badge>
                       {o.end_customer_id
                         ? <div className="mt-1 text-[12px] leading-tight rounded-md bg-[#F4FBF7] border border-[#BBE3CC] px-1.5 py-1" title="Khách lẻ cuối (người mua từ đại lý / khách buôn)">
-                            <span className="text-[10.5px] text-[#0E7A4A] font-semibold">👤 Khách lẻ:</span> <b>{o.end_customer_name}</b>
+                            <span className="text-[10.5px] text-[#0E7A4A] font-semibold">👤 Khách lẻ:</span> <b className="text-[11.5px]">{o.end_customer_name}</b>
                             {o.end_customer_phone && <div className="text-[11px] text-[#5A6572]">{o.end_customer_phone}</div>}
                           </div>
                         : thieuKhachLe(o) && <div className="mt-1 text-[11px] font-semibold text-[#A25F00]">👤 Chưa có khách lẻ</div>}
-                    </td>
+                    </div></td>
                     <td data-label="Tổng đơn" className="td font-bold">{fmtVND(total(o))}</td>
                     <td data-label="Hóa đơn" className="td">
                       <div className="flex items-center gap-1 flex-wrap">
