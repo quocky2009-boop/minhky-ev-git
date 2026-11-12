@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Badge, Toast, KPI, Pager, pageSlice } from "@/components/ui";
 import { fmtDate, errMsg } from "@/lib/format";
@@ -41,6 +42,13 @@ export default function KiemSoatTon() {
 
   const allowed = ["CEO", "MANAGER", "ADMIN"].includes(profile?.role);
   const [dangVe, setDangVe] = useState(null); // hang dang ve: don dat chua nhap du
+  const [kyGui, setKyGui] = useState(null);   // xe ky gui tai khach buon (chua co khach le sau cung)
+  useEffect(() => {
+    if (loading || !profile || !allowed) return;
+    supabase.from("sales_orders").select("id", { count: "exact", head: true }).eq("customer_type", "Khách buôn").is("end_customer_id", null)
+      .not("status", "in", '("Đã hủy","Đã trả hàng")').then(({ count }) => setKyGui(count ?? null));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, profile?.role]);
   useEffect(() => {
     if (loading || !profile || !allowed) return;
     (async () => {
@@ -251,6 +259,7 @@ export default function KiemSoatTon() {
             <KPI label="Đang chuyển" value={nf(kpiDc)} tone="purple" />
             <KPI label="Trên 30 ngày" value={<>{nf(kGt30)}<Delta cur={kGt30} prev={khaCmp ? khaCmp.reduce((a, r) => a + gt30(r), 0) : null} /></>} sub={kpiTon ? `${f1(100 * kGt30 / kpiTon)}% tồn khả dụng` : ""} tone={kGt30 ? "red" : "dark"} />
             <KPI label="Tuổi tồn bình quân" value={Number.isFinite(kTuoi) ? `${f1(kTuoi)} ngày` : "—"} tone="blue" />
+            {kyGui != null && <Link href="/ton-ky-gui" className="flex-1 min-w-[140px] flex" title="Xe đã xuất cho khách buôn, chưa có khách lẻ sau cùng — bấm để xem chi tiết"><KPI label="Ký gửi tại khách buôn →" value={nf(kyGui)} tone="amber" sub="ngoài tồn tại kho · mọi hãng" /></Link>}
           </div>
 
           {dangVe && dangVe.pos.length > 0 && (() => {

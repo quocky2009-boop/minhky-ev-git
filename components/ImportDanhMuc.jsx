@@ -119,7 +119,7 @@ export default function ImportDanhMuc({ mode, supabase, locations, notify, onDon
         {errs.length > 0 && <div className="rounded-lg bg-[#FDE8EA] text-[#B01E2C] text-[12.5px] p-2.5 mb-3 max-h-40 overflow-y-auto">{errs.slice(0, 30).map((x, i) => <div key={i}>• {x}</div>)}{errs.length > 30 && <div>… và {errs.length - 30} lỗi khác</div>}</div>}
         {rows && rows.length > 0 && !done && (<>
           <div className="text-[12.5px] mb-1.5"><b>{rows.length}</b> dòng hợp lệ{errs.length > 0 ? " — sửa các lỗi ở trên rồi chọn lại file để import" : ""}</div>
-          <div className="tbl-scroll max-h-64 overflow-y-auto border border-[#E3E8EF] rounded-lg"><table className="w-full border-collapse text-[12px]">
+          <div className="tbl-scroll max-h-64 overflow-y-auto border border-[#E3E8EF] rounded-lg"><table className="w-full border-collapse text-[12px] tbl-card">
             <thead><tr>{Object.keys(rows[0]).map((k) => <th key={k} className="th">{k}</th>)}</tr></thead>
             <tbody>{rows.slice(0, 50).map((r, i) => <tr key={i}>{Object.values(r).map((v, j) => <td key={j} className="td">{String(v)}</td>)}</tr>)}</tbody></table></div>
           <div className="flex gap-2 mt-3"><button className="btn-ok" disabled={busy || errs.length > 0} onClick={nhap}>{busy ? "Đang import…" : `Import ${rows.length} dòng`}</button><button className="btn-ghost" onClick={onClose}>Hủy</button></div>

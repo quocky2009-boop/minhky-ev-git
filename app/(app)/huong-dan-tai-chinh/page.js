@@ -172,7 +172,7 @@ export default function HuongDanTaiChinh() {
 
       <div className="card">
         <div className="font-extrabold mb-2">Ai được làm gì (mặc định)</div>
-        <div className="tbl-scroll"><table className="w-full border-collapse text-[12.5px]">
+        <div className="tbl-scroll"><table className="w-full border-collapse text-[12.5px] tbl-card">
           <thead><tr><th className="th">Module</th><th className="th">Cửa hàng trưởng</th><th className="th">Kế toán</th><th className="th">BGĐ</th></tr></thead>
           <tbody>{QUYEN.map((r) => <tr key={r[0]}>{r.map((c, i) => <td key={i} className={`td ${i === 0 ? "font-semibold" : ""}`}>{c}</td>)}</tr>)}</tbody>
         </table></div>
@@ -181,7 +181,7 @@ export default function HuongDanTaiChinh() {
 
       <div className="card">
         <div className="font-extrabold mb-2">Chu kỳ kiểm tra (đề xuất — BGĐ điều chỉnh theo thực tế)</div>
-        <div className="tbl-scroll"><table className="w-full border-collapse text-[12.5px]">
+        <div className="tbl-scroll"><table className="w-full border-collapse text-[12.5px] tbl-card">
           <thead><tr><th className="th">Công việc</th><th className="th">Cách làm</th><th className="th">Chu kỳ</th><th className="th">Người làm</th></tr></thead>
           <tbody>{CHU_KY.map((r) => <tr key={r[0]}>{r.map((c, i) => <td key={i} className={`td ${i === 0 ? "font-semibold" : ""}`}>{c}</td>)}</tr>)}</tbody>
         </table></div>
