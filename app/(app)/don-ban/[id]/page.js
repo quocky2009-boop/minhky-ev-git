@@ -233,7 +233,7 @@ export default function DonBanChiTiet() {
                       <div className="font-semibold">{v ? `${v.brand} ${v.name} ${v.color}` : o.vehicle_id}</div>
                       <div className="text-[10.5px] text-[#8A93A0] font-mono">SK: {o.frame_number}</div>
                       <div className="text-[10.5px] text-[#8A93A0]">Kho: {locName(o.location_code)}</div>
-                      {o.coc_giao && <Badge tone="green">COC đã giao</Badge>}
+                      {o.coc_giao && <Badge tone="green">Đã bàn giao xe & hồ sơ</Badge>}
                     </td>
                     <td className="py-2.5 text-right">{o.quantity}</td>
                     <td className="py-2.5 text-right">{fmtVND(o.sale_price)}</td>
@@ -305,7 +305,7 @@ export default function DonBanChiTiet() {
                 o.invoice_by_name && ["Người xác nhận HĐ", o.invoice_by_name],
                 ["Bảo hành", o.warranty_activated ? "✓ Đã kích hoạt" : "Chưa"],
                 o.app_activated && ["App VF eScooter", "✓ Đã kích hoạt"],
-                ["Giấy COC", o.coc_giao ? "✓ Đã giao cho khách" : "Chưa giao"],
+                ["BB bàn giao xe & hồ sơ", o.coc_giao ? "✓ Đã bàn giao" : "Chưa bàn giao"],
                 o.document_status && ["Đăng ký xe", o.document_status],
               ].filter(Boolean).map(([k, val]) => (
                 <div key={k} className="flex gap-2">
@@ -325,7 +325,7 @@ export default function DonBanChiTiet() {
             <div className="card">
               <div className="font-extrabold mb-2 text-[13px]">✅ Checklist giao xe</div>
               <div className="flex flex-col gap-1">
-                {[["da_thu_du_tien","💰 Thu đủ tiền"],["dung_so_khung","🔢 Đúng số khung"],["bao_hanh","🛡 Bảo hành"],["app_vf","📱 App VF"],["coc_giao","📄 Giấy COC"],["pdi","📋 Phiếu PDI"],["hdsd","📖 HDSD & bảo dưỡng"],["phu_kien","🎁 Phụ kiện/sạc/chìa"],["anh_khach","📸 Ảnh nhận xe"]].map(([k, label]) => (
+                {[["da_thu_du_tien","💰 Thu đủ tiền"],["dung_so_khung","🔢 Đúng số khung"],["bao_hanh","🛡 Bảo hành"],["app_vf","📱 App VF"],["coc_giao","📄 BB bàn giao xe & hồ sơ"],["pdi","📋 Phiếu PDI kiểm tra xe"],["hdsd","📖 HDSD xe và mốc bảo dưỡng"],["phu_kien","🎁 Phụ kiện/sạc/chìa"],["anh_khach","📸 Ảnh nhận xe"]].map(([k, label]) => (
                   <div key={k} className={`flex items-center gap-1.5 text-[12px] ${o.checklist_giao_xe[k] ? "text-[#0E7A4A]" : "text-[#C6CDD6]"}`}>
                     <span>{o.checklist_giao_xe[k] ? "✓" : "○"}</span><span>{label}</span>
                   </div>

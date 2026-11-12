@@ -173,8 +173,8 @@ export default function DonBan() {
   // Checklist giao xe: muc bat buoc (bao hanh, giay COC, app VF voi xe VinFast) + khuyen nghi (anh khach nhan xe, khach khoe FB/Zalo)
   const clOf = (o) => {
     const c = o.checklist_giao_xe || {};
-    const bb = [["Bảo hành", !!(o.warranty_activated || c.bao_hanh)], ["Giấy COC", !!(o.coc_giao || c.coc_giao)]];
-    const kn = [...(isVF(o) ? [["App VF", !!(o.app_activated || c.app_vf)]] : []), ["Phiếu PDI", !!c.pdi], ["HDSD & bảo dưỡng", !!c.hdsd], ["Ảnh khách nhận xe", !!c.anh_khach], ["Khách khoe FB/Zalo", !!c.khoe_fb]];
+    const bb = [["Bảo hành", !!(o.warranty_activated || c.bao_hanh)], ["BB bàn giao xe & hồ sơ", !!(o.coc_giao || c.coc_giao)], ["Phiếu PDI kiểm tra xe", !!c.pdi], ["HDSD xe và mốc bảo dưỡng", !!c.hdsd]];
+    const kn = [...(isVF(o) ? [["App VF", !!(o.app_activated || c.app_vf)]] : []), ["Ảnh khách nhận xe", !!c.anh_khach], ["Khách khoe FB/Zalo", !!c.khoe_fb]];
     const all = [...bb, ...kn]; const xong = all.filter((x) => x[1]).length, tong = all.length;
     return { xong, tong, thieuBB: bb.some((x) => !x[1]), du: xong === tong, thieu: all.filter((x) => !x[1]).map((x) => x[0]) };
   };
@@ -208,7 +208,9 @@ export default function DonBan() {
     if (!invF.no.trim()) return notify("Bắt buộc nhập số hóa đơn.", "err");
     if (!invF.dms?.trim()) return notify("Bắt buộc nhập Mã đơn DMS.", "err");
     if (!invF.checklist?.bao_hanh) return notify("Checklist: phải kích hoạt bảo hành.", "err");
-    if (!invF.checklist?.coc_giao) return notify("Checklist: phải xác nhận đã bàn giao giấy COC.", "err");
+    if (!invF.checklist?.coc_giao) return notify("Checklist: phải xác nhận BB bàn giao xe & hồ sơ.", "err");
+    if (!invF.checklist?.pdi) return notify("Checklist: phải có Phiếu PDI kiểm tra xe.", "err");
+    if (!invF.checklist?.hdsd) return notify("Checklist: phải HDSD xe và mốc bảo dưỡng cho khách.", "err");
     setBusy(true);
     const { error } = await supabase.rpc("fn_xac_nhan_hoa_don", { p: {
       id: o.id, invoice_no: invF.no, invoice_date: invF.date, dms_code: invF.dms || "",
@@ -432,7 +434,7 @@ export default function DonBan() {
         "Don_Gia_Xe","Chiet_Khau_Xe","Thanh_Tien_Xe","Thanh_Tien_Phu_Kien","Thanh_Tien_Bao_Hiem","Thanh_Tien_Dang_Ky",
         "Tong_Don", ...cotPT, "Da_TT",
         "Trang_Thai_HD","So_HD","Ngay_HD","Ma_Don_DMS","Nguoi_Xac_Nhan",
-        "CL_Kich_Hoat_Bao_Hanh","CL_App_VF","CL_Ban_Giao_COC","CL_Phieu_PDI","CL_HDSD_Bao_Duong","CL_Anh_Khach_Nhan_Xe","CL_Khoe_FB",
+        "CL_Kich_Hoat_Bao_Hanh","CL_App_VF","CL_BB_Ban_Giao_Xe_Ho_So","CL_Phieu_PDI","CL_HDSD_Moc_Bao_Duong","CL_Anh_Khach_Nhan_Xe","CL_Khoe_FB",
         "NV_Ban","Hinh_Thuc_Pin_Luc_Ban",
         "KhachLe_Ten","KhachLe_SDT","KhachLe_Loai_KH","KhachLe_So_Tien_HD","KhachLe_Hinh_Thuc_Pin",
         ...cotKm, "So_Lan_Sua_KM", "Co_Sua_KM_Sau_Khi_Tao"],
@@ -501,7 +503,7 @@ export default function DonBan() {
           <select className="inp !w-auto" value={fKl} onChange={(e) => { setFKl(e.target.value); setPage(1); }} title="Khách lẻ cuối của đơn bán cho đại lý / khách buôn">
             <option value="">Khách lẻ của đại lý: tất cả</option><option value="co">Đã có khách lẻ</option><option value="chua">Chưa có khách lẻ (chờ nhập)</option>
           </select>
-          <select className="inp !w-auto" value={fCl} onChange={(e) => { setFCl(e.target.value); setPage(1); }} title="Checklist giao xe: bảo hành, giấy COC (bắt buộc) + app VF, phiếu PDI, hướng dẫn sử dụng, ảnh khách nhận xe, khách khoe FB/Zalo (khuyến nghị)">
+          <select className="inp !w-auto" value={fCl} onChange={(e) => { setFCl(e.target.value); setPage(1); }} title="Checklist giao xe: bảo hành, BB bàn giao xe & hồ sơ, phiếu PDI, HDSD xe và mốc bảo dưỡng (bắt buộc) + app VF, ảnh khách nhận xe, khách khoe FB/Zalo (khuyến nghị)">
             <option value="">Checklist giao xe: tất cả</option><option value="thieu_bb">Thiếu mục bắt buộc</option><option value="chua_du">Chưa hoàn thành (còn thiếu mục)</option><option value="du">Đã hoàn thành đủ</option>
           </select>
           <select className="inp !w-auto" value={fPin} onChange={(e) => { setFPin(e.target.value); setPage(1); }} title="Hình thức kinh doanh pin của xe đổi pin (đơn khách buôn: theo khách lẻ sau cùng)">
@@ -576,7 +578,7 @@ export default function DonBan() {
                         {huy
                           ? <Badge tone="red">{nhanTra ? "Đã trả hàng" : "Đã hủy"}</Badge>
                           : done
-                          ? <span title={`HĐ ${o.invoice_no} · ${fmtDate(o.invoice_date)} · ${o.invoice_by_name} · BH✓${o.app_activated ? " App✓" : ""}${o.coc_giao ? " COC✓" : ""}${o.checklist_giao_xe?.anh_khach ? " Ảnh✓" : ""}${o.checklist_giao_xe?.khoe_fb ? " FB✓" : ""}`}><Badge tone="green">✓ {o.invoice_no}</Badge></span>
+                          ? <span title={`HĐ ${o.invoice_no} · ${fmtDate(o.invoice_date)} · ${o.invoice_by_name} · BH✓${o.app_activated ? " App✓" : ""}${o.coc_giao ? " BB bàn giao✓" : ""}${o.checklist_giao_xe?.anh_khach ? " Ảnh✓" : ""}${o.checklist_giao_xe?.khoe_fb ? " FB✓" : ""}`}><Badge tone="green">✓ {o.invoice_no}</Badge></span>
                           : <Badge tone="amber">Chờ xuất HĐ</Badge>}
                         {!huy && thieuKhachLe(o) && <Badge tone="red">⚠ Thiếu KL</Badge>}
                         {!huy && (() => { const c = clOf(o); return c.du
@@ -617,9 +619,9 @@ export default function DonBan() {
                             {[
                               ["bao_hanh","🛡 Kích hoạt bảo hành", true],
                               ["app_vf", isVF(o) ? "📱 App VF eScooter" : null, false],
-                              ["coc_giao","📄 Bàn giao giấy COC", true],
-                              ["pdi","📋 Phiếu PDI kiểm tra xe trước giao", false],
-                              ["hdsd","📖 Hướng dẫn sử dụng, bảo dưỡng xe", false],
+                              ["coc_giao","📄 BB bàn giao xe & hồ sơ", true],
+                              ["pdi","📋 Phiếu PDI kiểm tra xe", true],
+                              ["hdsd","📖 HDSD xe và mốc bảo dưỡng", true],
                               ["anh_khach","📸 Quay/chụp khách nhận xe", false],
                               ["khoe_fb","📲 Khách khoe ảnh lên FB/Zalo", false],
                             ].filter(([,label]) => label).map(([key, label, required]) => (
@@ -632,14 +634,14 @@ export default function DonBan() {
                             ))}
                           </div>
                           {(() => {
-                            const required = ["bao_hanh","coc_giao"];
+                            const required = ["bao_hanh","coc_giao","pdi","hdsd"];
                             const done = required.filter(k => invF.checklist?.[k]).length;
                             return <div className="text-[10.5px] text-[#8A93A0] mt-2">{done}/{required.length} mục bắt buộc · Còn lại là khuyến nghị</div>;
                           })()}
                         </div>
                         <div className="flex gap-2 items-center flex-wrap">
                           <button className="btn-ok !py-2 !text-xs" disabled={busy} onClick={() => confirmInv(o)}>Xác nhận hoàn thành đơn</button>
-                          <span className="text-[10.5px] text-[#8A93A0]">Bắt buộc: Số HĐ + Mã DMS + Bảo hành + Giấy COC. Các mục còn lại là khuyến nghị.</span>
+                          <span className="text-[10.5px] text-[#8A93A0]">Bắt buộc: Số HĐ + Mã DMS + Bảo hành + BB bàn giao xe & hồ sơ + Phiếu PDI + HDSD xe và mốc bảo dưỡng. Các mục còn lại là khuyến nghị.</span>
                         </div>
                       </div>
                     </td></tr>
