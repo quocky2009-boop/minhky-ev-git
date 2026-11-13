@@ -528,9 +528,12 @@ function TaoDonWizardInner() {
               <div className="mt-3 text-[13px] bg-[#F8FAFC] rounded-lg p-2.5">
                 <b>{kh.customer_name}</b> · {kh.customer_phone}{kh.customer_address && <div className="text-[#5A6572]">{kh.customer_address}</div>}
                 <div className="mt-2"><label className="lbl">Loại khách hàng của đơn</label>
-                  <select className="inp" value={kh.customer_type || "Khách lẻ"} onChange={(e) => setKh((p) => ({ ...p, customer_type: e.target.value }))}>
+                  {custs.find((c) => String(c.id) === String(custId))?.customer_type === "Khách buôn"
+                    ? <><select className="inp" value="Khách buôn" disabled><option>Khách buôn</option></select>
+                        <div className="text-[11px] text-[#8A93A0] mt-1">Khách thuộc danh mục Khách buôn nên đơn luôn là đơn khách buôn.</div></>
+                    : <select className="inp" value={kh.customer_type || "Khách lẻ"} onChange={(e) => setKh((p) => ({ ...p, customer_type: e.target.value }))}>
                     {CUSTOMER_TYPES.map((x) => <option key={x}>{x}</option>)}
-                  </select></div>
+                  </select>}</div>
               </div>
             )}
           </div>

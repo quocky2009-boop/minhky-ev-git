@@ -1,0 +1,6 @@
+-- 185 (13/11/2026) — Đã chạy trực tiếp trên database.
+-- 1) Sửa dữ liệu: 8 đơn đang hiệu lực có khách thuộc danh mục Khách buôn nhưng đơn ghi "Khách lẻ" -> customer_type = 'Khách buôn'
+--    (BH-2607-68112, -71129, -32866, -07069, -37898 của BB Anh Thảo Hà; BH-2607-10266, -19658, -73668 của BB A Cương Hương Lâm Bình).
+--    Mỗi đơn có 1 dòng don_audit_logs action 'sua_loai_khach'. Không đổi giá, chiết khấu, tiền đã thu. 3 đơn thử đã hủy giữ nguyên.
+-- 2) Chặn lặp lại: trigger trg_don_loai_khach_buon (BEFORE INSERT OR UPDATE OF customer_id, customer_type ON sales_orders)
+--    gọi _trg_don_loai_khach_buon(): nếu customers.customer_type của khách = 'Khách buôn' thì new.customer_type := 'Khách buôn'.

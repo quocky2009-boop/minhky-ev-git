@@ -560,7 +560,7 @@ function TaoDonInner() {
                     onClick={() => setKh((p) => ({ ...p, customer_gender: g }))}>{g}</button>
                 ))}</div>
               </Field>
-              <Field label="Loại khách"><select className="inp" value={kh.customer_type} onChange={(e) => setKh((p) => ({ ...p, customer_type: e.target.value }))}>{CUSTOMER_TYPES.map((x) => <option key={x}>{x}</option>)}</select></Field>
+              <Field label="Loại khách" hint={custs.find((c) => String(c.id) === String(custId))?.customer_type === "Khách buôn" ? "Khách thuộc danh mục Khách buôn nên đơn luôn là đơn khách buôn." : undefined}><select className="inp" disabled={custs.find((c) => String(c.id) === String(custId))?.customer_type === "Khách buôn"} value={custs.find((c) => String(c.id) === String(custId))?.customer_type === "Khách buôn" ? "Khách buôn" : kh.customer_type} onChange={(e) => setKh((p) => ({ ...p, customer_type: e.target.value }))}>{CUSTOMER_TYPES.map((x) => <option key={x}>{x}</option>)}</select></Field>
               <Field label="Nguồn khách"><select className="inp" value={kh.customer_source} onChange={(e) => setKh((p) => ({ ...p, customer_source: e.target.value }))}>{CUSTOMER_SOURCES.map((x) => <option key={x}>{x}</option>)}</select></Field>
               <Field label="Địa chỉ"><input className="inp" value={kh.customer_address} onChange={(e) => setKh((p) => ({ ...p, customer_address: e.target.value }))} /></Field>
               {kh.customer_type === "Khách buôn" && (
