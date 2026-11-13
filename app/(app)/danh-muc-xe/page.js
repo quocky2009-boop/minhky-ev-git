@@ -18,13 +18,14 @@ export default function DMXe() {
   const [showBulk, setShowBulk] = useState(false);
   const [bulk, setBulk] = useState({ brand: "", name: "", list_price: "", list_price_thue_pin: "" });
   const [showBulkSpecs, setShowBulkSpecs] = useState(false);
+  const [showTS, setShowTS] = useState(false); // bang thong so ky thuat theo model
   const [bulkSpecs, setBulkSpecs] = useState({ brand: "", name: "", cong_suat_dong_co_w: "", dung_luong_pin: "",
-    tam_hoat_dong_km: "", toc_do_toi_da_kmh: "", so_luong_pin_ac_quy: "", model_pin: "" });
+    tam_hoat_dong_km: "", toc_do_toi_da_kmh: "", so_luong_pin_ac_quy: "", model_pin: "", loai_pin: "", dung_luong_pin_kwh: "", pin_phu_kwh: "", cong_suat_sac_w: "", vi_tri_pin: "", cong_suat_toi_da_w: "" });
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const empty = { brand: "VinFast", name: "", color: "", mfr_code: "", list_price: "", list_price_thue_pin: "", min_stock: 2,
     cong_suat_dong_co_w: "", dung_luong_pin: "", tam_hoat_dong_km: "", toc_do_toi_da_kmh: "",
-    so_luong_pin_ac_quy: "", model_pin: "" };
+    so_luong_pin_ac_quy: "", model_pin: "", loai_pin: "", dung_luong_pin_kwh: "", pin_phu_kwh: "", cong_suat_sac_w: "", vi_tri_pin: "", cong_suat_toi_da_w: "" };
   const [f, setF] = useState(empty);
   const [editId, setEditId] = useState(null);
   const sort = useSortable();
@@ -87,7 +88,8 @@ export default function DMXe() {
     setF({ brand: v.brand, name: v.name, color: v.color, mfr_code: v.mfr_code || "", list_price: v.list_price, list_price_thue_pin: v.list_price_thue_pin ?? "", min_stock: v.min_stock,
       cong_suat_dong_co_w: v.cong_suat_dong_co_w ?? "", dung_luong_pin: v.dung_luong_pin || "",
       tam_hoat_dong_km: v.tam_hoat_dong_km ?? "", toc_do_toi_da_kmh: v.toc_do_toi_da_kmh ?? "",
-      so_luong_pin_ac_quy: v.so_luong_pin_ac_quy ?? "", model_pin: v.model_pin || "" });
+      so_luong_pin_ac_quy: v.so_luong_pin_ac_quy ?? "", model_pin: v.model_pin || "",
+      loai_pin: v.loai_pin || "", dung_luong_pin_kwh: v.dung_luong_pin_kwh ?? "", pin_phu_kwh: v.pin_phu_kwh ?? "", cong_suat_sac_w: v.cong_suat_sac_w ?? "", vi_tri_pin: v.vi_tri_pin || "", cong_suat_toi_da_w: v.cong_suat_toi_da_w ?? "" });
     setShow(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -160,7 +162,7 @@ export default function DMXe() {
 
   const capNhatThongSoHangLoat = async () => {
     if (!bulkSpecs.brand || !bulkSpecs.name) return notify("Chọn cả Hãng và Tên xe (Model) để giới hạn phạm vi.", "err");
-    const coGiTru = ["cong_suat_dong_co_w","dung_luong_pin","tam_hoat_dong_km","toc_do_toi_da_kmh","so_luong_pin_ac_quy","model_pin"]
+    const coGiTru = ["cong_suat_dong_co_w","dung_luong_pin","tam_hoat_dong_km","toc_do_toi_da_kmh","so_luong_pin_ac_quy","model_pin","loai_pin","dung_luong_pin_kwh","pin_phu_kwh","cong_suat_sac_w","vi_tri_pin","cong_suat_toi_da_w"]
       .some((k) => bulkSpecs[k] !== "");
     if (!coGiTru) return notify("Nhập ít nhất 1 thông số cần cập nhật.", "err");
     // So sanh chinh xac ten xe (khong dung includes/ilike, tranh khop nham Flazz vao Flazz Max)
@@ -176,11 +178,16 @@ export default function DMXe() {
       toc_do_toi_da_kmh: bulkSpecs.toc_do_toi_da_kmh === "" ? null : Number(bulkSpecs.toc_do_toi_da_kmh),
       so_luong_pin_ac_quy: bulkSpecs.so_luong_pin_ac_quy === "" ? null : Number(bulkSpecs.so_luong_pin_ac_quy),
       model_pin: bulkSpecs.model_pin || null,
+      loai_pin: bulkSpecs.loai_pin || null, vi_tri_pin: bulkSpecs.vi_tri_pin || null,
+      dung_luong_pin_kwh: bulkSpecs.dung_luong_pin_kwh === "" ? null : Number(bulkSpecs.dung_luong_pin_kwh),
+      pin_phu_kwh: bulkSpecs.pin_phu_kwh === "" ? null : Number(bulkSpecs.pin_phu_kwh),
+      cong_suat_sac_w: bulkSpecs.cong_suat_sac_w === "" ? null : Number(bulkSpecs.cong_suat_sac_w),
+      cong_suat_toi_da_w: bulkSpecs.cong_suat_toi_da_w === "" ? null : Number(bulkSpecs.cong_suat_toi_da_w),
     } });
     setBusy(false);
     if (error) return notify(errMsg(error), "err");
     notify(`Đã cập nhật thông số kỹ thuật cho ${data.so_ma_cap_nhat} mã xe.`);
-    setBulkSpecs({ brand: "", name: "", cong_suat_dong_co_w: "", dung_luong_pin: "", tam_hoat_dong_km: "", toc_do_toi_da_kmh: "", so_luong_pin_ac_quy: "", model_pin: "" });
+    setBulkSpecs({ brand: "", name: "", cong_suat_dong_co_w: "", dung_luong_pin: "", tam_hoat_dong_km: "", toc_do_toi_da_kmh: "", so_luong_pin_ac_quy: "", model_pin: "", loai_pin: "", dung_luong_pin_kwh: "", pin_phu_kwh: "", cong_suat_sac_w: "", vi_tri_pin: "", cong_suat_toi_da_w: "" });
     setShowBulkSpecs(false); refresh();
   };
 
@@ -243,6 +250,7 @@ export default function DMXe() {
         <button className="btn-primary" onClick={() => { setEditId(null); setF(empty); setShow(!show); }}>+ Thêm xe mới</button>
         <button className="btn-ghost" onClick={() => setShowBulk(!showBulk)}>💲 Sửa giá hàng loạt</button>
         <button className="btn-ghost" onClick={() => setShowBulkSpecs(!showBulkSpecs)}>⚙ Sửa thông số kỹ thuật hàng loạt</button>
+        <button className={`btn-ghost ${showTS ? "!bg-[#EAF2FF] !text-brand" : ""}`} onClick={() => setShowTS(!showTS)}>📋 Bảng thông số kỹ thuật</button>
         <button className="btn-ghost" onClick={exportCSV}>⬇ Xuất Excel</button>
         <button className="btn-ghost" onClick={() => fileRef.current?.click()}>⬆ Nhập Excel</button>
         <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" className="hidden" onChange={(e) => { if (e.target.files[0]) importCSV(e.target.files[0]); e.target.value = ""; }} />
@@ -299,6 +307,41 @@ export default function DMXe() {
         </div>
       )}
 
+      {showTS && (() => {
+        // Moi model 1 dong (lay ma xe dau tien cua model lam dai dien — thong so nhap theo model, giong nhau giua cac mau)
+        const ms = [...new Map(vehicles.map((v) => [v.brand + "|" + v.name, v])).values()].sort((a, b) => a.brand.localeCompare(b.brand) || a.name.localeCompare(b.name));
+        const so = (x, dv = "") => (x === null || x === undefined || x === "" ? <span className="text-[#C6CDD6]">—</span> : `${Number(x).toLocaleString("vi-VN")}${dv}`);
+        const chu = (x) => x || <span className="text-[#C6CDD6]">—</span>;
+        return (
+          <div className="card">
+            <div className="flex items-center gap-2 flex-wrap mb-2">
+              <div className="font-extrabold mr-auto">Bảng thông số kỹ thuật theo model ({ms.length})</div>
+              <button className="btn-ghost !text-xs" onClick={() => downloadXLSX("thong_so_ky_thuat_xe.xlsx", [
+                ["Hãng", "Tên xe", "Model pin", "Loại pin", "Dung lượng pin kèm xe (kWh)", "Pin phụ tùy chọn (kWh)", "Tổng dung lượng khi lắp pin phụ (kWh)", "Công suất sạc (W)", "Vị trí pin", "Tầm hoạt động (km)", "Tốc độ tối đa (km/h)", "Công suất động cơ danh định (W)", "Công suất động cơ tối đa (W)", "Số lượng pin/AQ", "Dung lượng pin (ghi chú)"],
+                ...ms.map((v) => [v.brand, v.name, v.model_pin || "", v.loai_pin || "", v.dung_luong_pin_kwh ?? "", v.pin_phu_kwh ?? "", Number(v.pin_phu_kwh) > 0 ? Math.round(((Number(v.dung_luong_pin_kwh) || 0) + Number(v.pin_phu_kwh)) * 1000) / 1000 : "",
+                  v.cong_suat_sac_w ?? "", v.vi_tri_pin || "", v.tam_hoat_dong_km ?? "", v.toc_do_toi_da_kmh ?? "", v.cong_suat_dong_co_w ?? "", v.cong_suat_toi_da_w ?? "", v.so_luong_pin_ac_quy ?? "", v.dung_luong_pin || ""])], "Thong_so")}>⬇ Xuất Excel</button>
+            </div>
+            <div className="tbl-scroll"><table className="w-full border-collapse tbl-card text-[12.5px]">
+              <thead><tr><th className="th">Tên xe</th><th className="th">Model pin</th><th className="th">Loại pin</th><th className="th text-right">Pin kèm xe</th><th className="th text-right">Pin phụ</th><th className="th text-right">Tổng khi lắp pin phụ</th><th className="th text-right">Sạc</th><th className="th">Vị trí pin</th><th className="th text-right">Tầm hoạt động</th><th className="th text-right">Tốc độ tối đa</th><th className="th text-right">CS danh định</th><th className="th text-right">CS tối đa</th></tr></thead>
+              <tbody>{ms.map((v) => (
+                <tr key={v.brand + v.name} className="hover:bg-[#F8FAFC]">
+                  <td data-m="title" className="td font-semibold">{v.name} <span className="text-[10.5px] font-normal text-[#8A93A0]">· {v.brand}</span></td>
+                  <td data-m="nolabel" className="td text-xs">{v.model_pin ? <Badge tone={v.model_pin === "Xe đổi pin" ? "amber" : "blue"}>{v.model_pin}</Badge> : chu("")}</td>
+                  <td data-label="Loại pin" className="td">{chu(v.loai_pin)}</td>
+                  <td data-label="Pin kèm xe" className="td text-right">{so(v.dung_luong_pin_kwh, " kWh")}</td>
+                  <td data-label="Pin phụ" className="td text-right">{so(v.pin_phu_kwh, " kWh")}</td>
+                  <td data-label="Tổng khi lắp pin phụ" className="td text-right">{Number(v.pin_phu_kwh) > 0 ? so(Math.round(((Number(v.dung_luong_pin_kwh) || 0) + Number(v.pin_phu_kwh)) * 1000) / 1000, " kWh") : chu("")}</td>
+                  <td data-label="Sạc" className="td text-right">{so(v.cong_suat_sac_w, " W")}</td>
+                  <td data-label="Vị trí pin" className="td text-xs">{chu(v.vi_tri_pin)}</td>
+                  <td data-label="Tầm hoạt động" className="td text-right">{so(v.tam_hoat_dong_km, " km")}</td>
+                  <td data-label="Tốc độ tối đa" className="td text-right">{so(v.toc_do_toi_da_kmh, " km/h")}</td>
+                  <td data-label="CS danh định" className="td text-right">{so(v.cong_suat_dong_co_w, " W")}</td>
+                  <td data-label="CS tối đa" className="td text-right">{so(v.cong_suat_toi_da_w, " W")}</td>
+                </tr>))}</tbody>
+            </table></div>
+            <div className="text-[11px] text-[#8A93A0] mt-1.5">Thông số nhập theo model, áp cho mọi màu. Sửa bằng nút “⚙ Sửa thông số kỹ thuật hàng loạt” hoặc ✎ Sửa từng mã xe.</div>
+          </div>);
+      })()}
       {showBulkSpecs && (
         <div className="card border-l-4 border-l-brand">
           <div className="font-extrabold mb-1">Cập nhật thông số kỹ thuật hàng loạt</div>
@@ -319,17 +362,25 @@ export default function DMXe() {
                   tam_hoat_dong_km: mau?.tam_hoat_dong_km ?? "",
                   toc_do_toi_da_kmh: mau?.toc_do_toi_da_kmh ?? "",
                   so_luong_pin_ac_quy: mau?.so_luong_pin_ac_quy ?? "",
-                  model_pin: mau?.model_pin || "" }));
+                  model_pin: mau?.model_pin || "",
+                  loai_pin: mau?.loai_pin || "", dung_luong_pin_kwh: mau?.dung_luong_pin_kwh ?? "", pin_phu_kwh: mau?.pin_phu_kwh ?? "",
+                  cong_suat_sac_w: mau?.cong_suat_sac_w ?? "", vi_tri_pin: mau?.vi_tri_pin || "", cong_suat_toi_da_w: mau?.cong_suat_toi_da_w ?? "" }));
               }}>
                 <option value="">— Chọn model —</option>
                 {Array.from(new Set(vehicles.filter((v) => !bulkSpecs.brand || v.brand === bulkSpecs.brand).map((v) => v.name))).sort().map((n) => <option key={n}>{n}</option>)}
               </select>
             </Field>
-            <Field label="Công suất động cơ (W)"><input type="number" className="inp" value={bulkSpecs.cong_suat_dong_co_w} onChange={(e) => setBulkSpecs((p) => ({ ...p, cong_suat_dong_co_w: e.target.value }))} /></Field>
-            <Field label="Dung lượng pin"><input className="inp" placeholder="VD: 60V-20Ah" value={bulkSpecs.dung_luong_pin} onChange={(e) => setBulkSpecs((p) => ({ ...p, dung_luong_pin: e.target.value }))} /></Field>
+            <Field label="Công suất động cơ danh định (W)"><input type="number" className="inp" value={bulkSpecs.cong_suat_dong_co_w} onChange={(e) => setBulkSpecs((p) => ({ ...p, cong_suat_dong_co_w: e.target.value }))} /></Field>
+            <Field label="Dung lượng pin (ghi chú)"><input className="inp" placeholder="VD: 1,5 kWh LFP / 60V-20Ah" value={bulkSpecs.dung_luong_pin} onChange={(e) => setBulkSpecs((p) => ({ ...p, dung_luong_pin: e.target.value }))} /></Field>
             <Field label="Tầm hoạt động (km)"><input type="number" className="inp" value={bulkSpecs.tam_hoat_dong_km} onChange={(e) => setBulkSpecs((p) => ({ ...p, tam_hoat_dong_km: e.target.value }))} /></Field>
             <Field label="Tốc độ tối đa (km/h)"><input type="number" className="inp" value={bulkSpecs.toc_do_toi_da_kmh} onChange={(e) => setBulkSpecs((p) => ({ ...p, toc_do_toi_da_kmh: e.target.value }))} /></Field>
             <Field label="Số lượng pin/AQ"><input type="number" className="inp" value={bulkSpecs.so_luong_pin_ac_quy} onChange={(e) => setBulkSpecs((p) => ({ ...p, so_luong_pin_ac_quy: e.target.value }))} /></Field>
+            <Field label="Công suất động cơ tối đa (W)"><input type="number" className="inp" value={bulkSpecs.cong_suat_toi_da_w} onChange={(e) => setBulkSpecs((p) => ({ ...p, cong_suat_toi_da_w: e.target.value }))} /></Field>
+            <Field label="Loại pin"><input className="inp" placeholder="VD: LFP" value={bulkSpecs.loai_pin} onChange={(e) => setBulkSpecs((p) => ({ ...p, loai_pin: e.target.value }))} /></Field>
+            <Field label="Dung lượng pin kèm xe (kWh)"><input type="number" step="0.001" className="inp" value={bulkSpecs.dung_luong_pin_kwh} onChange={(e) => setBulkSpecs((p) => ({ ...p, dung_luong_pin_kwh: e.target.value }))} /></Field>
+            <Field label="Pin phụ tùy chọn (kWh)" hint={(Number(bulkSpecs.dung_luong_pin_kwh) || 0) + (Number(bulkSpecs.pin_phu_kwh) || 0) > 0 && Number(bulkSpecs.pin_phu_kwh) > 0 ? `Tổng khi lắp pin phụ: ${Math.round(((Number(bulkSpecs.dung_luong_pin_kwh) || 0) + Number(bulkSpecs.pin_phu_kwh)) * 1000) / 1000} kWh` : undefined}><input type="number" step="0.001" className="inp" value={bulkSpecs.pin_phu_kwh} onChange={(e) => setBulkSpecs((p) => ({ ...p, pin_phu_kwh: e.target.value }))} /></Field>
+            <Field label="Công suất sạc (W)"><input type="number" className="inp" value={bulkSpecs.cong_suat_sac_w} onChange={(e) => setBulkSpecs((p) => ({ ...p, cong_suat_sac_w: e.target.value }))} /></Field>
+            <Field label="Vị trí pin"><input className="inp" placeholder="VD: Dưới sàn; pin phụ trong cốp" value={bulkSpecs.vi_tri_pin} onChange={(e) => setBulkSpecs((p) => ({ ...p, vi_tri_pin: e.target.value }))} /></Field>
             <Field label="Model pin">
               <select className="inp" value={bulkSpecs.model_pin} onChange={(e) => setBulkSpecs((p) => ({ ...p, model_pin: e.target.value }))}>
                 <option value="">— Giữ nguyên —</option>
@@ -375,11 +426,17 @@ export default function DMXe() {
           </div>
           <div className="font-bold text-xs text-[#5A6572] mt-3 mb-1.5">Thông số kỹ thuật (hiển thị cho Bot Minh Trí tra cứu)</div>
           <div className="grid gap-x-3.5 md:grid-cols-4 sm:grid-cols-2 mb-3">
-            <Field label="Công suất động cơ (W)"><input type="number" className="inp" value={f.cong_suat_dong_co_w} onChange={(e) => set("cong_suat_dong_co_w", e.target.value)} /></Field>
-            <Field label="Dung lượng pin"><input className="inp" placeholder="VD: 60V-20Ah" value={f.dung_luong_pin} onChange={(e) => set("dung_luong_pin", e.target.value)} /></Field>
+            <Field label="Công suất động cơ danh định (W)"><input type="number" className="inp" value={f.cong_suat_dong_co_w} onChange={(e) => set("cong_suat_dong_co_w", e.target.value)} /></Field>
+            <Field label="Dung lượng pin (ghi chú)"><input className="inp" placeholder="VD: 1,5 kWh LFP / 60V-20Ah" value={f.dung_luong_pin} onChange={(e) => set("dung_luong_pin", e.target.value)} /></Field>
             <Field label="Tầm hoạt động (km)"><input type="number" className="inp" value={f.tam_hoat_dong_km} onChange={(e) => set("tam_hoat_dong_km", e.target.value)} /></Field>
             <Field label="Tốc độ tối đa (km/h)"><input type="number" className="inp" value={f.toc_do_toi_da_kmh} onChange={(e) => set("toc_do_toi_da_kmh", e.target.value)} /></Field>
             <Field label="Số lượng pin/AQ"><input type="number" className="inp" value={f.so_luong_pin_ac_quy} onChange={(e) => set("so_luong_pin_ac_quy", e.target.value)} /></Field>
+            <Field label="Công suất động cơ tối đa (W)"><input type="number" className="inp" value={f.cong_suat_toi_da_w} onChange={(e) => set("cong_suat_toi_da_w", e.target.value)} /></Field>
+            <Field label="Loại pin"><input className="inp" placeholder="VD: LFP" value={f.loai_pin} onChange={(e) => set("loai_pin", e.target.value)} /></Field>
+            <Field label="Dung lượng pin kèm xe (kWh)"><input type="number" step="0.001" className="inp" value={f.dung_luong_pin_kwh} onChange={(e) => set("dung_luong_pin_kwh", e.target.value)} /></Field>
+            <Field label="Pin phụ tùy chọn (kWh)" hint={(Number(f.dung_luong_pin_kwh) || 0) + (Number(f.pin_phu_kwh) || 0) > 0 && Number(f.pin_phu_kwh) > 0 ? `Tổng khi lắp pin phụ: ${Math.round(((Number(f.dung_luong_pin_kwh) || 0) + Number(f.pin_phu_kwh)) * 1000) / 1000} kWh` : undefined}><input type="number" step="0.001" className="inp" value={f.pin_phu_kwh} onChange={(e) => set("pin_phu_kwh", e.target.value)} /></Field>
+            <Field label="Công suất sạc (W)"><input type="number" className="inp" value={f.cong_suat_sac_w} onChange={(e) => set("cong_suat_sac_w", e.target.value)} /></Field>
+            <Field label="Vị trí pin"><input className="inp" placeholder="VD: Dưới sàn; pin phụ trong cốp" value={f.vi_tri_pin} onChange={(e) => set("vi_tri_pin", e.target.value)} /></Field>
             <Field label="Model pin">
               <select className="inp" value={f.model_pin} onChange={(e) => set("model_pin", e.target.value)}>
                 <option value="">— Chọn —</option>

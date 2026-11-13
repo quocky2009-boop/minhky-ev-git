@@ -1,0 +1,30 @@
+-- 184 (13/11/2026) — Đã chạy trực tiếp trên database.
+-- Bổ sung trường thông số kỹ thuật cho danh mục xe + cập nhật số liệu chuẩn 12 dòng xe VinFast (theo file "Bảng thông số pin VinFast Minh Kỳ", cập nhật 13/11/2026).
+--
+-- alter table vehicles add: loai_pin text, dung_luong_pin_kwh numeric (pin kèm xe), pin_phu_kwh numeric (pin phụ tùy chọn),
+--   cong_suat_sac_w int, vi_tri_pin text, cong_suat_toi_da_w int.
+-- Ý nghĩa trường cũ: cong_suat_dong_co_w = công suất động cơ DANH ĐỊNH; dung_luong_pin (text) giữ làm ghi chú hiển thị, vd "1,5 kWh LFP".
+--
+-- Hàm đã vá để đọc/ghi 6 trường mới: fn_sua_xe, fn_them_xe (khi cập nhật trùng mã: không ghi đè bằng rỗng), fn_cap_nhat_thong_so_hang_loat.
+-- fn_ai_gia_thong_so_xe (bot tra cứu): giữ nguyên cột trả về, gộp các thông số mới vào thong_so_khac.
+--
+-- Số liệu cập nhật (áp cho mọi màu, khớp đúng tên xe):
+--   tên xe          | pin kèm xe | pin phụ | sạc W | vị trí pin                   | tầm km | tốc độ | CS danh định | CS tối đa
+--   Amio            | 1.024      | —       | 210   | Dưới sàn                     | 65     | 30     | 400          | 800
+--   ZGOO            | 1.2        | —       | 210   | Dưới sàn                     | 70     | 39     | 600          | 1100
+--   FLAZZ           | 1.2        | 1.2     | 210   | Dưới sàn; pin phụ trong cốp  | 70     | 39     | 600          | 1100
+--   Evo Grand Lite  | 1.2        | 2.4     | 210   | Dưới sàn; pin phụ trong cốp  | 70     | 48     | 1500         | 1900
+--   Evo Grand       | 2.4        | 2.4     | 400   | Dưới sàn; pin phụ trong cốp  | 134    | 70     | 1500         | 2250
+--   Feliz 2025      | 2.4        | 2.4     | 400   | Dưới sàn; pin phụ trong cốp  | 134    | 70     | 1800         | 2800
+--   EVO LITE        | 1.5        | 1.5     | 400   | Trong cốp xe                 | 85     | 49     | 1500         | 2300
+--   EVO             | 1.5        | 1.5     | 400   | Trong cốp xe                 | 85     | 70     | 1500         | 2450
+--   Feliz II        | 1.5        | 1.5     | 400   | Trong cốp xe                 | 82     | 70     | 1800         | 3000
+--   Viper           | 1.5        | 1.5     | 400   | Trong cốp xe                 | 82     | 70     | 1800         | 3000
+--   KYO             | 1.5        | 1.5     | 400   | Trong cốp xe                 | 82     | 70     | 1800         | 3000
+--   Kinet           | 3          | —       | 400   | Trong cốp xe                 | 145    | 90     | 3000         | 5200
+--   (tất cả loai_pin = 'LFP')
+--
+-- Giá trị cũ bị thay (công suất | pin | tầm | tốc độ): Amio 800|1.5 kWh|65|30 · EVO 2450|1.5|80|70 · Evo Grand 1900|2.4|131|70 ·
+--   Evo Grand Lite 1900|1.2|99|48 · EVO LITE 2300|1.5|80|49 · Feliz 2025 2800|2.4|130|70 · Feliz II 3000|1.5|165|70 ·
+--   FLAZZ 1500|1.2|85|48 · Viper 3000|1.5|156|70 · ZGOO 1100|1.2|70|39 · Kinet, KYO: chỉ có pin "1.5 kWh LFP".
+-- Không đụng tới (file không có): Amio S, Amio S2, Evo Grand II, Evo Grand Premia, Evo Grand Premia Limited, Flazz Max, KLARA Neo.
