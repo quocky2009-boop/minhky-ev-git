@@ -3,6 +3,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useCatalog, useToast } from "@/lib/useData";
+import { printDonBuon, printBienBanGiaoXe } from "@/lib/printBanBuon";
 import { Badge, Toast, KPI, Field, MoneyInput, VehicleSearch, LocSearch, SearchPicker, MultiCheck, Pager, pageSlice, pageClamp, useSortable, Th, LocGon } from "@/components/ui";
 import { QuickDates, AmountFilter, SavedFilters, TongLoc, trongKhoang } from "@/components/FinFilters";
 import BankOptions from "@/components/BankOptions";
@@ -18,7 +19,8 @@ const tienDong = (l) => (Number(l.qty) || 0) * donGia(l);
 const tongDonXe = (o) => { const g = (Number(o.sale_price) || 0) * (Number(o.quantity) || 1); const ck = o.vehicle_discount_type === "percent" ? Math.round(g * (Number(o.vehicle_discount_value) || 0) / 100) : Number(o.vehicle_discount_value) || 0; return Math.max(g - ck - (Number(o.discount_amount) || 0) - (Number(o.kb_dieu_chinh) || 0), 0); };
 
 function BanBuonInner() {
-  const { supabase, vehicles, locations, profile, loading } = useCatalog();
+  const { supabase, vehicles, locations, profile, loading, settings } = useCatalog();
+  const [moIn, setMoIn] = useState(false); // menu in bien ban ban giao
   const { toast, notify } = useToast();
   const sp = useSearchParams();
   const router = useRouter();
@@ -348,8 +350,24 @@ function BanBuonInner() {
               <button className="btn-ghost !text-xs" onClick={() => { setLo(null); router.replace("/ban-buon"); }}>← Danh sách đơn bán buôn</button>
               <span className="text-xl font-extrabold">{h.code}</span><Badge tone={TT_TONE[h.trang_thai]}>{h.trang_thai}</Badge>
               <span className="text-[13px] text-[#5A6572]">{h.customer_name} · chốt {fmtDate(h.ngay_chot)} · {h.created_by_name}</span>
-              <div className="ml-auto flex gap-2">
+              <div className="ml-auto flex gap-2 flex-wrap">
                 {!huy && h.con_phai_tra > 0 && <button className="btn-ok !text-xs" onClick={() => moThu(h)}>💵 Thu tiền ({fmtVND(h.con_phai_tra)})</button>}
+                <button className="btn-ghost !text-xs" title="Xem in / in đơn bán buôn (không cần số khung)" onClick={() => printDonBuon({ supabase, lo, vehicles, locations, settings: settings || {}, notify })}>🖨 In đơn</button>
+                {(() => {
+                  const giao = lo.orders.filter((o) => !["Đã hủy", "Đã trả hàng"].includes(o.status));
+                  if (!giao.length) return null;
+                  const ngays = [...new Set(giao.map((o) => o.sale_date))].sort();
+                  const inBB = (ngayGiao) => { setMoIn(false); printBienBanGiaoXe({ supabase, lo, vehicles, locations, settings: settings || {}, notify, ngayGiao }); };
+                  return (
+                    <div className="relative">
+                      <button className="btn-ghost !text-xs" title="In biên bản bàn giao xe cho khách buôn" onClick={() => (ngays.length > 1 ? setMoIn(!moIn) : inBB(""))}>🖨 Biên bản bàn giao{ngays.length > 1 ? " ▾" : ""}</button>
+                      {moIn && ngays.length > 1 && (
+                        <div className="absolute right-0 top-full mt-1 z-30 bg-white border border-[#E3E8EF] rounded-xl shadow-lg p-1.5 min-w-[230px] flex flex-col">
+                          <button className="text-left text-[13px] px-3 py-2 rounded-lg hover:bg-[#F3F5F8]" onClick={() => inBB("")}>Tất cả xe đã giao<div className="text-[11px] text-[#8A93A0]">{giao.length} xe · {ngays.length} đợt giao</div></button>
+                          {ngays.map((d) => <button key={d} className="text-left text-[13px] px-3 py-2 rounded-lg hover:bg-[#F3F5F8]" onClick={() => inBB(d)}>Đợt giao {fmtDate(d)}<div className="text-[11px] text-[#8A93A0]">{giao.filter((o) => o.sale_date === d).length} xe</div></button>)}
+                        </div>)}
+                    </div>);
+                })()}
                 <Link className="btn-ghost !text-xs" href={`/khach-buon?kh=${h.customer_id}`}>Sổ khách buôn</Link>
                 {!huy && <button className="btn-ghost !text-xs" onClick={() => setForm({ id: h.id, customer_id: h.customer_id, location_code: h.location_code || "", ngay_chot: h.ngay_chot, note: h.note, lines: lo.dong.map((d) => ({ ...d, gia_ban: d.gia_ban ?? "" })) })}>✎ Sửa đơn</button>}
                 {!huy && lo.orders.length === 0 && <button className="btn-ghost !text-xs !text-danger" onClick={huyLo}>Hủy đơn</button>}
