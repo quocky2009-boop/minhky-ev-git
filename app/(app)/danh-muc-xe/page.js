@@ -3,10 +3,11 @@ import { useState, useRef, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { useCatalog, useToast } from "@/lib/useData";
 import { Field, Toast, stockBadge, Badge, Pager, pageSlice, useSortable, Th, LocSearch, VehicleSearch, MoneyInput, ComboFree, useSelection, ThCheck, TdCheck, SelectionBar } from "@/components/ui";
+import BangThongSoXe from "@/components/BangThongSoXe";
 import { fmtVND, fmtDate, errMsg, readTableFile, downloadXLSX } from "@/lib/format";
 
 export default function DMXe() {
-  const { supabase, vehicles, brands, loading, totalQty, refresh } = useCatalog();
+  const { supabase, vehicles, brands, loading, totalQty, refresh, profile } = useCatalog();
   const { toast, notify } = useToast();
   const fileRef = useRef(null);
   const [show, setShow] = useState(false);
@@ -307,41 +308,7 @@ export default function DMXe() {
         </div>
       )}
 
-      {showTS && (() => {
-        // Moi model 1 dong (lay ma xe dau tien cua model lam dai dien — thong so nhap theo model, giong nhau giua cac mau)
-        const ms = [...new Map(vehicles.map((v) => [v.brand + "|" + v.name, v])).values()].sort((a, b) => a.brand.localeCompare(b.brand) || a.name.localeCompare(b.name));
-        const so = (x, dv = "") => (x === null || x === undefined || x === "" ? <span className="text-[#C6CDD6]">—</span> : `${Number(x).toLocaleString("vi-VN")}${dv}`);
-        const chu = (x) => x || <span className="text-[#C6CDD6]">—</span>;
-        return (
-          <div className="card">
-            <div className="flex items-center gap-2 flex-wrap mb-2">
-              <div className="font-extrabold mr-auto">Bảng thông số kỹ thuật theo model ({ms.length})</div>
-              <button className="btn-ghost !text-xs" onClick={() => downloadXLSX("thong_so_ky_thuat_xe.xlsx", [
-                ["Hãng", "Tên xe", "Model pin", "Loại pin", "Dung lượng pin kèm xe (kWh)", "Pin phụ tùy chọn (kWh)", "Tổng dung lượng khi lắp pin phụ (kWh)", "Công suất sạc (W)", "Vị trí pin", "Tầm hoạt động (km)", "Tốc độ tối đa (km/h)", "Công suất động cơ danh định (W)", "Công suất động cơ tối đa (W)", "Số lượng pin/AQ", "Dung lượng pin (ghi chú)"],
-                ...ms.map((v) => [v.brand, v.name, v.model_pin || "", v.loai_pin || "", v.dung_luong_pin_kwh ?? "", v.pin_phu_kwh ?? "", Number(v.pin_phu_kwh) > 0 ? Math.round(((Number(v.dung_luong_pin_kwh) || 0) + Number(v.pin_phu_kwh)) * 1000) / 1000 : "",
-                  v.cong_suat_sac_w ?? "", v.vi_tri_pin || "", v.tam_hoat_dong_km ?? "", v.toc_do_toi_da_kmh ?? "", v.cong_suat_dong_co_w ?? "", v.cong_suat_toi_da_w ?? "", v.so_luong_pin_ac_quy ?? "", v.dung_luong_pin || ""])], "Thong_so")}>⬇ Xuất Excel</button>
-            </div>
-            <div className="tbl-scroll"><table className="w-full border-collapse tbl-card text-[12.5px]">
-              <thead><tr><th className="th">Tên xe</th><th className="th">Model pin</th><th className="th">Loại pin</th><th className="th text-right">Pin kèm xe</th><th className="th text-right">Pin phụ</th><th className="th text-right">Tổng khi lắp pin phụ</th><th className="th text-right">Sạc</th><th className="th">Vị trí pin</th><th className="th text-right">Tầm hoạt động</th><th className="th text-right">Tốc độ tối đa</th><th className="th text-right">CS danh định</th><th className="th text-right">CS tối đa</th></tr></thead>
-              <tbody>{ms.map((v) => (
-                <tr key={v.brand + v.name} className="hover:bg-[#F8FAFC]">
-                  <td data-m="title" className="td font-semibold">{v.name} <span className="text-[10.5px] font-normal text-[#8A93A0]">· {v.brand}</span></td>
-                  <td data-m="nolabel" className="td text-xs">{v.model_pin ? <Badge tone={v.model_pin === "Xe đổi pin" ? "amber" : "blue"}>{v.model_pin}</Badge> : chu("")}</td>
-                  <td data-label="Loại pin" className="td">{chu(v.loai_pin)}</td>
-                  <td data-label="Pin kèm xe" className="td text-right">{so(v.dung_luong_pin_kwh, " kWh")}</td>
-                  <td data-label="Pin phụ" className="td text-right">{so(v.pin_phu_kwh, " kWh")}</td>
-                  <td data-label="Tổng khi lắp pin phụ" className="td text-right">{Number(v.pin_phu_kwh) > 0 ? so(Math.round(((Number(v.dung_luong_pin_kwh) || 0) + Number(v.pin_phu_kwh)) * 1000) / 1000, " kWh") : chu("")}</td>
-                  <td data-label="Sạc" className="td text-right">{so(v.cong_suat_sac_w, " W")}</td>
-                  <td data-label="Vị trí pin" className="td text-xs">{chu(v.vi_tri_pin)}</td>
-                  <td data-label="Tầm hoạt động" className="td text-right">{so(v.tam_hoat_dong_km, " km")}</td>
-                  <td data-label="Tốc độ tối đa" className="td text-right">{so(v.toc_do_toi_da_kmh, " km/h")}</td>
-                  <td data-label="CS danh định" className="td text-right">{so(v.cong_suat_dong_co_w, " W")}</td>
-                  <td data-label="CS tối đa" className="td text-right">{so(v.cong_suat_toi_da_w, " W")}</td>
-                </tr>))}</tbody>
-            </table></div>
-            <div className="text-[11px] text-[#8A93A0] mt-1.5">Thông số nhập theo model, áp cho mọi màu. Sửa bằng nút “⚙ Sửa thông số kỹ thuật hàng loạt” hoặc ✎ Sửa từng mã xe.</div>
-          </div>);
-      })()}
+      {showTS && <BangThongSoXe vehicles={vehicles} brands={brands} supabase={supabase} notify={notify} refresh={refresh} canEdit={["CEO", "ADMIN"].includes(profile?.role)} />}
       {showBulkSpecs && (
         <div className="card border-l-4 border-l-brand">
           <div className="font-extrabold mb-1">Cập nhật thông số kỹ thuật hàng loạt</div>
