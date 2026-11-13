@@ -1,0 +1,12 @@
+-- 186 (13/11/2026) — Đã chạy trực tiếp trên database.
+-- Gộp khách buôn bị tạo trùng (cùng một đại lý, 2-3 mã khách). Giữ mã có SĐT thật do Cửa hàng trưởng tạo:
+--   • KH-2607-63397 (id 45, tên danh mục "Khách lẻ Test A", SĐT giả 0935735888; các đơn ghi "BB Anh Thảo Hà")
+--       -> gộp vào KH-2610-02182 (id 441) "BB - A THẢO HÀ ĐẠI LÝ CẤP 2", 0868030782
+--   • KH-2607-50892 (id 46) "BB chị Hải Chuyển Km11", SĐT giả 0935735000
+--     KH-2607-56707 (id 13) "ĐLBB chị Hải Km11", 0911222333 (chỉ có 1 đơn đã hủy)
+--       -> gộp vào KH-2611-86778 (id 697) "BB- C HẢI KM11", 0987564789
+-- Đã chuyển sang mã giữ lại: sales_orders.customer_id (đơn đang hiệu lực đổi luôn tên + SĐT khách trên đơn), don_buon,
+--   customer_vehicles, customer_vehicle_owners, khóa việc nhắc ký gửi (tasks.recurrence_instance_key, thêm hậu tố -gop<id cũ>).
+--   Chuyển hồ sơ xe trước rồi mới chuyển đơn để trigger _trg_xe_tu_don_ban không sinh dòng "đổi chủ".
+-- Bản ghi khách cũ đã xóa sau khi chuyển hết; toàn bộ dữ liệu cũ (hồ sơ khách, danh sách id đã chuyển, tên/SĐT/loại khách cũ trên từng đơn)
+--   lưu ở bảng public.kh_gop_log (RLS bật, không cấp cho anon/authenticated) để khôi phục khi cần.
