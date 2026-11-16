@@ -311,6 +311,7 @@ export default function DonBan() {
     if (detail.customer_type === "Khách buôn" && detail.customer_id) {
       const { data: kb, error: e2 } = await supabase.rpc("fn_kb_ghi_khach_le_cuoi", { p_sale_code: detail.code, p_promotion_ids: klKm.chon });
       if (e2) notify("Lưu khách lẻ xong nhưng chưa ghi sổ khách buôn: " + errMsg(e2), "err");
+      else if (kb && !kb.bo_qua && Number(kb.chenh_pin) > 0) kbMsg = ` Khách lẻ chọn Kèm pin: khách buôn cần trả thêm chênh pin ${fmtVND(kb.chenh_pin)} (đã cộng vào tiền đơn xe).${kb.khuyen_mai > 0 ? ` Sổ khách buôn: +${fmtVND(kb.khuyen_mai)} khuyến mại.` : ""}`;
       else if (kb && !kb.bo_qua && (kb.bu_pin > 0 || kb.khuyen_mai > 0)) kbMsg = ` Sổ khách buôn: +${fmtVND((kb.bu_pin || 0) + (kb.khuyen_mai || 0))} (KM ${fmtVND(kb.khuyen_mai || 0)}${kb.bu_pin > 0 ? `, bù pin ${fmtVND(kb.bu_pin)}` : ""}).`;
       napKbDong(detail.code);
     }
@@ -805,6 +806,7 @@ export default function DonBan() {
                                   <Link href={`/khach-buon?kh=${detail.customer_id}`} className="text-brand underline text-[11.5px]">Xem sổ khách buôn</Link>
                                 </div>
                               )}
+                              {detail.extra?.chenh_pin && <div className="mt-1.5 text-[12px] rounded-lg bg-[#FFF4D6] border border-[#F0C000] px-2 py-1">🔋 <b>Chênh pin: +{fmtVND(detail.extra.chenh_pin.so_tien)}</b> — xe bán buôn theo giá thuê pin, khách lẻ cuối mua kèm pin nên khách buôn trả thêm phần chênh (không chiết khấu). Đã cộng vào tổng đơn.</div>}
                               {canKL && <button className="btn-ghost !text-xs mt-1.5 self-start" onClick={() => moKhachLe({
                                 name: detail.end_customer_name, phone: detail.end_customer_phone,
                                 email: detail.end_customer_email, address: detail.end_customer_address,

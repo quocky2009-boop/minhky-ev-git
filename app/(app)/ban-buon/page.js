@@ -77,7 +77,7 @@ function BanBuonInner() {
       supabase.from("v_don_buon").select("*").eq("id", id).single(),
       supabase.from("don_buon_dong").select("*").eq("don_id", id).order("id"),
       supabase.from("don_buon_thanh_toan").select("*").eq("don_id", id).order("id"),
-      supabase.from("sales_orders").select("id,code,sale_date,vehicle_id,frame_number,location_code,status,paid_amount,sale_price,quantity,vehicle_discount_type,vehicle_discount_value,discount_amount,kb_dieu_chinh,don_buon_dong_id,end_customer_name").eq("don_buon_id", id).order("id"),
+      supabase.from("sales_orders").select("id,code,sale_date,vehicle_id,frame_number,location_code,status,paid_amount,sale_price,quantity,vehicle_discount_type,vehicle_discount_value,discount_amount,kb_dieu_chinh,don_buon_dong_id,end_customer_name,extra,battery_option,end_customer_battery_option").eq("don_buon_id", id).order("id"),
     ]);
     if (!h) return notify("Không tìm thấy đơn bán buôn.", "err");
     const vids = [...new Set((dg || []).map((d) => d.vehicle_id))];
@@ -494,7 +494,7 @@ function BanBuonInner() {
                       <tr key={o.id} className={`border-b border-dashed border-[#F0F2F5] ${["Đã hủy", "Đã trả hàng"].includes(o.status) ? "opacity-50" : ""}`}>
                         <td className="py-2"><Link className="text-brand underline" href={`/don-ban/${o.id}`}>{o.code}</Link></td><td>{fmtDate(o.sale_date)}</td>
                         <td>{vName(o.vehicle_id)}<div className="font-mono text-[11px]">{o.frame_number}</div></td><td>{locName(o.location_code)}</td>
-                        <td className="text-right">{fmtVND(tongDonXe(o))}</td><td className={`text-right ${Number(o.paid_amount || 0) > tongDonXe(o) ? "text-[#A25F00] font-semibold" : Number(o.paid_amount || 0) < tongDonXe(o) ? "text-danger" : ""}`}>{fmtVND(o.paid_amount || 0)}{Number(o.paid_amount || 0) > tongDonXe(o) && <div className="text-[10.5px]">dư {fmtVND(Number(o.paid_amount) - tongDonXe(o))}</div>}</td><td>{o.end_customer_name || <span className="text-[#8A93A0]">chưa bán</span>}</td>
+                        <td className="text-right">{fmtVND(tongDonXe(o))}{o.extra?.chenh_pin && <div className="text-[10.5px] text-[#A25F00] font-semibold whitespace-nowrap" title="Khách lẻ cuối mua kèm pin — khách buôn trả thêm phần chênh pin, không chiết khấu">🔋 gồm chênh pin {fmtVND(o.extra.chenh_pin.so_tien)}</div>}</td><td className={`text-right ${Number(o.paid_amount || 0) > tongDonXe(o) ? "text-[#A25F00] font-semibold" : Number(o.paid_amount || 0) < tongDonXe(o) ? "text-danger" : ""}`}>{fmtVND(o.paid_amount || 0)}{Number(o.paid_amount || 0) > tongDonXe(o) && <div className="text-[10.5px]">dư {fmtVND(Number(o.paid_amount) - tongDonXe(o))}</div>}</td><td>{o.end_customer_name || <span className="text-[#8A93A0]">chưa bán</span>}</td>
                       </tr>
                     ))}
                     {lo.orders.length === 0 && <tr><td colSpan={7} className="py-3 text-[#8A93A0]">Chưa giao xe nào.</td></tr>}</tbody>

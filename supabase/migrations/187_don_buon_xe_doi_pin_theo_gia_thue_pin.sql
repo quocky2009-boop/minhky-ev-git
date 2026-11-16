@@ -8,3 +8,12 @@
 -- • fn_lo_giao_xe: đơn xe sinh ra khi giao có battery_option = 'Thuê pin' nếu dòng tính theo giá thuê pin (trước đây luôn 'Kèm pin')
 --   => fn_kb_ghi_khach_le_cuoi không còn cộng "bù thuê pin" cho các xe này (vì giá bán buôn đã là giá thuê pin).
 -- Chưa xử lý: khách lẻ cuối chọn KÈM PIN trên xe bán buôn theo giá thuê pin (phần chênh pin chưa tự tính thu thêm khách buôn).
+
+-- Bổ sung 16/11/2026 (đã chạy):
+-- • Đơn BB-2611-0052: 3 dòng EVO LITE chưa giao chuyển sang giá thuê pin (18.900.000 -> 14.300.000, gia_theo = 'THUE_PIN').
+-- • CHÊNH PIN — fn_kb_ghi_khach_le_cuoi: xe đổi pin có đơn xe battery_option = 'Thuê pin' (bán buôn theo giá thuê pin) mà khách lẻ cuối
+--   chọn 'Kèm pin' => khách buôn trả thêm nguyên phần chênh (list_price − list_price_thue_pin) × số lượng, KHÔNG hưởng chiết khấu sỉ
+--   (kể cả đơn có giá bán buôn nhập tay). Cách ghi: sale_price += chênh, chiết khấu chuyển sang số tiền cố định (giữ nguyên tiền CK cũ),
+--   lưu giá trị cũ ở sales_orders.extra.chenh_pin {so_tien, moi_xe, sale_price_cu, dt_cu, dv_cu, luc, boi}.
+--   Đổi khách lẻ về 'Thuê pin' => trả đơn về giá cũ và xóa extra.chenh_pin. Gọi lại nhiều lần không cộng trùng.
+--   Hàm trả thêm khóa 'chenh_pin' trong kết quả.
