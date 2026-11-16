@@ -3,7 +3,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useCatalog, useToast } from "@/lib/useData";
-import { printDonBuon, printBienBanGiaoXe, printBaoGiaBuon } from "@/lib/printBanBuon";
+import { printDonBuon, printBienBanGiaoXe } from "@/lib/printBanBuon";
 import { Badge, Toast, KPI, Field, MoneyInput, VehicleSearch, LocSearch, SearchPicker, MultiCheck, Pager, pageSlice, pageClamp, useSortable, Th, LocGon } from "@/components/ui";
 import { QuickDates, AmountFilter, SavedFilters, TongLoc, trongKhoang } from "@/components/FinFilters";
 import BankOptions from "@/components/BankOptions";
@@ -13,6 +13,9 @@ import { fmtVND, fmtDate, fmtTime, errMsg, downloadXLSX } from "@/lib/format";
 const TT_TONE = { "Chờ giao": "amber", "Đang giao": "blue", "Đã giao đủ": "green", "Đã hủy": "dark" };
 const homNay = () => new Date().toLocaleDateString("sv-SE");
 const coGiaFix = (l) => l.gia_ban !== "" && l.gia_ban !== null && l.gia_ban !== undefined;
+// Xe doi pin VinFast co gia thue pin: don ban buon mac dinh tinh CK si tu gia niem yet THUE PIN (khop voi _lo_gia_niem_yet tren may chu)
+const giaNY = (xe) => (xe && xe.model_pin === "Xe đổi pin" && /vinfast/i.test(xe.brand || "") && Number(xe.list_price_thue_pin) > 0
+  ? { gia: Number(xe.list_price_thue_pin), theo: "THUE_PIN" } : { gia: Number(xe?.list_price) || 0, theo: "KEM_PIN" });
 const donGia = (l) => (coGiaFix(l) ? Number(l.gia_ban) || 0 : (Number(l.gia_niem_yet) || 0) - Math.round((Number(l.gia_niem_yet) || 0) * (Number(l.ck_pct) || 0) / 100));
 const tienDong = (l) => (Number(l.qty) || 0) * donGia(l);
 // tong tien 1 don xe (giong _tong_don tren server, khong tinh hang kem)
@@ -101,7 +104,7 @@ function BanBuonInner() {
       const xe = vehicles.find((x) => x.id === v);
       let pct = "";
       if (form.customer_id) { const { data } = await supabase.rpc("fn_ck_si_tra", { p_customer: Number(form.customer_id), p_vehicle_id: v, p_ngay: form.ngay_chot || null }); if (data !== null && data !== undefined) pct = Number(data); }
-      setForm((f) => ({ ...f, lines: f.lines.map((l, j) => j === i ? { ...l, gia_niem_yet: xe?.list_price || 0, ck_pct: pct } : l) }));
+      setForm((f) => ({ ...f, lines: f.lines.map((l, j) => j === i ? { ...l, gia_niem_yet: giaNY(xe).gia, gia_theo: giaNY(xe).theo, ck_pct: pct } : l) }));
     }
   };
   const apCkTatCa = async (custId, ngay) => {
@@ -318,7 +321,7 @@ function BanBuonInner() {
                 <div key={i} className="grid gap-2 md:grid-cols-[2fr_70px_130px_90px_160px_140px_32px] items-end border-b border-dashed border-[#F0F2F5] pb-2">
                   <div><label className="lbl">Model + màu</label><VehicleSearch vehicles={vehicles} value={l.vehicle_id} onChange={(v) => setLine(i, "vehicle_id", v || "")} /></div>
                   <div><label className="lbl">SL</label><input type="number" min="1" className="inp" value={l.qty} onChange={(e) => setLine(i, "qty", e.target.value)} /></div>
-                  <div><label className="lbl">Giá niêm yết (kèm pin)</label><div className="inp bg-[#F8FAFC]">{fmtVND(l.gia_niem_yet)}</div></div>
+                  <div><label className="lbl">Giá niêm yết {l.gia_theo === "THUE_PIN" ? <b className="text-[#A25F00]">(thuê pin)</b> : vehicles.find((x) => x.id === l.vehicle_id)?.model_pin === "Xe đổi pin" ? "(kèm pin)" : ""}</label><div className="inp bg-[#F8FAFC]">{fmtVND(l.gia_niem_yet)}</div></div>
                   <div><label className="lbl">CK sỉ %</label>{admin
                     ? <input type="number" step="0.1" className="inp" value={l.ck_pct} placeholder="—" onChange={(e) => setLine(i, "ck_pct", e.target.value)} />
                     : <div className={`inp ${l.ck_pct === "" && !coGiaFix(l) ? "text-danger" : "bg-[#F8FAFC]"}`}>{coGiaFix(l) ? "—" : l.ck_pct === "" ? "chưa có" : `${l.ck_pct}%`}</div>}</div>
@@ -335,7 +338,7 @@ function BanBuonInner() {
               <div className="mr-auto text-[13px]">Tổng {form.lines.reduce((s, l) => s + (Number(l.qty) || 0), 0)} xe · <b className="text-brand text-[15px]">Khách buôn cần trả {fmtVND(tongForm)}</b></div>
               <button className="btn-primary" disabled={busy} onClick={luuLo}>{busy ? "Đang lưu…" : "Lưu đơn"}</button>
             </div>
-            <div className="text-[11.5px] text-[#8A93A0] mt-1">CK sỉ tự lấy từ Bảng chiết khấu sỉ (Khách buôn › Bảng chiết khấu sỉ) theo khách, model và ngày chốt. Nhập “Giá bán buôn/xe” để bán theo giá cố định (VD xe TAILG) — khi có giá này thì không tính % CK; xóa trống để quay lại tính theo %.{admin ? " Bạn được quyền sửa % và giá trực tiếp trên đơn." : " Cần quyền “Sửa % CK sỉ trên đơn bán buôn” để sửa % / giá trực tiếp."}</div>
+            <div className="text-[11.5px] text-[#8A93A0] mt-1">CK sỉ tự lấy từ Bảng chiết khấu sỉ (Khách buôn › Bảng chiết khấu sỉ) theo khách, model và ngày chốt. Xe đổi pin VinFast: giá niêm yết và CK sỉ tính theo <b>giá Thuê pin</b>. Nhập “Giá bán buôn/xe” để bán theo giá cố định (VD xe TAILG) — khi có giá này thì không tính % CK; xóa trống để quay lại tính theo %.{admin ? " Bạn được quyền sửa % và giá trực tiếp trên đơn." : " Cần quyền “Sửa % CK sỉ trên đơn bán buôn” để sửa % / giá trực tiếp."}</div>
           </div>
         </>
       )}
@@ -352,7 +355,6 @@ function BanBuonInner() {
               <span className="text-[13px] text-[#5A6572]">{h.customer_name} · chốt {fmtDate(h.ngay_chot)} · {h.created_by_name}</span>
               <div className="ml-auto flex gap-2 flex-wrap">
                 {!huy && h.con_phai_tra > 0 && <button className="btn-ok !text-xs" onClick={() => moThu(h)}>💵 Thu tiền ({fmtVND(h.con_phai_tra)})</button>}
-                {!huy && lo.orders.filter((o) => !["Đã hủy", "Đã trả hàng"].includes(o.status)).length === 0 && <button className="btn-ghost !text-xs" title="In báo giá gửi khách buôn (khi chưa giao xe)" onClick={() => printBaoGiaBuon({ supabase, lo, vehicles, locations, settings: settings || {}, notify })}>🖨 In báo giá</button>}
                 <button className="btn-ghost !text-xs" title="Xem in / in đơn bán buôn (không cần số khung)" onClick={() => printDonBuon({ supabase, lo, vehicles, locations, settings: settings || {}, notify })}>🖨 In đơn</button>
                 {(() => {
                   const giao = lo.orders.filter((o) => !["Đã hủy", "Đã trả hàng"].includes(o.status));
@@ -426,7 +428,7 @@ function BanBuonInner() {
                           <th className="px-1.5 text-right">Tiền niêm yết</th><th className="px-1.5 text-right">Tổng tiền CK</th><th className="px-1.5 text-right">Thành tiền</th></tr></thead>
                         <tbody>{rows.map(({ d, gn, dgx, ckx, g }, i) => (
                           <tr key={d.id} className="border-b border-dashed border-[#F0F2F5]">
-                            <td className="py-2 px-1.5 text-[#8A93A0]">{i + 1}</td><td className="px-1.5 font-semibold">{vName(d.vehicle_id)}{coGiaFix(d) && <div className="text-[10.5px] font-normal text-brand">giá bán buôn cố định</div>}</td>
+                            <td className="py-2 px-1.5 text-[#8A93A0]">{i + 1}</td><td className="px-1.5 font-semibold">{vName(d.vehicle_id)}{coGiaFix(d) && <div className="text-[10.5px] font-normal text-brand">giá bán buôn cố định</div>}{d.gia_theo === "THUE_PIN" && <div className="text-[10.5px] font-normal text-[#A25F00]">giá niêm yết thuê pin</div>}</td>
                             <td className="px-1.5 text-right">{d.qty}</td><td className="px-1.5 text-center"><Badge tone={g >= d.qty ? "green" : "amber"}>{g}/{d.qty}</Badge></td>
                             <td className="px-1.5 text-right">{fmtVND(gn)}</td><td className="px-1.5 text-right">{coGiaFix(d) ? (gn > 0 ? `${Math.round(ckx / gn * 1000) / 10}%` : "—") : `${Number(d.ck_pct)}%`}</td>
                             <td className="px-1.5 text-right text-[#A25F00]">{fmtVND(ckx)}</td><td className="px-1.5 text-right font-semibold">{fmtVND(dgx)}</td>

@@ -1,0 +1,10 @@
+-- 187 (16/11/2026) — Đã chạy trực tiếp trên database.
+-- Đơn bán buôn: xe ĐỔI PIN của VinFast (có giá niêm yết thuê pin) mặc định tính giá niêm yết + CK sỉ theo GIÁ THUÊ PIN.
+-- • don_buon_dong.gia_theo text: 'THUE_PIN' | 'KEM_PIN' | null (dòng cũ = kèm pin).
+-- • _lo_gia_niem_yet(p_vehicle_id, p_theo) -> {gia, theo}: VinFast + model_pin 'Xe đổi pin' + list_price_thue_pin > 0 => giá thuê pin;
+--   p_theo = 'KEM_PIN' để giữ cách tính cũ.
+-- • fn_lo_luu: dòng mới lấy giá theo hàm trên và ghi gia_theo; sửa dòng chưa giao: đổi xe => tính lại theo mặc định mới,
+--   giữ nguyên xe => giữ cách tính của dòng (dòng cũ vẫn kèm pin). Dòng đã giao xe không đổi.
+-- • fn_lo_giao_xe: đơn xe sinh ra khi giao có battery_option = 'Thuê pin' nếu dòng tính theo giá thuê pin (trước đây luôn 'Kèm pin')
+--   => fn_kb_ghi_khach_le_cuoi không còn cộng "bù thuê pin" cho các xe này (vì giá bán buôn đã là giá thuê pin).
+-- Chưa xử lý: khách lẻ cuối chọn KÈM PIN trên xe bán buôn theo giá thuê pin (phần chênh pin chưa tự tính thu thêm khách buôn).
