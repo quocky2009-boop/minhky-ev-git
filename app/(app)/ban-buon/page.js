@@ -3,7 +3,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useCatalog, useToast } from "@/lib/useData";
-import { printDonBuon, printBienBanGiaoXe } from "@/lib/printBanBuon";
+import { printDonBuon, printBienBanGiaoXe, printBaoGiaBuon } from "@/lib/printBanBuon";
 import { Badge, Toast, KPI, Field, MoneyInput, VehicleSearch, LocSearch, SearchPicker, MultiCheck, Pager, pageSlice, pageClamp, useSortable, Th, LocGon } from "@/components/ui";
 import { QuickDates, AmountFilter, SavedFilters, TongLoc, trongKhoang } from "@/components/FinFilters";
 import BankOptions from "@/components/BankOptions";
@@ -352,6 +352,7 @@ function BanBuonInner() {
               <span className="text-[13px] text-[#5A6572]">{h.customer_name} · chốt {fmtDate(h.ngay_chot)} · {h.created_by_name}</span>
               <div className="ml-auto flex gap-2 flex-wrap">
                 {!huy && h.con_phai_tra > 0 && <button className="btn-ok !text-xs" onClick={() => moThu(h)}>💵 Thu tiền ({fmtVND(h.con_phai_tra)})</button>}
+                {!huy && lo.orders.filter((o) => !["Đã hủy", "Đã trả hàng"].includes(o.status)).length === 0 && <button className="btn-ghost !text-xs" title="In báo giá gửi khách buôn (khi chưa giao xe)" onClick={() => printBaoGiaBuon({ supabase, lo, vehicles, locations, settings: settings || {}, notify })}>🖨 In báo giá</button>}
                 <button className="btn-ghost !text-xs" title="Xem in / in đơn bán buôn (không cần số khung)" onClick={() => printDonBuon({ supabase, lo, vehicles, locations, settings: settings || {}, notify })}>🖨 In đơn</button>
                 {(() => {
                   const giao = lo.orders.filter((o) => !["Đã hủy", "Đã trả hàng"].includes(o.status));
