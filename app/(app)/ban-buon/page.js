@@ -458,20 +458,32 @@ function BanBuonInner() {
                             {chon.length > 0 && <div className="flex gap-1 flex-wrap mb-1.5 items-center"><span className="text-[11.5px] font-semibold text-brand">Đã chọn {chon.length}/{con}:</span>
                               {chon.map((f) => { const u = ton.find((x) => x.frame_number === f); return (
                                 <span key={f} className="text-[11px] font-mono rounded px-1.5 py-0.5 bg-brand text-white">{f}{u && <span className="font-sans opacity-80"> · {locName(u.location_code)}</span>} <button className="ml-1 font-bold" onClick={() => toggleXe(d.id, f, con)}>✕</button></span>); })}</div>}
-                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                               <span className="text-[11.5px] text-[#5A6572]">Chọn số khung trong kho (còn {con - chon.length} xe cần chọn) — {ton.length} xe tồn{tk ? `, ${tonLoc.length} khớp` : ""}:</span>
-                              {ton.length > 6 && <input className="inp !py-1 !text-xs !w-56 font-mono" placeholder="Lọc số khung / tên kho…" value={timDong[d.id] || ""} onChange={(e) => setTimDong((m) => ({ ...m, [d.id]: e.target.value }))} />}
+                              {ton.length > 0 && <input className="inp !py-1 !text-xs !w-56 max-md:!w-full font-mono" placeholder="Tìm số khung / tên kho…" value={timDong[d.id] || ""} onChange={(e) => setTimDong((m) => ({ ...m, [d.id]: e.target.value }))} />}
                             </div>
-                            <div className="flex gap-1 flex-wrap max-h-40 overflow-y-auto">
-                              {tonLoc.map((u) => (
-                                <button key={u.frame_number} type="button" onClick={() => toggleXe(d.id, u.frame_number, con)}
-                                  className={`text-[11px] font-mono rounded px-1.5 py-0.5 border ${chon.includes(u.frame_number) ? "bg-brand text-white border-brand" : "bg-[#F3F5F8] border-transparent"}`}>
-                                  {u.frame_number} <span className="font-sans opacity-75">· {locName(u.location_code)}</span>
-                                </button>
-                              ))}
-                              {ton.length === 0 && <span className="text-[12px] text-danger">Hết tồn model này.</span>}
-                              {ton.length > 0 && tonLoc.length === 0 && tk && <span className="text-[12px] text-[#8A93A0]">Không có số khung khớp “{timDong[d.id]}”.</span>}
-                            </div>
+                            {ton.length === 0 ? <div className="text-[12px] text-danger">Hết tồn model này.</div> : (
+                              <div className="overflow-auto max-h-64 border border-[#E6EAEF] rounded-lg">
+                                <table className="w-full border-collapse text-[12.5px] whitespace-nowrap">
+                                  <thead className="sticky top-0 z-10"><tr className="bg-[#F3F5F8] text-[11px] text-[#5A6572] uppercase text-left">
+                                    <th className="py-1.5 px-2 w-8"></th><th className="px-2">Số khung</th><th className="px-2">Kho / vị trí</th><th className="px-2">Ngày nhập</th><th className="px-2 text-right">Số ngày tồn</th></tr></thead>
+                                  <tbody>{tonLoc.map((u) => {
+                                    const da = chon.includes(u.frame_number); const het = !da && chon.length >= con;
+                                    const tuoi = u.imported_at ? Math.max(0, Math.floor((Date.now() - new Date(u.imported_at).getTime()) / 86400000)) : null;
+                                    return (
+                                      <tr key={u.frame_number} onClick={() => !het && toggleXe(d.id, u.frame_number, con)}
+                                        className={`border-t border-[#F0F2F5] ${da ? "bg-[#EAF2FF]" : het ? "opacity-50" : "cursor-pointer hover:bg-[#F8FAFC]"}`}>
+                                        <td className="py-1.5 px-2"><input type="checkbox" className="w-4 h-4 cursor-pointer" checked={da} disabled={het} readOnly /></td>
+                                        <td className="px-2 font-mono font-semibold">{u.frame_number}</td>
+                                        <td className="px-2">{locName(u.location_code)}</td>
+                                        <td className="px-2">{u.imported_at ? fmtDate(u.imported_at) : "—"}</td>
+                                        <td className="px-2 text-right"><b className={tuoi > 90 ? "text-danger" : tuoi > 60 ? "text-[#C2410C]" : tuoi > 30 ? "text-[#A25F00]" : ""}>{tuoi ?? "—"}</b></td>
+                                      </tr>);
+                                  })}
+                                  {tonLoc.length === 0 && <tr><td colSpan={5} className="py-2 px-2 text-[#8A93A0]">Không có số khung khớp “{timDong[d.id]}”.</td></tr>}
+                                  </tbody>
+                                </table>
+                              </div>)}
                           </div>
                         )}
                       </div>
